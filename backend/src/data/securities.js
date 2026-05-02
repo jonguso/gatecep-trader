@@ -1,0 +1,42 @@
+export const SECURITIES = [
+  { symbol: "SCOM", name: "Safaricom PLC", sector: "Telecommunication" },
+  { symbol: "EQTY", name: "Equity Group Holdings PLC", sector: "Banking" },
+  { symbol: "KCB", name: "KCB Group PLC", sector: "Banking" },
+  { symbol: "EABL", name: "East African Breweries PLC", sector: "Manufacturing" },
+  { symbol: "COOP", name: "Co-operative Bank of Kenya", sector: "Banking" },
+  { symbol: "ABSA", name: "Absa Bank Kenya PLC", sector: "Banking" },
+  { symbol: "NCBA", name: "NCBA Group PLC", sector: "Banking" },
+  { symbol: "SCBK", name: "Standard Chartered Bank Kenya", sector: "Banking" },
+  { symbol: "BAT", name: "BAT Kenya PLC", sector: "Manufacturing" },
+  { symbol: "BAMB", name: "Bamburi Cement PLC", sector: "Construction" },
+  { symbol: "KEGN", name: "KenGen PLC", sector: "Energy" },
+  { symbol: "KPLC", name: "Kenya Power PLC", sector: "Energy" },
+  { symbol: "JUB", name: "Jubilee Holdings Ltd", sector: "Insurance" },
+  { symbol: "BRIT", name: "Britam Holdings PLC", sector: "Insurance" },
+  { symbol: "NSE", name: "Nairobi Securities Exchange PLC", sector: "Investment Services" },
+  { symbol: "CTUM", name: "Centum Investment Company PLC", sector: "Investment" },
+  { symbol: "NMG", name: "Nation Media Group PLC", sector: "Commercial" },
+  { symbol: "KQ", name: "Kenya Airways PLC", sector: "Commercial" },
+  { symbol: "TPSE", name: "TPS Eastern Africa PLC", sector: "Commercial" },
+  { symbol: "TOTL", name: "TotalEnergies Marketing Kenya PLC", sector: "Energy" },
+  { symbol: "KUKZ", name: "Kakuzi PLC", sector: "Agricultural" },
+  { symbol: "SASN", name: "Sasini PLC", sector: "Agricultural" },
+  { symbol: "WTK", name: "Williamson Tea Kenya PLC", sector: "Agricultural" },
+  { symbol: "LIMT", name: "Limuru Tea PLC", sector: "Agricultural" },
+  { symbol: "BOC", name: "BOC Kenya PLC", sector: "Manufacturing" },
+  { symbol: "CARB", name: "Carbacid Investments PLC", sector: "Manufacturing" },
+  { symbol: "UNGA", name: "Unga Group PLC", sector: "Manufacturing" },
+  { symbol: "CIC", name: "CIC Insurance Group Ltd", sector: "Insurance" },
+  { symbol: "KNRE", name: "Kenya Reinsurance Corp", sector: "Insurance" },
+  { symbol: "DTK", name: "Diamond Trust Bank Kenya", sector: "Banking" },
+  { symbol: "IMH", name: "I&M Group PLC", sector: "Banking" }
+];
+
+export const STARTING_PRICES = {
+  SCOM: 15.0, EQTY: 42.5, KCB: 38.75, EABL: 155.0, COOP: 31.3,
+  ABSA: 14.2, NCBA: 46.0, SCBK: 210.0, BAT: 410.0, BAMB: 38.5,
+  KEGN: 2.45, KPLC: 1.85, JUB: 185.0, BRIT: 5.6, NSE: 7.2,
+  CTUM: 8.9, NMG: 20.5, KQ: 3.8, TPSE: 15.5, TOTL: 22.5,
+  KUKZ: 420.0, SASN: 19.6, WTK: 230.0, LIMT: 380.0, BOC: 80.0,
+  CARB: 16.0, UNGA: 17.5, CIC: 2.1, KNRE: 1.9, DTK: 62.0, IMH: 18.3
+};

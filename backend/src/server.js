@@ -1,0 +1,41 @@
+import dotenv from "dotenv";
+dotenv.config();
+import express from "express";
+import http from "http";
+import { WebSocketServer } from "ws";
+import cors from "cors";
+import { handleOrder, getOrders, getAudit } from "./routes/orders.js";
+import { handlePreview } from "./routes/preview.js";
+import { createUser, getUsers, depositCash, getAccount, getPortfolio } from "./routes/accounts.js";
+import { getRecommendation, handleChat } from "./routes/ai.js";
+import { voiceUploadMiddleware, handleVoiceCoach } from "./routes/voice.js";
+import { getSecurities, getPrices, getSinglePrice } from "./routes/market.js";
+import { startMarketFeed } from "./ws/market.js";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get("/", (req, res) => res.json({ message: "GATECEP Trader terminal backend running" }));
+app.get("/securities", getSecurities);
+app.get("/prices", getPrices);
+app.get("/prices/:symbol", getSinglePrice);
+app.get("/users", getUsers);
+app.post("/users", createUser);
+app.get("/account/:userId", getAccount);
+app.get("/portfolio/:userId", getPortfolio);
+app.post("/deposit", depositCash);
+app.post("/order", handleOrder);
+app.get("/orders", getOrders);
+app.get("/audit", getAudit);
+app.post("/preview", handlePreview);
+app.get("/recommendation/:symbol/:userId", getRecommendation);
+app.post("/ai/chat", handleChat);
+app.post("/voice/coach-g", voiceUploadMiddleware, handleVoiceCoach);
+
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+global.clients = [];
+wss.on("connection", ws => { global.clients.push(ws); ws.on("close", () => { global.clients = global.clients.filter(c => c !== ws); }); });
+startMarketFeed();
+server.listen(4000, () => console.log("GATECEP Trader terminal backend running on http://localhost:4000"));
