@@ -10,8 +10,6 @@
     "serve": "^14.2.6"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "serve": "serve -s build"
-  }
+  "start": "react-scripts start",
+  "build": "react-scripts build"
 }
