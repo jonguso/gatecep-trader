@@ -31,7 +31,9 @@ export default function App() {
   useEffect(() => { load(); }, [userId, symbol]);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:4000");
+    const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
+const WS_URL = API_URL.replace("https://", "wss://").replace("http://", "ws://");
+const ws = new WebSocket(WS_URL);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === "price") setPrices(msg.data.prices);
