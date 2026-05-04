@@ -1,4 +1,6 @@
-import { refreshPublicDelayedPrices, latestPrices, priceMeta } from "../services/publicMarketData.js";
+import { refreshPrices, latestPrices } from "../services/marketData.js";
+import { updateCandlesFromPrice } from "../routes/candles.js";
+
 export { latestPrices };
 
 export function broadcast(type, data) {
@@ -8,7 +10,8 @@ export function broadcast(type, data) {
 
 export function startMarketFeed() {
   setInterval(async () => {
-    await refreshPublicDelayedPrices();
-    broadcast("price", { prices: latestPrices, meta: priceMeta });
+    await refreshPrices();
+    for (const [symbol, price] of Object.entries(latestPrices)) updateCandlesFromPrice(symbol, price);
+    broadcast("price", { prices: latestPrices });
   }, 3000);
 }

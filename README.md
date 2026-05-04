@@ -1,41 +1,56 @@
-# GATECEP Trader Terminal UI
+# GATECEP Multi-Broker Phase 2
 
-Broker-terminal style update inspired by common online trading workflows.
+This package updates the platform toward the myStocks-style model:
 
-Includes:
-- Dashboard
-- Market Watch
-- Order Entry
-- Orders / Order Report
-- Portfolio Valuation
-- Available Funds
-- Reports / Audit Log
-- Risk Management
-- Coach G
-- Multi-symbol delayed/demo pricing
-- Per-symbol order book and matching engine
+- Customers can choose/connect a broker
+- GATECEP acts as AI trading companion and broker connector
+- Broker marketplace
+- Broker account linking
+- Broker-aware Coach G recommendations
+- Broker-specific order routing
+- Mock broker remains active for safe testing
 
-## Run backend
+## Backend
 
 ```bash
 cd backend
-copy .env.example .env
+cp .env.example .env
 npm install
 npm start
 ```
 
-## Run frontend
+## Mobile
 
 ```bash
-cd frontend
+cd mobile
 npm install
-npm start
+npx expo start -c
 ```
 
-Open:
+Edit mobile API URL:
 
-```txt
-http://localhost:3000
+```text
+mobile/src/api.js
 ```
 
-This is a simulator, not connected to a licensed broker or live NSE execution.
+## Key backend endpoints
+
+```text
+GET  /brokers
+GET  /brokers/links?userId=u1
+POST /brokers/link
+POST /brokers/select
+POST /order
+POST /ai/chat
+GET  /recommendation/:symbol/:userId
+```
+
+## Product positioning
+
+GATECEP is not the broker. GATECEP is:
+
+```text
+AI stock coach + broker connector + investor onboarding layer
+```
+
+Execution should go through the customer’s selected licensed broker.

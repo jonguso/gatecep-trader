@@ -1,1 +1,0 @@
-Frontend package placeholder. If download failed earlier, ask to regenerate full frontend files.

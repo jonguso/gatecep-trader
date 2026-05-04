@@ -1,10 +1,6 @@
 import { SECURITIES } from "../data/securities.js";
-import { getAllPrices, priceMeta, refreshPublicDelayedPrices, latestPrices } from "../services/publicMarketData.js";
+import { getAllPrices, getMarketSummary, refreshPrices } from "../services/marketData.js";
 
 export function getSecurities(req, res) { res.json(SECURITIES); }
-export async function getPrices(req, res) { await refreshPublicDelayedPrices(); res.json({ meta: priceMeta, data: getAllPrices() }); }
-export function getSinglePrice(req, res) {
-  const symbol = String(req.params.symbol).toUpperCase();
-  if (!latestPrices[symbol]) return res.status(404).json({ error: "Symbol not found" });
-  res.json({ symbol, price: latestPrices[symbol], meta: priceMeta });
-}
+export async function getPrices(req, res) { await refreshPrices(); res.json({ data: getAllPrices() }); }
+export function getSummary(req, res) { res.json(getMarketSummary()); }

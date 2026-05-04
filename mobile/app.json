@@ -1,1 +1,10 @@
-{"expo":{"name":"GATECEP AI Coach","slug":"gatecep-mobile","version":"1.0.0","orientation":"portrait","scheme":"gatecep","userInterfaceStyle":"dark"}}
+{
+  "expo": {
+    "name": "GATECEP Multi-Broker",
+    "slug": "gatecep-mobile-multibroker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "gatecep",
+    "userInterfaceStyle": "dark"
+  }
+}
