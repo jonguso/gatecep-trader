@@ -1,24 +1,58 @@
 import { useState } from "react";
-import { ScrollView, Text, Pressable, StyleSheet, View } from "react-native";
+import { ScrollView, Text, StyleSheet } from "react-native";
 import API from "../../src/api";
-import { Card, RiskDisclaimer } from "../../src/components";
-import { COLORS } from "../../src/config";
+import { Page, Header, Segments, Card, CTA, InfoRow, Disclaimer } from "../../src/components/ProTradingUI";
+import { P } from "../../src/theme/proTheme";
 
 export default function Coach() {
   const [symbol, setSymbol] = useState("SCOM");
-  const [answer, setAnswer] = useState("");
   const [rec, setRec] = useState(null);
-  const ask = async () => { const res = await API.post("/ai/chat", { userId:"u1", symbol }); setAnswer(res.data.answer); setRec(res.data.recommendation); };
+  const [loading, setLoading] = useState(false);
+
+  const ask = async () => {
+    setLoading(true);
+    try {
+      const res = await API.post("/ai/chat", { userId: "u1", symbol });
+      setRec(res.data.recommendation || { action: "HOLD", confidence: 50, message: res.data.answer });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <ScrollView style={s.page}>
-      <Text style={s.title}>Coach G</Text>
-      <Text style={s.subtitle}>Broker-aware AI decision support.</Text>
-      <View style={s.symbols}>{["SCOM","KCB","EQTY","EABL","COOP"].map(x => <Pressable key={x} onPress={() => setSymbol(x)} style={[s.chip, symbol === x && s.activeChip]}><Text style={s.chipText}>{x}</Text></Pressable>)}</View>
-      <Pressable style={s.button} onPress={ask}><Text style={s.buttonText}>Should I buy {symbol}?</Text></Pressable>
-      {!!answer && <Card title="Coach G Recommendation"><Text style={s.action}>{rec?.action} - {rec?.confidence}% confidence</Text><Text style={s.white}>{answer}</Text><Text style={s.muted}>Broker: {rec?.broker}</Text></Card>}
-      <RiskDisclaimer />
-    </ScrollView>
+    <Page>
+      <Header title="Coach G" subtitle="AI-powered broker-agnostic trading assistant" />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Segments tabs={["SCOM", "KCB", "EQTY", "EABL", "COOP"]} active={symbol} onChange={setSymbol} />
+
+        <Card>
+          <Text style={styles.question}>Should I buy {symbol}?</Text>
+          <Text style={styles.body}>
+            Coach G checks broker status, fees, risk profile, liquidity, and portfolio exposure before giving a Buy/Sell/Hold signal.
+          </Text>
+        </Card>
+
+        <CTA onPress={ask}>{loading ? "Analyzing..." : "Ask Coach G"}</CTA>
+
+        {rec && (
+          <Card>
+            <Text style={styles.signal}>{rec.action || "HOLD"}</Text>
+            <Text style={styles.confidence}>{rec.confidence || 0}% confidence</Text>
+            <Text style={styles.body}>{rec.message}</Text>
+            <InfoRow label="Broker" value={rec.broker || "Selected Broker"} />
+            <InfoRow label="Exposure" value={`${rec.exposurePercent || 0}%`} />
+          </Card>
+        )}
+
+        <Disclaimer />
+      </ScrollView>
+    </Page>
   );
 }
-const s = StyleSheet.create({page:{flex:1,backgroundColor:COLORS.bg,padding:14},title:{color:COLORS.gold,fontSize:26,fontWeight:"900"},subtitle:{color:COLORS.muted,marginBottom:14},symbols:{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:12},chip:{backgroundColor:COLORS.card,padding:8,borderRadius:18,borderWidth:1,borderColor:COLORS.border},activeChip:{borderColor:COLORS.gold},chipText:{color:COLORS.white,fontWeight:"800"},button:{backgroundColor:COLORS.gold,padding:14,borderRadius:10,marginBottom:12},buttonText:{color:"#111827",textAlign:"center",fontWeight:"900"},action:{color:COLORS.gold,fontSize:20,fontWeight:"900",marginBottom:8},white:{color:COLORS.white,lineHeight:22},muted:{color:COLORS.muted,marginTop:8}});
+
+const styles = StyleSheet.create({
+  question: { color: P.color.text, fontSize: 20, fontWeight: "900", marginBottom: 8 },
+  body: { color: P.color.muted, lineHeight: 20 },
+  signal: { color: P.color.blue, fontSize: 30, fontWeight: "900" },
+  confidence: { color: P.color.text, fontWeight: "800", marginBottom: 10 }
+});

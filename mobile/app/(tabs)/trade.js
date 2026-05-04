@@ -1,122 +1,106 @@
 import { useEffect, useState } from "react";
-import { ScrollView, View, Text, TextInput, StyleSheet } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { ScrollView, Text, TextInput, StyleSheet } from "react-native";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback } from "react";
 import API from "../../src/api";
-import { Card, Chip, PrimaryButton, RiskDisclaimer } from "../../src/components/NSEUI";
-import { TOKENS } from "../../src/theme/tokens";
-import { formatKES, orderReference } from "../../src/utils/format";
+import { Page, Header, Segments, Card, CTA, InfoRow, ActivityRow, Disclaimer } from "../../src/components/ProTradingUI";
+import { P } from "../../src/theme/proTheme";
+import { kes, ref } from "../../src/utils/money";
 
 export default function Trade() {
   const params = useLocalSearchParams();
   const [symbol, setSymbol] = useState(params.symbol || "SCOM");
-  const [side, setSide] = useState("BUY");
+  const [side, setSide] = useState(params.side || "BUY");
   const [orderType, setOrderType] = useState("Limit");
   const [price, setPrice] = useState("15");
   const [qty, setQty] = useState("100");
-  const [result, setResult] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [account, setAccount] = useState(null);
+  const [confirmation, setConfirmation] = useState(null);
 
-  useEffect(() => { if (params.symbol) setSymbol(params.symbol); }, [params.symbol]);
+  const load = async () => {
+    const [o, a] = await Promise.all([
+      API.get("/orders?userId=u1"),
+      API.get("/account/u1")
+    ]);
+    setOrders(o.data || []);
+    setAccount(a.data);
+  };
+
+  useEffect(() => { if (params.symbol) setSymbol(params.symbol); if (params.side) setSide(params.side); }, [params.symbol, params.side]);
+  useEffect(() => { load().catch(() => {}); }, []);
+  useFocusEffect(useCallback(() => { load().catch(() => {}); }, []));
 
   const notional = Number(price || 0) * Number(qty || 0);
-  const nseLevy = notional * TOKENS.fees.nseLevy;
-  const brokerFee = notional * TOKENS.fees.brokerCommission;
-  const cdsFee = side === "BUY" ? notional * TOKENS.fees.cdsFee : 0;
-  const cdscLevy = notional * TOKENS.fees.cdscLevy;
-  const total = side === "BUY" ? notional + nseLevy + brokerFee + cdsFee + cdscLevy : notional - nseLevy - brokerFee - cdscLevy;
+  const brokerFee = notional * 0.015;
+  const nseLevy = notional * 0.0012;
+  const cdsFee = side === "BUY" ? notional * 0.0006 : 0;
+  const total = side === "BUY" ? notional + brokerFee + nseLevy + cdsFee : notional - brokerFee - nseLevy;
 
   const submit = async () => {
     try {
       const res = await API.post("/order", { userId: "u1", symbol, side, price: Number(price), qty: Number(qty) });
-      setResult({ ...res.data, ref: orderReference(symbol) });
+      setConfirmation({ ...res.data, ref: ref(symbol) });
+      await load();
     } catch (e) {
       alert(e.response?.data?.error || "Order failed");
     }
   };
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Buy / Sell</Text>
-      <Text style={styles.subtitle}>Review fees and settlement before sending to your broker.</Text>
-
-      <Card>
-        <View style={styles.segment}>
-          {["SCOM", "KCB", "EQTY", "EABL", "COOP"].map(x => (
-            <Chip key={x} label={x} active={symbol === x} onPress={() => setSymbol(x)} />
-          ))}
-        </View>
-
-        <View style={styles.segment}>
-          <Chip label="BUY" active={side === "BUY"} tone="up" onPress={() => setSide("BUY")} />
-          <Chip label="SELL" active={side === "SELL"} tone="down" onPress={() => setSide("SELL")} />
-        </View>
-
-        <View style={styles.segment}>
-          {["Market", "Limit", "Stop"].map(x => <Chip key={x} label={x} active={orderType === x} onPress={() => setOrderType(x)} />)}
-        </View>
-
-        <Text style={styles.label}>Limit Price</Text>
-        <TextInput value={price} onChangeText={setPrice} keyboardType="numeric" style={styles.input} />
-
-        <Text style={styles.label}>Quantity</Text>
-        <TextInput value={qty} onChangeText={setQty} keyboardType="numeric" style={styles.input} />
-      </Card>
-
-      <Card caption="Fee Summary" title="Estimated Total">
-        <FeeRow label="Subtotal" value={formatKES(notional)} />
-        <FeeRow label="NSE levy 0.12%" value={formatKES(nseLevy)} />
-        <FeeRow label="Broker 1.5%" value={formatKES(brokerFee)} />
-        {side === "BUY" && <FeeRow label="CDS fee 0.06%" value={formatKES(cdsFee)} />}
-        <FeeRow label="CDSC levy 0.05%" value={formatKES(cdscLevy)} />
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>{side === "BUY" ? "Amount Payable" : "Estimated Proceeds"}</Text>
-          <Text style={styles.totalValue}>{formatKES(total)}</Text>
-        </View>
-        <Text style={styles.settlement}>Settlement: {TOKENS.settlement.cycle} · CDS credit after matching and clearing</Text>
-      </Card>
-
-      <PrimaryButton tone={side === "BUY" ? "buy" : "sell"} onPress={submit}>
-        Confirm {side} Order
-      </PrimaryButton>
-
-      {result && (
-        <Card caption="Order Confirmation" title="Order Sent">
-          <Text style={styles.success}>✓ Reference {result.ref}</Text>
-          <Text style={styles.body}>{result.message || "Order routed to selected broker."}</Text>
+    <Page>
+      <Header title="Trade" subtitle="Activities, open orders, and order ticket" />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Card>
+          <Text style={styles.section}>Trade Activity</Text>
+          {orders.length === 0 && <Text style={styles.empty}>No activity yet. Place your first demo order.</Text>}
+          {orders.slice(0, 5).map(o => <ActivityRow key={o.id} item={o} />)}
         </Card>
-      )}
 
-      <RiskDisclaimer />
-    </ScrollView>
+        <Segments tabs={["SCOM", "KCB", "EQTY", "EABL", "COOP"]} active={symbol} onChange={setSymbol} />
+        <Segments tabs={["BUY", "SELL"]} active={side} onChange={setSide} />
+        <Segments tabs={["Market", "Limit", "Stop"]} active={orderType} onChange={setOrderType} />
+
+        <Card>
+          <Text style={styles.section}>Place Trade</Text>
+          <Text style={styles.label}>Price</Text>
+          <TextInput value={price} onChangeText={setPrice} keyboardType="numeric" style={styles.input} />
+          <Text style={styles.label}>Quantity</Text>
+          <TextInput value={qty} onChangeText={setQty} keyboardType="numeric" style={styles.input} />
+        </Card>
+
+        <Card>
+          <Text style={styles.section}>Portfolio Impact</Text>
+          <InfoRow label="Current Equity" value={kes(account?.equity || 0)} />
+          <InfoRow label="Order Value" value={kes(notional)} />
+          <InfoRow label="Broker Fee" value={kes(brokerFee)} />
+          <InfoRow label="NSE Levy" value={kes(nseLevy)} />
+          {side === "BUY" && <InfoRow label="CDS Fee" value={kes(cdsFee)} />}
+          <InfoRow label={side === "BUY" ? "Cash Required" : "Estimated Proceeds"} value={kes(total)} valueTone={side === "BUY" ? undefined : "green"} />
+        </Card>
+
+        <CTA tone={side === "BUY" ? "buy" : "sell"} onPress={submit}>Confirm {side} Order</CTA>
+
+        {confirmation && (
+          <Card>
+            <Text style={styles.success}>✓ Order Sent</Text>
+            <Text style={styles.body}>Reference: {confirmation.ref}</Text>
+            <Text style={styles.body}>{confirmation.message || "Order routed to selected broker."}</Text>
+            <Text style={styles.body}>Portfolio values refresh automatically after execution.</Text>
+          </Card>
+        )}
+
+        <Disclaimer />
+      </ScrollView>
+    </Page>
   );
 }
 
-function FeeRow({ label, value }) {
-  return <View style={styles.feeRow}><Text style={styles.feeLabel}>{label}</Text><Text style={styles.feeValue}>{value}</Text></View>;
-}
-
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: TOKENS.color.bg },
-  content: { padding: TOKENS.spacing.screen, paddingBottom: 32 },
-  title: { ...TOKENS.type.h1, color: TOKENS.color.text },
-  subtitle: { ...TOKENS.type.caption, color: TOKENS.color.textSecondary, marginTop: 4, marginBottom: 14 },
-  segment: { flexDirection: "row", flexWrap: "wrap", marginBottom: 8 },
-  label: { ...TOKENS.type.caption, color: TOKENS.color.textSecondary, marginTop: 8, marginBottom: 4 },
-  input: {
-    height: TOKENS.layout.fieldHeight,
-    backgroundColor: TOKENS.color.bg,
-    color: TOKENS.color.text,
-    borderWidth: 1,
-    borderColor: TOKENS.color.border,
-    borderRadius: TOKENS.radius.md,
-    paddingHorizontal: 12
-  },
-  feeRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
-  feeLabel: { color: TOKENS.color.textSecondary, fontSize: 13 },
-  feeValue: { color: TOKENS.color.text, fontWeight: "700" },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: TOKENS.color.border, paddingTop: 10, marginTop: 6 },
-  totalLabel: { color: TOKENS.color.text, fontWeight: "800" },
-  totalValue: { color: TOKENS.color.brandLight, fontWeight: "900" },
-  settlement: { color: TOKENS.color.textSecondary, fontSize: 11, marginTop: 10 },
-  success: { color: TOKENS.color.up, fontWeight: "900", marginBottom: 8 },
-  body: { color: TOKENS.color.text, lineHeight: 20 }
+  section: { color: P.color.text, fontSize: 18, fontWeight: "900", marginBottom: 8 },
+  empty: { color: P.color.muted, lineHeight: 20 },
+  label: { color: P.color.muted, fontSize: 12, marginBottom: 5, marginTop: 8 },
+  input: { backgroundColor: P.color.bg, borderWidth: 1, borderColor: P.color.border, borderRadius: P.radius.md, minHeight: 46, paddingHorizontal: 12, color: P.color.text, fontWeight: "800" },
+  success: { color: P.color.green, fontSize: 18, fontWeight: "900", marginBottom: 8 },
+  body: { color: P.color.text, lineHeight: 20, marginTop: 4 }
 });

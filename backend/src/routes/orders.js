@@ -4,7 +4,7 @@ import { requireApprovedKyc } from "../services/compliance/KycService.js";
 import { validatePreTradeRisk } from "../services/risk/RiskService.js";
 import { engine } from "../engine/orderBook.js";
 import { getBroker } from "../data/brokers.js";
-import { getUser, getHolding, getUserBrokerLink, state, audit } from "../store/state.js";
+import { getUser, getHolding, getUserBrokerLink, state, audit, applyBuy, applySell } from "../store/state.js";
 import { broadcast } from "../ws/market.js";
 
 export async function handleOrder(req, res) {
@@ -61,11 +61,25 @@ export async function handleOrder(req, res) {
 
     let trades = [];
     if (selectedBrokerId === "mock-broker") {
-      trades = engine.addOrder(order);
-      trades.forEach(t => broadcast("trade", t));
-      broadcast("orderbook", engine.getOrderBook(cleanSymbol));
-      broadcast("account_update", { userId });
-    }
+  if (cleanSide === "BUY") {
+    applyBuy(userId, cleanSymbol, cleanQty, cleanPrice, order.id);
+  } else {
+    applySell(userId, cleanSymbol, cleanQty, cleanPrice, order.id);
+  }
+
+  trades = [{
+    symbol: cleanSymbol,
+    side: cleanSide,
+    price: cleanPrice,
+    qty: cleanQty,
+    userId,
+    brokerId: selectedBrokerId,
+    timestamp: Date.now()
+  }];
+
+  broadcast("trade", trades[0]);
+  broadcast("account_update", { userId });
+}
 
     res.json({ message: "Order routed to selected broker", broker, order, risk, brokerResponse, trades });
   } catch (err) {

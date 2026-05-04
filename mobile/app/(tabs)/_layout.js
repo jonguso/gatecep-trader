@@ -1,16 +1,30 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "../../src/config";
+import { P } from "../../src/theme/proTheme";
 
 export default function TabLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false, tabBarStyle: { backgroundColor: COLORS.bg, borderTopColor: COLORS.border }, tabBarActiveTintColor: COLORS.gold, tabBarInactiveTintColor: COLORS.muted }}>
-      <Tabs.Screen name="dashboard" options={{ title: "Home", tabBarIcon: ({ color }) => <Ionicons name="home" size={20} color={color} /> }} />
-      <Tabs.Screen name="markets" options={{ title: "Markets", tabBarIcon: ({ color }) => <Ionicons name="pulse" size={20} color={color} /> }} />
-      <Tabs.Screen name="brokers" options={{ title: "Brokers", tabBarIcon: ({ color }) => <Ionicons name="business" size={20} color={color} /> }} />
-      <Tabs.Screen name="trade" options={{ title: "Trade", tabBarIcon: ({ color }) => <Ionicons name="stats-chart" size={20} color={color} /> }} />
-      <Tabs.Screen name="coach" options={{ title: "Coach G", tabBarIcon: ({ color }) => <Ionicons name="chatbubble" size={20} color={color} /> }} />
-      <Tabs.Screen name="portfolio" options={{ href: null }} />
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: P.color.surface,
+          borderTopColor: P.color.border,
+          height: 68,
+          paddingTop: 8,
+          paddingBottom: 8
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "800" },
+        tabBarActiveTintColor: P.color.blue,
+        tabBarInactiveTintColor: P.color.muted
+      }}
+    >
+      <Tabs.Screen name="portfolio" options={{ title: "Portfolio", tabBarIcon: ({ color }) => <Ionicons name="briefcase" size={21} color={color} /> }} />
+      <Tabs.Screen name="markets" options={{ title: "Markets", tabBarIcon: ({ color }) => <Ionicons name="trending-up" size={21} color={color} /> }} />
+      <Tabs.Screen name="trade" options={{ title: "Trade", tabBarIcon: ({ color }) => <Ionicons name="swap-horizontal" size={22} color={color} /> }} />
+      <Tabs.Screen name="coach" options={{ title: "Coach G", tabBarIcon: ({ color }) => <Ionicons name="sparkles" size={21} color={color} /> }} />
+      <Tabs.Screen name="dashboard" options={{ href: null }} />
+      <Tabs.Screen name="brokers" options={{ href: null }} />
       <Tabs.Screen name="orders" options={{ href: null }} />
     </Tabs>
   );
