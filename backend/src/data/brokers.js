@@ -1,5 +1,16 @@
 export const BROKERS = [
   {
+    id: "mock-broker",
+    name: "GATECEP Mock Broker",
+    country: "Kenya",
+    status: "ACTIVE_DEMO",
+    supportsApiTrading: true,
+    supportsPortfolioSync: true,
+    accountLinkingMode: "INSTANT_DEMO",
+    fees: { commissionBps: 200, minFee: 50 },
+    notes: "Demo broker used for safe testing only."
+  },
+  {
     id: "aib-axys",
     name: "AIB-AXYS Africa",
     country: "Kenya",
@@ -42,17 +53,6 @@ export const BROKERS = [
     accountLinkingMode: "MANUAL_VERIFICATION",
     fees: { commissionBps: 210, minFee: 100 },
     notes: "Adapter placeholder. Enable after signed API partnership."
-  },
-  {
-    id: "mock-broker",
-    name: "GATECEP Mock Broker",
-    country: "Kenya",
-    status: "ACTIVE_DEMO",
-    supportsApiTrading: true,
-    supportsPortfolioSync: true,
-    accountLinkingMode: "INSTANT_DEMO",
-    fees: { commissionBps: 200, minFee: 50 },
-    notes: "Demo broker used for testing only."
   }
 ];
 

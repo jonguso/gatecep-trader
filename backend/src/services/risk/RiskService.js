@@ -1,9 +1,9 @@
 import { getPortfolioValue } from "../../store/state.js";
-import { latestPrices } from "../marketData.js";
+import { getLatestPrices } from "../marketData/SimulatedDataAdapter.js";
 
 export function validatePreTradeRisk({ user, side, price, qty, broker }) {
   const notional = Number(price) * Number(qty);
-  const portfolio = getPortfolioValue(user.id, latestPrices);
+  const portfolio = getPortfolioValue(user.id, getLatestPrices());
   const holdingsValue = portfolio.reduce((s, h) => s + h.marketValue, 0);
   const equity = user.cash + holdingsValue;
   const commission = Math.max((broker?.fees?.commissionBps || 200) / 10000 * notional, broker?.fees?.minFee || 0);

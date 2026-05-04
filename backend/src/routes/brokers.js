@@ -2,9 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { BROKERS, getBroker } from "../data/brokers.js";
 import { state, getUser, audit } from "../store/state.js";
 
-export function getBrokers(req, res) {
-  res.json(BROKERS);
-}
+export function getBrokers(req, res) { res.json(BROKERS); }
 
 export function getMyBrokerLinks(req, res) {
   const userId = req.query.userId;
@@ -32,7 +30,6 @@ export function linkBroker(req, res) {
   user.selectedBrokerId = brokerId;
   user.brokerCustomerId = brokerCustomerId || user.brokerCustomerId;
   user.cdsAccount = cdsAccount || user.cdsAccount;
-
   audit("BROKER_LINK_REQUESTED", `Linked broker ${broker.name}`, userId, link);
   res.json(link);
 }
@@ -45,5 +42,6 @@ export function selectBroker(req, res) {
   if (!broker) return res.status(404).json({ error: "Broker not found" });
   user.selectedBrokerId = brokerId;
   audit("BROKER_SELECTED", `Selected broker ${broker.name}`, userId);
-  res.json({ user: { ...user, password: undefined }, broker });
+  const { password, ...safeUser } = user;
+  res.json({ user: safeUser, broker });
 }

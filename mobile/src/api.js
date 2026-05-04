@@ -1,7 +1,7 @@
 import axios from "axios";
-
-export const API_URL = "https://gatecep-trader.up.railway.app";
+import { API_URL } from "./config";
 
 export default axios.create({
-  baseURL: API_URL
+  baseURL: API_URL,
+  timeout: 15000
 });

@@ -13,11 +13,6 @@ export class BrokerGateway {
   async placeOrder(order) {
     return this.getAdapter(order.brokerId).placeOrder(order);
   }
-
-  async getBrokerStatus(brokerId) {
-    const broker = getBroker(brokerId);
-    return broker || null;
-  }
 }
 
 export const brokerGateway = new BrokerGateway();

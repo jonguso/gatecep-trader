@@ -1,17 +1,19 @@
-# GATECEP Multi-Broker Phase 2
+# GATECEP Clean Full Package
 
-This package updates the platform toward the myStocks-style model:
+Clean project structure:
 
-- Customers can choose/connect a broker
-- GATECEP acts as AI trading companion and broker connector
-- Broker marketplace
-- Broker account linking
-- Broker-aware Coach G recommendations
-- Broker-specific order routing
-- Mock broker remains active for safe testing
+```text
+gatecep-clean-full-package/
+├── backend/      # Node/Express API, broker routing, onboarding, market data pipeline
+├── frontend/     # React web dashboard
+├── mobile/       # Expo Router mobile app
+├── legal-site/   # Privacy, Terms, Risk Disclosure static site
+└── docs/         # Deployment and product notes
+```
 
-## Backend
+## Quick start
 
+### Backend
 ```bash
 cd backend
 cp .env.example .env
@@ -19,38 +21,34 @@ npm install
 npm start
 ```
 
-## Mobile
+### Frontend
+```bash
+cd frontend
+npm install
+npm start
+```
 
+### Mobile
 ```bash
 cd mobile
 npm install
 npx expo start -c
 ```
 
-Edit mobile API URL:
+### Legal site
+Deploy `legal-site/` to Vercel, Netlify, or GitHub Pages.
+
+## Demo user
 
 ```text
-mobile/src/api.js
+demo@gatecep.local / demo123
 ```
 
-## Key backend endpoints
+## Important
 
-```text
-GET  /brokers
-GET  /brokers/links?userId=u1
-POST /brokers/link
-POST /brokers/select
-POST /order
-POST /ai/chat
-GET  /recommendation/:symbol/:userId
-```
-
-## Product positioning
-
-GATECEP is not the broker. GATECEP is:
-
-```text
-AI stock coach + broker connector + investor onboarding layer
-```
-
-Execution should go through the customer’s selected licensed broker.
+This package is broker-ready and app-store-ready foundation code. It is not live regulated trading software until:
+- broker partnership is signed
+- licensed NSE/vendor data feed is connected
+- KYC and compliance are productionized
+- legal review is completed
+- security review is completed

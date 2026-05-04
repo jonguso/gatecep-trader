@@ -27,6 +27,7 @@ export const state = {
       createdAt: new Date().toISOString()
     }
   ],
+  brokerOnboarding: [],
   portfolios: { u1: {} },
   orderLog: [],
   auditLog: [],
@@ -82,7 +83,6 @@ export function saveHolding(userId, holding) {
 export function applyBuy(userId, symbol, qty, price, reference = "trade") {
   const user = getUser(userId);
   if (!user) throw new Error("User not found");
-
   const cost = qty * price;
   if (user.cash < cost) throw new Error("Insufficient cash");
 
@@ -92,14 +92,12 @@ export function applyBuy(userId, symbol, qty, price, reference = "trade") {
   h.qty = newQty;
   user.cash -= cost;
   saveHolding(userId, h);
-
   ledgerEntry({ userId, type: "SECURITY_BUY", amount: -cost, reference, description: `Bought ${qty} ${symbol} @ ${price}` });
 }
 
 export function applySell(userId, symbol, qty, price, reference = "trade") {
   const user = getUser(userId);
   if (!user) throw new Error("User not found");
-
   const h = getHolding(userId, symbol);
   if (h.qty < qty) throw new Error("Insufficient shares");
 
@@ -109,7 +107,6 @@ export function applySell(userId, symbol, qty, price, reference = "trade") {
   if (h.qty === 0) h.avgPrice = 0;
   user.cash += proceeds;
   saveHolding(userId, h);
-
   ledgerEntry({ userId, type: "SECURITY_SELL", amount: proceeds, reference, description: `Sold ${qty} ${symbol} @ ${price}` });
 }
 

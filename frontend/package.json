@@ -1,6 +1,6 @@
 {
-  "name": "gatecep-professional-frontend",
-  "version": "3.0.0",
+  "name": "gatecep-frontend-clean",
+  "version": "5.0.0",
   "private": true,
   "dependencies": {
     "axios": "^1.6.8",

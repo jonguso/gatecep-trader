@@ -1,7 +1,4 @@
-import { refreshPrices, latestPrices } from "../services/marketData.js";
-import { updateCandlesFromPrice } from "../routes/candles.js";
-
-export { latestPrices };
+import { marketDataGateway } from "../services/marketData/MarketDataGateway.js";
 
 export function broadcast(type, data) {
   const msg = JSON.stringify({ type, data });
@@ -10,8 +7,12 @@ export function broadcast(type, data) {
 
 export function startMarketFeed() {
   setInterval(async () => {
-    await refreshPrices();
-    for (const [symbol, price] of Object.entries(latestPrices)) updateCandlesFromPrice(symbol, price);
-    broadcast("price", { prices: latestPrices });
+    try {
+      const result = await marketDataGateway.getPrices();
+      const prices = Object.fromEntries((result.data || []).map(x => [x.symbol, x.price]));
+      broadcast("price", { prices, provider: result.provider, delayed: result.delayed });
+    } catch {
+      // keep websocket alive
+    }
   }, 3000);
 }

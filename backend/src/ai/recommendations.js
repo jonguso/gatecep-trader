@@ -1,10 +1,10 @@
 import { getBroker } from "../data/brokers.js";
 import { getPortfolioValue } from "../store/state.js";
-import { latestPrices } from "../services/marketData.js";
+import { getLatestPrices } from "../services/marketData/SimulatedDataAdapter.js";
 
 export function generateRecommendation({ symbol = "SCOM", user, brokerId }) {
   const broker = getBroker(brokerId || user?.selectedBrokerId || "mock-broker");
-  const portfolio = getPortfolioValue(user.id, latestPrices);
+  const portfolio = getPortfolioValue(user.id, getLatestPrices());
   const holdingsValue = portfolio.reduce((s, h) => s + h.marketValue, 0);
   const holding = portfolio.find(h => h.symbol === symbol);
   const exposure = holdingsValue > 0 && holding ? holding.marketValue / holdingsValue : 0;

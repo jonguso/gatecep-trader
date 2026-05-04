@@ -1,10 +1,22 @@
 {
   "expo": {
-    "name": "GATECEP Multi-Broker",
-    "slug": "gatecep-mobile-multibroker",
+    "name": "GATECEP AI Coach",
+    "slug": "gatecep-ai-coach",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "gatecep",
-    "userInterfaceStyle": "dark"
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gatecep.aicoach"
+    },
+    "android": {
+      "package": "com.gatecep.aicoach"
+    },
+    "extra": {
+      "apiUrl": "https://gatecep-trader.up.railway.app",
+      "privacyUrl": "https://gatecep.com/privacy",
+      "termsUrl": "https://gatecep.com/terms"
+    }
   }
 }

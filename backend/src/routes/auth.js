@@ -9,5 +9,6 @@ export function login(req, res) {
   if (!user || user.password !== password) return res.status(401).json({ error: "Invalid credentials" });
   audit("LOGIN", `Login for ${email}`, user.id);
   const accessToken = jwt.sign({ sub: user.id, role: user.role }, secret, { expiresIn: "2h" });
-  res.json({ accessToken, user: { ...user, password: undefined } });
+  const { password: _password, ...safe } = user;
+  res.json({ accessToken, user: safe });
 }
