@@ -1,42 +1,122 @@
 import { useEffect, useState } from "react";
-import { ScrollView, Text, TextInput, Pressable, StyleSheet, View } from "react-native";
+import { ScrollView, View, Text, TextInput, StyleSheet } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import API from "../../src/api";
-import { Card, RiskDisclaimer } from "../../src/components";
-import { COLORS } from "../../src/config";
+import { Card, Chip, PrimaryButton, RiskDisclaimer } from "../../src/components/NSEUI";
+import { TOKENS } from "../../src/theme/tokens";
+import { formatKES, orderReference } from "../../src/utils/format";
 
 export default function Trade() {
   const params = useLocalSearchParams();
   const [symbol, setSymbol] = useState(params.symbol || "SCOM");
   const [side, setSide] = useState("BUY");
+  const [orderType, setOrderType] = useState("Limit");
   const [price, setPrice] = useState("15");
   const [qty, setQty] = useState("100");
   const [result, setResult] = useState(null);
 
   useEffect(() => { if (params.symbol) setSymbol(params.symbol); }, [params.symbol]);
 
+  const notional = Number(price || 0) * Number(qty || 0);
+  const nseLevy = notional * TOKENS.fees.nseLevy;
+  const brokerFee = notional * TOKENS.fees.brokerCommission;
+  const cdsFee = side === "BUY" ? notional * TOKENS.fees.cdsFee : 0;
+  const cdscLevy = notional * TOKENS.fees.cdscLevy;
+  const total = side === "BUY" ? notional + nseLevy + brokerFee + cdsFee + cdscLevy : notional - nseLevy - brokerFee - cdscLevy;
+
   const submit = async () => {
     try {
-      const res = await API.post("/order", { userId:"u1", symbol, side, price:Number(price), qty:Number(qty) });
-      setResult(res.data);
-    } catch(e) { alert(e.response?.data?.error || "Order failed"); }
+      const res = await API.post("/order", { userId: "u1", symbol, side, price: Number(price), qty: Number(qty) });
+      setResult({ ...res.data, ref: orderReference(symbol) });
+    } catch (e) {
+      alert(e.response?.data?.error || "Order failed");
+    }
   };
 
   return (
-    <ScrollView style={s.page}>
-      <Text style={s.title}>Broker-Aware Trade</Text>
-      <View style={s.symbols}>{["SCOM","KCB","EQTY","EABL","COOP"].map(x => <Pressable key={x} onPress={() => setSymbol(x)} style={[s.chip, symbol === x && s.activeChip]}><Text style={s.chipText}>{x}</Text></Pressable>)}</View>
-      <Card title="Order Ticket">
-        <Text style={s.label}>Symbol</Text><TextInput style={s.input} value={symbol} onChangeText={setSymbol}/>
-        <View style={s.row}><Pressable style={side==="BUY"?s.buy:s.btn} onPress={() => setSide("BUY")}><Text style={s.btnText}>BUY</Text></Pressable><Pressable style={side==="SELL"?s.sell:s.btn} onPress={() => setSide("SELL")}><Text style={s.btnText}>SELL</Text></Pressable></View>
-        <Text style={s.label}>Limit Price</Text><TextInput style={s.input} value={price} onChangeText={setPrice} keyboardType="numeric"/>
-        <Text style={s.label}>Quantity</Text><TextInput style={s.input} value={qty} onChangeText={setQty} keyboardType="numeric"/>
-        <Text style={s.value}>Estimated value: KES {(Number(price) * Number(qty || 0)).toFixed(2)}</Text>
-        <Pressable style={side==="BUY"?s.buySubmit:s.sellSubmit} onPress={submit}><Text style={s.btnText}>Submit to Broker</Text></Pressable>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Buy / Sell</Text>
+      <Text style={styles.subtitle}>Review fees and settlement before sending to your broker.</Text>
+
+      <Card>
+        <View style={styles.segment}>
+          {["SCOM", "KCB", "EQTY", "EABL", "COOP"].map(x => (
+            <Chip key={x} label={x} active={symbol === x} onPress={() => setSymbol(x)} />
+          ))}
+        </View>
+
+        <View style={styles.segment}>
+          <Chip label="BUY" active={side === "BUY"} tone="up" onPress={() => setSide("BUY")} />
+          <Chip label="SELL" active={side === "SELL"} tone="down" onPress={() => setSide("SELL")} />
+        </View>
+
+        <View style={styles.segment}>
+          {["Market", "Limit", "Stop"].map(x => <Chip key={x} label={x} active={orderType === x} onPress={() => setOrderType(x)} />)}
+        </View>
+
+        <Text style={styles.label}>Limit Price</Text>
+        <TextInput value={price} onChangeText={setPrice} keyboardType="numeric" style={styles.input} />
+
+        <Text style={styles.label}>Quantity</Text>
+        <TextInput value={qty} onChangeText={setQty} keyboardType="numeric" style={styles.input} />
       </Card>
-      {result && <Card title="Broker Response"><Text style={s.white}>{result.brokerResponse?.brokerStatus || "ROUTED"}</Text><Text style={s.muted}>{result.brokerResponse?.message || result.message}</Text><Text style={s.gold}>Estimated fees: KES {result.risk?.estimatedBrokerFees || "-"}</Text></Card>}
+
+      <Card caption="Fee Summary" title="Estimated Total">
+        <FeeRow label="Subtotal" value={formatKES(notional)} />
+        <FeeRow label="NSE levy 0.12%" value={formatKES(nseLevy)} />
+        <FeeRow label="Broker 1.5%" value={formatKES(brokerFee)} />
+        {side === "BUY" && <FeeRow label="CDS fee 0.06%" value={formatKES(cdsFee)} />}
+        <FeeRow label="CDSC levy 0.05%" value={formatKES(cdscLevy)} />
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>{side === "BUY" ? "Amount Payable" : "Estimated Proceeds"}</Text>
+          <Text style={styles.totalValue}>{formatKES(total)}</Text>
+        </View>
+        <Text style={styles.settlement}>Settlement: {TOKENS.settlement.cycle} · CDS credit after matching and clearing</Text>
+      </Card>
+
+      <PrimaryButton tone={side === "BUY" ? "buy" : "sell"} onPress={submit}>
+        Confirm {side} Order
+      </PrimaryButton>
+
+      {result && (
+        <Card caption="Order Confirmation" title="Order Sent">
+          <Text style={styles.success}>✓ Reference {result.ref}</Text>
+          <Text style={styles.body}>{result.message || "Order routed to selected broker."}</Text>
+        </Card>
+      )}
+
       <RiskDisclaimer />
     </ScrollView>
   );
 }
-const s = StyleSheet.create({page:{flex:1,backgroundColor:COLORS.bg,padding:14},title:{color:COLORS.gold,fontSize:24,fontWeight:"900"},symbols:{flexDirection:"row",flexWrap:"wrap",gap:8,marginVertical:12},chip:{backgroundColor:COLORS.card,padding:8,borderRadius:18,borderWidth:1,borderColor:COLORS.border},activeChip:{borderColor:COLORS.gold},chipText:{color:COLORS.white,fontWeight:"800"},label:{color:COLORS.muted,marginTop:8},input:{backgroundColor:COLORS.bg,color:COLORS.white,padding:12,borderRadius:10,borderWidth:1,borderColor:COLORS.border,marginTop:4},row:{flexDirection:"row",gap:10,marginVertical:10},btn:{flex:1,backgroundColor:"#1e293b",padding:12,borderRadius:10},buy:{flex:1,backgroundColor:COLORS.green,padding:12,borderRadius:10},sell:{flex:1,backgroundColor:COLORS.red,padding:12,borderRadius:10},btnText:{color:COLORS.white,textAlign:"center",fontWeight:"900"},buySubmit:{backgroundColor:COLORS.green,padding:14,borderRadius:10,marginTop:10},sellSubmit:{backgroundColor:COLORS.red,padding:14,borderRadius:10,marginTop:10},value:{color:COLORS.white,fontWeight:"800",marginTop:12},white:{color:COLORS.white,lineHeight:22},muted:{color:COLORS.muted,marginTop:6},gold:{color:COLORS.gold,marginTop:8,fontWeight:"800"}});
+
+function FeeRow({ label, value }) {
+  return <View style={styles.feeRow}><Text style={styles.feeLabel}>{label}</Text><Text style={styles.feeValue}>{value}</Text></View>;
+}
+
+const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: TOKENS.color.bg },
+  content: { padding: TOKENS.spacing.screen, paddingBottom: 32 },
+  title: { ...TOKENS.type.h1, color: TOKENS.color.text },
+  subtitle: { ...TOKENS.type.caption, color: TOKENS.color.textSecondary, marginTop: 4, marginBottom: 14 },
+  segment: { flexDirection: "row", flexWrap: "wrap", marginBottom: 8 },
+  label: { ...TOKENS.type.caption, color: TOKENS.color.textSecondary, marginTop: 8, marginBottom: 4 },
+  input: {
+    height: TOKENS.layout.fieldHeight,
+    backgroundColor: TOKENS.color.bg,
+    color: TOKENS.color.text,
+    borderWidth: 1,
+    borderColor: TOKENS.color.border,
+    borderRadius: TOKENS.radius.md,
+    paddingHorizontal: 12
+  },
+  feeRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
+  feeLabel: { color: TOKENS.color.textSecondary, fontSize: 13 },
+  feeValue: { color: TOKENS.color.text, fontWeight: "700" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: TOKENS.color.border, paddingTop: 10, marginTop: 6 },
+  totalLabel: { color: TOKENS.color.text, fontWeight: "800" },
+  totalValue: { color: TOKENS.color.brandLight, fontWeight: "900" },
+  settlement: { color: TOKENS.color.textSecondary, fontSize: 11, marginTop: 10 },
+  success: { color: TOKENS.color.up, fontWeight: "900", marginBottom: 8 },
+  body: { color: TOKENS.color.text, lineHeight: 20 }
+});
