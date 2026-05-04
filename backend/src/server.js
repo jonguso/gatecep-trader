@@ -25,6 +25,7 @@ import { handleOrder, getOrders, getAudit } from "./routes/orders.js";
 import { handlePreview } from "./routes/preview.js";
 import { getSecurities, getPrices, getSummary, getCandles } from "./routes/market.js";
 import { getRecommendation, handleChat } from "./routes/ai.js";
+import { clearPendingOrders } from "./routes/clearPendingOrders.js";
 import { startMarketFeed } from "./ws/market.js";
 
 const app = express();
@@ -64,6 +65,7 @@ app.get("/candles/:symbol", getCandles);
 
 app.post("/order", handleOrder);
 app.get("/orders", getOrders);
+app.post("/orders/clear-pending", clearPendingOrders);
 app.get("/audit", getAudit);
 app.post("/preview", handlePreview);
 

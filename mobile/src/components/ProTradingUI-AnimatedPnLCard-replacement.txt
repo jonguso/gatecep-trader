@@ -1,0 +1,48 @@
+// In mobile/src/components/ProTradingUI.js,
+// replace your AnimatedPnLCard function with this:
+
+export function AnimatedPnLCard({
+  title = "AVAILABLE FUNDS",
+  primary,
+  pnl,
+  pnlPct,
+  leftLabel = "Ledger Balance",
+  leftValue,
+  rightLabel = "Pending",
+  rightValue
+}) {
+  const anim = useRef(new Animated.Value(0.94)).current;
+  const isUp = !String(pnl).includes("-");
+
+  useEffect(() => {
+    Animated.spring(anim, { toValue: 1, friction: 7, tension: 70, useNativeDriver: true }).start();
+  }, []);
+
+  return (
+    <Animated.View style={[s.pnlCard, { transform: [{ scale: anim }] }]}>
+      <Text style={s.overline}>{title}</Text>
+      <Text style={s.bigValue}>{primary}</Text>
+
+      {!!pnl && (
+        <View style={[s.pnlBadge, { backgroundColor: isUp ? P.color.greenSoft : P.color.redSoft }]}>
+          <Text style={[s.pnlText, { color: isUp ? P.color.green : P.color.red }]}>
+            {isUp ? "▲" : "▼"} {pnl}{pnlPct ? ` (${pnlPct})` : ""}
+          </Text>
+        </View>
+      )}
+
+      <View style={s.divider} />
+
+      <View style={s.rowBetween}>
+        <View>
+          <Text style={s.label}>{leftLabel}</Text>
+          <Text style={s.value}>{leftValue}</Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={s.label}>{rightLabel}</Text>
+          <Text style={s.value}>{rightValue}</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
