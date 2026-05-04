@@ -16,7 +16,10 @@
     "extra": {
       "apiUrl": "https://gatecep-trader.up.railway.app",
       "privacyUrl": "https://gatecep.com/privacy",
-      "termsUrl": "https://gatecep.com/terms"
+      "termsUrl": "https://gatecep.com/terms",
+      "eas": {
+        "projectId": "fae2196b-6e12-42f1-b2f0-d215d3cbcb30"
+      }
     }
   }
 }
