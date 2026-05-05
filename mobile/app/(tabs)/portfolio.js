@@ -97,7 +97,7 @@ export default function Portfolio() {
     <Page>
       <Header
         title="Portfolio"
-        subtitle="Available Funds = Ledger Balance - Pending Payments - Pending Orders"
+        subtitle="Available Funds = Ledger Balance - Pending Total"
         right={<Text style={styles.open}>● Open</Text>}
       />
 
