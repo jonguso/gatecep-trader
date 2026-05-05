@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, StyleSheet, Alert } from "react-native";
+import { ScrollView, Text, StyleSheet } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
 import API from "../../src/api";
 import { Page, Header, Card, CTA, InfoRow, Disclaimer } from "../../src/components/ProTradingUI";
 import PortfolioHoldingRow from "../../src/components/PortfolioHoldingRow";
-import AvailableFundsCard from "../../src/components/AvailableFundsCard";
+import AvailableFundsPortfolioCard from "../../src/components/AvailableFundsPortfolioCard";
 import { P } from "../../src/theme/proTheme";
 import { kes, pct } from "../../src/utils/money";
 
 function mergePortfolioWithPrices(portfolioRows, priceRows) {
   const priceMap = Object.fromEntries(
-    (priceRows || []).map(x => [x.symbol, Number(x.price || x.lastPrice || x.marketPrice || 0)])
+    (priceRows || []).map(x => [
+      x.symbol,
+      Number(x.price || x.lastPrice || x.marketPrice || 0)
+    ])
   );
 
   return (portfolioRows || [])
@@ -24,55 +27,32 @@ function mergePortfolioWithPrices(portfolioRows, priceRows) {
       const investedValue = qty * avgPrice;
       const unrealizedPnl = marketValue - investedValue;
 
-      return {
-        ...h,
-        qty,
-        avgPrice,
-        marketPrice,
-        marketValue,
-        investedValue,
-        unrealizedPnl,
-        totalPnl: Number(h.realizedPnl || 0) + unrealizedPnl
-      };
+      return { ...h, qty, avgPrice, marketPrice, marketValue, investedValue, unrealizedPnl };
     });
-}
-
-function calculatePendingOrders(orderRows) {
-  return (orderRows || [])
-    .filter(o => ["PENDING", "OPEN", "ROUTED", "ACCEPTED"].includes(String(o.status || "").toUpperCase()))
-    .reduce((sum, o) => {
-      if (String(o.side || "").toUpperCase() !== "BUY") return sum;
-      return sum + Number(o.price || 0) * Number(o.qty || o.originalQty || 0);
-    }, 0);
 }
 
 export default function Portfolio() {
   const [account, setAccount] = useState(null);
   const [portfolio, setPortfolio] = useState([]);
   const [prices, setPrices] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [balances, setBalances] = useState(null);
 
   const load = async () => {
-    const [a, pf, p, o] = await Promise.all([
+    const [a, pf, p] = await Promise.all([
       API.get("/account/u1"),
       API.get("/portfolio/u1"),
-      API.get("/prices"),
-      API.get("/orders?userId=u1")
+      API.get("/prices")
     ]);
 
     setAccount(a.data);
     setPortfolio(pf.data || []);
     setPrices(p.data.data || []);
-    setOrders(o.data || []);
-  };
 
-  const clearPendingOrders = async () => {
     try {
-      const res = await API.post("/orders/clear-pending", { userId: "u1" });
-      await load();
-      Alert.alert("Pending Orders Cleared", `${res.data.cleared || 0} pending order(s) cleared.`);
-    } catch (e) {
-      Alert.alert("Clear Failed", e.response?.data?.error || "Could not clear pending orders.");
+      const b = await API.get("/balances/u1");
+      setBalances(b.data);
+    } catch {
+      setBalances(null);
     }
   };
 
@@ -82,30 +62,29 @@ export default function Portfolio() {
   const holdings = useMemo(() => mergePortfolioWithPrices(portfolio, prices), [portfolio, prices]);
 
   const investedValue = holdings.reduce((sum, h) => sum + Number(h.investedValue || 0), 0);
-  const holdingsCurrentValue = holdings.reduce((sum, h) => sum + Number(h.marketValue || 0), 0);
-  const pnl = holdingsCurrentValue - investedValue;
+  const currentValue = holdings.reduce((sum, h) => sum + Number(h.marketValue || 0), 0);
+  const pnl = currentValue - investedValue;
   const pnlPct = investedValue > 0 ? (pnl / investedValue) * 100 : 0;
 
-  const ledgerBalance = Number(account?.cash || 0);
-  const pendingPayments = 0;
-  const pendingOrders = calculatePendingOrders(orders);
-  const pendingTotal = pendingPayments + pendingOrders;
-  const availableFunds = ledgerBalance - pendingTotal;
-  const totalEquity = holdingsCurrentValue + availableFunds;
+  const ledgerBalance = balances?.ledgerBalance ?? Number(account?.cash || 0);
+  const pendingOrders = balances?.pendingOrders ?? 0;
+  const pendingPayments = balances?.pendingPayments ?? 0;
+  const availableFunds = balances?.availableFunds ?? ledgerBalance;
+  const totalEquity = ledgerBalance + currentValue;
 
   return (
     <Page>
       <Header
         title="Portfolio"
-        subtitle="Available Funds = Ledger Balance - Pending Total"
+        subtitle="Available Funds = Ledger Balance - Pending Orders - Pending Payments"
         right={<Text style={styles.open}>● Open</Text>}
       />
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <AvailableFundsCard
+        <AvailableFundsPortfolioCard
           availableFunds={availableFunds}
-          ledgerBalance={ledgerBalance}
-          pendingTotal={pendingTotal}
+          investedValue={investedValue}
+          currentValue={currentValue}
           pnl={pnl}
           pnlPct={pnlPct}
           formatMoney={kes}
@@ -116,25 +95,19 @@ export default function Portfolio() {
           <Text style={styles.section}>Portfolio Summary</Text>
           <InfoRow label="Available Funds" value={kes(availableFunds)} />
           <InfoRow label="Ledger Balance" value={kes(ledgerBalance)} />
-          <InfoRow label="Pending Payments" value={kes(pendingPayments)} />
           <InfoRow label="Pending Orders" value={kes(pendingOrders)} />
-          <InfoRow label="Holdings Current Value" value={kes(holdingsCurrentValue)} />
+          <InfoRow label="Pending Payments" value={kes(pendingPayments)} />
+          <InfoRow label="Holdings Current Value" value={kes(currentValue)} />
           <InfoRow label="Invested Value" value={kes(investedValue)} />
           <InfoRow label="Unrealized P&L" value={kes(pnl)} tone={pnl >= 0 ? "green" : "red"} />
           <InfoRow label="Total Equity" value={kes(totalEquity)} />
         </Card>
 
-        {pendingOrders > 0 && <CTA tone="sell" onPress={clearPendingOrders}>Clear Pending Orders</CTA>}
-
         <CTA onPress={() => router.push("/trade")}>Place Trade</CTA>
 
         <Card>
           <Text style={styles.section}>Holdings</Text>
-
-          {holdings.length === 0 && (
-            <Text style={styles.empty}>No holdings yet. Buy shares from the Trade tab to populate your portfolio.</Text>
-          )}
-
+          {holdings.length === 0 && <Text style={styles.empty}>No holdings yet.</Text>}
           {holdings.map(h => (
             <PortfolioHoldingRow
               key={h.symbol}
