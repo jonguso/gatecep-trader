@@ -13,10 +13,7 @@ export default function PortfolioDetailsModal({ visible, onClose, holdings, avai
         <Text style={styles.title}>Portfolio Details</Text>
         <Text style={styles.subtitle}>Holdings, allocation charts, and Coach G analytics.</Text>
 
-        <AnalyticsSummary analytics={analytics} />
-        <AllocationPie title="Allocation by Securities" data={analytics.bySecurity} />
-        <AllocationPie title="Allocation by Industries" data={analytics.bySector} />
-
+        
         <View style={styles.card}>
           <Text style={styles.section}>Holdings</Text>
           {holdings.length === 0 && <Text style={styles.empty}>No holdings yet.</Text>}
