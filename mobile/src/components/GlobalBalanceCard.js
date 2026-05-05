@@ -1,0 +1,5 @@
+import { View, Text, StyleSheet } from "react-native";
+import { P } from "../theme/proTheme";
+import { kes } from "../utils/money";
+export default function GlobalBalanceCard({availableFunds=0,investedValue=0,currentValue=0,pnl=0}){const up=Number(pnl)>=0;return <View style={s.card}><Text style={s.label}>AVAILABLE FUNDS</Text><Text style={s.value}>{kes(availableFunds)}</Text><View style={s.row}><Text style={s.small}>Invested{"\n"}{kes(investedValue)}</Text><Text style={s.small}>Current{"\n"}{kes(currentValue)}</Text></View><Text style={{color:up?P.color.green:P.color.red,fontWeight:"900",marginTop:10}}>{up?"▲":"▼"} {kes(pnl)}</Text></View>}
+const s=StyleSheet.create({card:{backgroundColor:P.color.card,borderRadius:P.radius.xl,borderWidth:1,borderColor:P.color.border,padding:18,marginHorizontal:P.spacing.screen,marginBottom:14},label:{color:P.color.muted,fontSize:11,fontWeight:"900"},value:{color:P.color.text,fontSize:32,fontWeight:"900",marginTop:8},row:{flexDirection:"row",justifyContent:"space-between",marginTop:16,borderTopWidth:1,borderTopColor:P.color.border,paddingTop:14},small:{color:P.color.text,fontWeight:"900"}});

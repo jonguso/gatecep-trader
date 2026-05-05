@@ -1,86 +1,37 @@
-import dotenv from "dotenv";
-dotenv.config();
-
+import "dotenv/config";
 import express from "express";
-import http from "http";
-import { WebSocketServer } from "ws";
 import cors from "cors";
-
-import { login } from "./routes/auth.js";
-import { getUsers, getAccount, getPortfolio } from "./routes/accounts.js";
-import { getBrokers, getMyBrokerLinks, linkBroker, selectBroker } from "./routes/brokers.js";
-import {
-  getOnboardingSteps,
-  startOnboarding,
-  getOnboarding,
-  updatePersonalDetails,
-  updateCdsDetails,
-  addDocument,
-  updateRiskProfile,
-  acceptTerms,
-  submitForReview,
-  approveOnboarding
-} from "./routes/onboarding.js";
-import { handleOrder, getOrders, getAudit } from "./routes/orders.js";
-import { handlePreview } from "./routes/preview.js";
-import { getSecurities, getPrices, getSummary, getCandles } from "./routes/market.js";
-import { getRecommendation, handleChat } from "./routes/ai.js";
-import { clearPendingOrders } from "./routes/clearPendingOrders.js";
-import { startMarketFeed } from "./ws/market.js";
+import { state } from "./store/state.js";
+import { marketDataGateway } from "./services/marketData/MarketDataGateway.js";
+import { placeOrder, listOrders } from "./routes/orders.js";
+import { getTradeRecommendation } from "./routes/recommendations.js";
+import { getLedger, getBalances, clearPendingOrders } from "./routes/accounting.js";
 
 const app = express();
-const port = process.env.PORT || 4000;
-
-app.use(cors({ origin: "*" }));
+app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => res.json({ message: "GATECEP Clean Backend running" }));
-
-app.post("/auth/login", login);
-
-app.get("/brokers", getBrokers);
-app.get("/brokers/links", getMyBrokerLinks);
-app.post("/brokers/link", linkBroker);
-app.post("/brokers/select", selectBroker);
-
-app.get("/onboarding/steps", getOnboardingSteps);
-app.post("/onboarding/start", startOnboarding);
-app.get("/onboarding", getOnboarding);
-app.post("/onboarding/personal", updatePersonalDetails);
-app.post("/onboarding/cds", updateCdsDetails);
-app.post("/onboarding/document", addDocument);
-app.post("/onboarding/risk", updateRiskProfile);
-app.post("/onboarding/terms", acceptTerms);
-app.post("/onboarding/submit", submitForReview);
-app.post("/onboarding/approve", approveOnboarding);
-
-app.get("/users", getUsers);
-app.get("/account/:userId", getAccount);
-app.get("/portfolio/:userId", getPortfolio);
-
-app.get("/securities", getSecurities);
-app.get("/prices", getPrices);
-app.get("/market/summary", getSummary);
-app.get("/candles/:symbol", getCandles);
-
-app.post("/order", handleOrder);
-app.get("/orders", getOrders);
+app.get("/", (req, res) => res.json({ ok: true, app: "gatecep-backend" }));
+app.get("/prices", async (req, res) => res.json(await marketDataGateway.getPrices()));
+app.get("/account/:userId", (req, res) => res.json(state.users[req.params.userId]));
+app.get("/portfolio/:userId", (req, res) => res.json(state.holdings[req.params.userId] || []));
+app.get("/orders", listOrders);
+app.post("/order", placeOrder);
+app.get("/ledger", getLedger);
+app.get("/balances/:userId", getBalances);
 app.post("/orders/clear-pending", clearPendingOrders);
-app.get("/audit", getAudit);
-app.post("/preview", handlePreview);
-
-app.get("/recommendation/:symbol/:userId", getRecommendation);
-app.post("/ai/chat", handleChat);
-
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
-global.clients = [];
-wss.on("connection", ws => {
-  global.clients.push(ws);
-  ws.on("close", () => { global.clients = global.clients.filter(c => c !== ws); });
+app.post("/ai/recommendation", getTradeRecommendation);
+app.post("/ai/chat", getTradeRecommendation);
+app.get("/market/rankings", async (req, res) => {
+  const prices = await marketDataGateway.getPrices();
+  const rows = prices.data;
+  res.json({
+    provider: prices.provider,
+    gainers: rows.filter(x => x.changePct > 0).sort((a,b)=>b.changePct-a.changePct).slice(0,10),
+    losers: rows.filter(x => x.changePct < 0).sort((a,b)=>a.changePct-b.changePct).slice(0,5),
+    movers: [...rows].sort((a,b)=>b.turnover-a.turnover).slice(0,5)
+  });
 });
 
-startMarketFeed();
-
-server.listen(port, () => console.log(`GATECEP Clean Backend running on http://localhost:${port}`));
+const port = process.env.PORT || 4000;
+app.listen(port, () => console.log(`Gatecep backend running on ${port}`));

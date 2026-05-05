@@ -1,24 +1,47 @@
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, TextInput, StyleSheet, Alert } from "react-native";
+import { ScrollView, Text, StyleSheet, Alert, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
 import API from "../../src/api";
-import { Page, Header, Segments, Card, CTA, InfoRow, ActivityRow, Disclaimer } from "../../src/components/ProTradingUI";
+import { Page, Header, Card, CTA, ActivityRow, Disclaimer } from "../../src/components/ProTradingUI";
+import NSEOrderBook from "../../src/components/NSEOrderBook";
+import NSEOrderEntry from "../../src/components/NSEOrderEntry";
+import PortfolioImpactModal from "../../src/components/PortfolioImpactModal";
+import AISignalCard from "../../src/components/AISignalCard";
 import { P } from "../../src/theme/proTheme";
-import { kes, ref } from "../../src/utils/money";
+import { ref } from "../../src/utils/money";
 import { getPriceBand, isPriceAllowed } from "../../src/utils/priceBands";
+
+function isDuplicateOrder(orders, { symbol, side, qty, price }) {
+  return (orders || []).some(o => {
+    const active = ["PENDING", "OPEN", "ROUTED", "ACCEPTED", "NEW"].includes(String(o.status || "").toUpperCase());
+    return active &&
+      String(o.symbol).toUpperCase() === String(symbol).toUpperCase() &&
+      String(o.side).toUpperCase() === String(side).toUpperCase() &&
+      Number(o.qty || o.originalQty || 0) === Number(qty || 0) &&
+      Number(o.price || 0) === Number(price || 0);
+  });
+}
 
 export default function Trade() {
   const params = useLocalSearchParams();
   const [symbol, setSymbol] = useState(params.symbol || "SCOM");
   const [side, setSide] = useState(params.side || "BUY");
-  const [orderType, setOrderType] = useState("Limit");
+  const [orderType, setOrderType] = useState("LIMIT");
+  const [validity, setValidity] = useState("DAY");
+  const [mode, setMode] = useState("Delivery");
   const [price, setPrice] = useState("15");
   const [qty, setQty] = useState("100");
+
   const [orders, setOrders] = useState([]);
   const [account, setAccount] = useState(null);
   const [marketRows, setMarketRows] = useState([]);
   const [confirmation, setConfirmation] = useState(null);
+  const [impactOpen, setImpactOpen] = useState(false);
+  const [coachRec, setCoachRec] = useState(null);
+  const [userOverride, setUserOverride] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
 
   const load = async () => {
     const [o, a, p] = await Promise.all([
@@ -26,7 +49,6 @@ export default function Trade() {
       API.get("/account/u1"),
       API.get("/prices")
     ]);
-
     setOrders(o.data || []);
     setAccount(a.data);
     setMarketRows(p.data.data || []);
@@ -41,36 +63,13 @@ export default function Trade() {
   useFocusEffect(useCallback(() => { load().catch(() => {}); }, []));
 
   const selectedMarket = useMemo(
-    () => (marketRows || []).find(x => x.symbol === symbol),
+    () => (marketRows || []).find(x => String(x.symbol).toUpperCase() === String(symbol).toUpperCase()),
     [marketRows, symbol]
   );
 
-  const bestOfferPrice = Number(
-    selectedMarket?.offerPrice ||
-    selectedMarket?.bestOffer ||
-    selectedMarket?.price ||
-    selectedMarket?.lastPrice ||
-    price ||
-    0
-  );
-
-  const bestOfferQty = Number(
-    selectedMarket?.offerQty ||
-    selectedMarket?.offerQuantity ||
-    selectedMarket?.availableQty ||
-    100
-  );
-
-  const priceBand = useMemo(
-    () => getPriceBand(bestOfferPrice, 0.10, 0.10),
-    [bestOfferPrice]
-  );
-
-  useEffect(() => {
-    if (bestOfferPrice > 0) setPrice(String(bestOfferPrice));
-    if (bestOfferQty > 0) setQty(String(Math.min(bestOfferQty, 100)));
-  }, [symbol, bestOfferPrice]);
-
+  const selectedName = selectedMarket?.name || selectedMarket?.securityName || symbol;
+  const referencePrice = Number(selectedMarket?.offerPrice || selectedMarket?.bestOffer || selectedMarket?.price || selectedMarket?.lastPrice || price || 0);
+  const priceBand = useMemo(() => getPriceBand(referencePrice, 0.10, 0.10), [referencePrice]);
   const priceAllowed = isPriceAllowed(price, priceBand);
 
   const orderValue = Number(price || 0) * Number(qty || 0);
@@ -78,19 +77,75 @@ export default function Trade() {
   const nseLevy = orderValue * 0.0012;
   const cdsFee = side === "BUY" ? orderValue * 0.0006 : 0;
   const cdscLevy = orderValue * 0.0005;
-  const totalFees = brokerFee + nseLevy + cdsFee + cdscLevy;
-  const cashRequired = orderValue + totalFees;
-  const estimatedProceeds = orderValue - totalFees;
+  const cashRequired = orderValue + brokerFee + nseLevy + cdsFee + cdscLevy;
+  const estimatedProceeds = orderValue - (brokerFee + nseLevy + cdscLevy);
+  const ledgerBalance = Number(account?.cash || 0);
+
+  const duplicate = isDuplicateOrder(orders, { symbol, side, qty, price });
+  const inCooldown = Date.now() < cooldownUntil;
+  const canConfirm = (coachRec?.allowAutoEnable || userOverride) && !duplicate && !inCooldown && !isSubmitting && priceAllowed;
+
+  useEffect(() => {
+    setCoachRec(null);
+    setUserOverride(false);
+    setConfirmation(null);
+  }, [symbol, side, price, qty, orderType]);
+
+  const handlePickBuy = ({ price, qty }) => {
+    setSide("BUY");
+    setPrice(String(price));
+    setQty(String(Math.min(Number(qty || 100), 1000)));
+  };
+
+  const handlePickSell = ({ price, qty }) => {
+    setSide("SELL");
+    setPrice(String(price));
+    setQty(String(Math.min(Number(qty || 100), 1000)));
+  };
+
+  const openImpact = (nextSide) => {
+    setSide(nextSide);
+    if (!priceAllowed) {
+      Alert.alert("Invalid Price", "Price must be within allowed range.");
+      return;
+    }
+    setImpactOpen(true);
+  };
+
+  const continueToCoach = async () => {
+    setImpactOpen(false);
+    try {
+      const res = await API.post("/ai/recommendation", {
+        userId: "u1",
+        symbol,
+        side,
+        price: Number(price),
+        qty: Number(qty),
+        cashRequired
+      });
+      setCoachRec(res.data);
+    } catch {
+      setCoachRec({
+        symbol,
+        signal: "REVIEW",
+        action: "REVIEW",
+        confidence: 68,
+        recommendationText: "Coach G recommends review before submitting this trade.",
+        scores: { momentum: 60, liquidity: 60, priceRisk: 70, exposure: 65 },
+        riskFlags: duplicate ? ["Duplicate order detected"] : [],
+        reasons: ["Local fallback recommendation used."],
+        allowAutoEnable: !duplicate && priceAllowed
+      });
+    }
+  };
 
   const submit = async () => {
-    if (!priceAllowed) {
-      Alert.alert(
-        "Invalid Price",
-        `${side} price must be between ${kes(priceBand.minPrice)} and ${kes(priceBand.maxPrice)}.`
-      );
+    if (!canConfirm) {
+      Alert.alert("Confirmation Required", "Accept Coach G recommendation or manually override before confirming.");
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const res = await API.post("/order", {
         userId: "u1",
@@ -101,67 +156,57 @@ export default function Trade() {
       });
 
       setConfirmation({ ...res.data, ref: ref(symbol) });
+      setCooldownUntil(Date.now() + 2000);
+      setCoachRec(null);
+      setUserOverride(false);
       await load();
     } catch (e) {
       Alert.alert("Order Failed", e.response?.data?.error || "Order failed");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <Page>
-      <Header title="Trade" subtitle="Limit price must be within allowed broker range" />
-
+      <Header title="Trade" subtitle="NSE-style order entry" />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Card>
-          <Text style={styles.section}>Trade Activity</Text>
-          {orders.length === 0 && <Text style={styles.empty}>No activity yet. Place your first demo order.</Text>}
-          {orders.slice(0, 5).map(o => <ActivityRow key={o.id} item={o} />)}
-        </Card>
+        <NSEOrderBook symbol={symbol} name={selectedName} market={selectedMarket} onPickBuy={handlePickBuy} onPickSell={handlePickSell} />
 
-        <Segments tabs={["SCOM", "KCB", "EQTY", "EABL", "COOP", "KPLC"]} active={symbol} onChange={setSymbol} />
-        <Segments tabs={["BUY", "SELL"]} active={side} onChange={setSide} />
-        <Segments tabs={["Market", "Limit", "Stop"]} active={orderType} onChange={setOrderType} />
-
-        <Card>
-          <Text style={styles.section}>Place Trade</Text>
-
-          <Text style={styles.label}>Quantity</Text>
-          <TextInput value={qty} onChangeText={setQty} keyboardType="numeric" style={styles.input} />
-          <Text style={styles.helpText}>Default quantity uses offer quantity when provided by market feed.</Text>
-
-          <Text style={styles.label}>Price</Text>
-          <TextInput
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="numeric"
-            style={[styles.input, !priceAllowed && styles.inputError]}
-          />
-
-          <Text style={[styles.rangeText, !priceAllowed && styles.errorText]}>
-            Allowed price range: {priceBand.valid ? `${kes(priceBand.minPrice)} to ${kes(priceBand.maxPrice)}` : "Not available"}
-          </Text>
-
-          <Text style={styles.helpText}>Default price uses best offer/market price: {kes(bestOfferPrice)}</Text>
-        </Card>
+        <NSEOrderEntry
+          symbol={symbol}
+          name={selectedName}
+          side={side}
+          setSide={setSide}
+          qty={qty}
+          setQty={setQty}
+          price={price}
+          setPrice={setPrice}
+          orderType={orderType}
+          setOrderType={setOrderType}
+          validity={validity}
+          setValidity={setValidity}
+          mode={mode}
+          setMode={setMode}
+          priceBand={priceBand}
+          onOpenImpact={openImpact}
+        />
 
         <Card>
-          <Text style={styles.section}>Portfolio Impact</Text>
-          <InfoRow label="Ledger Balance" value={kes(account?.cash || 0)} />
-          <InfoRow label="Order Value" value={kes(orderValue)} />
-          <InfoRow label="Broker Fee" value={kes(brokerFee)} />
-          <InfoRow label="NSE Levy" value={kes(nseLevy)} />
-          {side === "BUY" && <InfoRow label="CDS Fee" value={kes(cdsFee)} />}
-          <InfoRow label="CDSC Levy" value={kes(cdscLevy)} />
-          <InfoRow
-            label={side === "BUY" ? "Cash Required" : "Estimated Proceeds"}
-            value={kes(side === "BUY" ? cashRequired : estimatedProceeds)}
-            tone={side === "SELL" ? "green" : undefined}
-          />
+          <Text style={styles.section}>Coach G Decision</Text>
+          <AISignalCard recommendation={coachRec} />
+          {duplicate && <Text style={styles.warning}>You already placed this order with the same symbol, side, quantity, and price.</Text>}
+          {coachRec && !coachRec.allowAutoEnable && (
+            <CTA tone="ghost" onPress={() => setUserOverride(true)}>Ignore & Proceed Manually</CTA>
+          )}
+          {userOverride && <Text style={styles.override}>Manual override enabled.</Text>}
         </Card>
 
-        <CTA tone={side === "BUY" ? "buy" : "sell"} onPress={submit}>
-          Confirm {side} Order
-        </CTA>
+        <View style={[styles.submitWrap, !canConfirm && styles.disabled]}>
+          <CTA tone={side === "BUY" ? "buy" : "sell"} onPress={submit}>
+            {isSubmitting ? "Processing..." : `Confirm ${side} Order`}
+          </CTA>
+        </View>
 
         {confirmation && (
           <Card>
@@ -171,30 +216,40 @@ export default function Trade() {
           </Card>
         )}
 
+        <Card>
+          <Text style={styles.section}>Recent Activity</Text>
+          {orders.length === 0 && <Text style={styles.empty}>No recent trades</Text>}
+          {orders.slice(0, 5).map(o => <ActivityRow key={o.id} item={o} />)}
+        </Card>
+
         <Disclaimer />
       </ScrollView>
+
+      <PortfolioImpactModal
+        visible={impactOpen}
+        onCancel={() => setImpactOpen(false)}
+        onOk={continueToCoach}
+        side={side}
+        ledgerBalance={ledgerBalance}
+        orderValue={orderValue}
+        brokerFee={brokerFee}
+        nseLevy={nseLevy}
+        cdsFee={cdsFee}
+        cdscLevy={cdscLevy}
+        cashRequired={cashRequired}
+        estimatedProceeds={estimatedProceeds}
+      />
     </Page>
   );
 }
 
 const styles = StyleSheet.create({
   section: { color: P.color.text, fontSize: 18, fontWeight: "900", marginBottom: 8 },
-  empty: { color: P.color.muted, lineHeight: 20 },
-  label: { color: P.color.muted, fontSize: 12, marginBottom: 5, marginTop: 8 },
-  input: {
-    backgroundColor: P.color.bg,
-    borderWidth: 1,
-    borderColor: P.color.border,
-    borderRadius: P.radius.md,
-    minHeight: 46,
-    paddingHorizontal: 12,
-    color: P.color.text,
-    fontWeight: "800"
-  },
-  inputError: { borderColor: P.color.red },
-  rangeText: { color: P.color.green, fontSize: 12, marginTop: 7, fontWeight: "800" },
-  errorText: { color: P.color.red },
-  helpText: { color: P.color.muted, fontSize: 11, marginTop: 5, lineHeight: 16 },
+  warning: { color: P.color.red, fontWeight: "900", lineHeight: 19, marginTop: 10 },
+  override: { color: P.color.green, fontWeight: "900", marginTop: 10 },
+  submitWrap: { marginHorizontal: 18 },
+  disabled: { opacity: 0.45 },
   success: { color: P.color.green, fontSize: 18, fontWeight: "900", marginBottom: 8 },
-  body: { color: P.color.text, lineHeight: 20, marginTop: 4 }
+  body: { color: P.color.text, lineHeight: 20, marginTop: 4 },
+  empty: { color: P.color.muted, lineHeight: 20 }
 });

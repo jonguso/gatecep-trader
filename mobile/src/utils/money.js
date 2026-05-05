@@ -1,13 +1,3 @@
-export function kes(value) {
-  const n = Number(value || 0);
-  return `KES ${n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-export function pct(value) {
-  const n = Number(value || 0);
-  return `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
-
-export function ref(symbol = "NSE") {
-  return `NSE-${new Date().getFullYear()}-${symbol}-${Math.floor(10000 + Math.random() * 90000)}`;
-}
+export function kes(v){ return `KES ${Number(v || 0).toLocaleString("en-KE",{minimumFractionDigits:2, maximumFractionDigits:2})}`; }
+export function pct(v){ return `${Number(v || 0).toFixed(2)}%`; }
+export function ref(symbol){ return `NSE-${new Date().getFullYear()}-${symbol}-${Math.floor(Math.random()*90000+10000)}`; }

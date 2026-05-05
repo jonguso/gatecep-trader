@@ -1,25 +1,12 @@
 {
   "expo": {
-    "name": "GATECEP AI Coach",
-    "slug": "gatecep-ai-coach",
+    "name": "Gatecep Trader",
+    "slug": "gatecep-trader",
+    "scheme": "gatecep",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "gatecep",
-    "userInterfaceStyle": "dark",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.gatecep.aicoach"
-    },
-    "android": {
-      "package": "com.gatecep.aicoach"
-    },
-    "extra": {
-      "apiUrl": "https://gatecep-trader.up.railway.app",
-      "privacyUrl": "https://gatecep.com/privacy",
-      "termsUrl": "https://gatecep.com/terms",
-      "eas": {
-        "projectId": "fae2196b-6e12-42f1-b2f0-d215d3cbcb30"
-      }
-    }
+    "plugins": [
+      "expo-router"
+    ]
   }
 }
