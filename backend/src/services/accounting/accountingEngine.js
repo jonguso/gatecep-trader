@@ -164,7 +164,13 @@ export function postBuyExecution({ userId, symbol, qty, price, orderId }) {
   const oldQty = Number(h.qty || 0);
   const oldAvg = Number(h.avgPrice || 0);
   const newQty = oldQty + Number(qty);
-  h.avgPrice = newQty === 0 ? 0 : Number((((oldQty * oldAvg) + (Number(qty) * Number(price))) / newQty).toFixed(4));
+  const oldCost = oldQty * oldAvg;
+const buyCostIncludingFees = fees.cashRequired;
+
+h.avgPrice =
+  newQty === 0
+    ? 0
+    : Number(((oldCost + buyCostIncludingFees) / newQty).toFixed(4));
   h.qty = newQty;
   saveHolding(userId, h);
 
