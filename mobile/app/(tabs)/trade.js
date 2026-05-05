@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { ScrollView, Text, TextInput, StyleSheet } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView, Text, TextInput, StyleSheet, Alert } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
 import API from "../../src/api";
 import { Page, Header, Segments, Card, CTA, InfoRow, ActivityRow, Disclaimer } from "../../src/components/ProTradingUI";
 import { P } from "../../src/theme/proTheme";
 import { kes, ref } from "../../src/utils/money";
+import { getPriceBand, isPriceAllowed } from "../../src/utils/priceBands";
 
 export default function Trade() {
   const params = useLocalSearchParams();
@@ -16,15 +17,19 @@ export default function Trade() {
   const [qty, setQty] = useState("100");
   const [orders, setOrders] = useState([]);
   const [account, setAccount] = useState(null);
+  const [marketRows, setMarketRows] = useState([]);
   const [confirmation, setConfirmation] = useState(null);
 
   const load = async () => {
-    const [o, a] = await Promise.all([
+    const [o, a, p] = await Promise.all([
       API.get("/orders?userId=u1"),
-      API.get("/account/u1")
+      API.get("/account/u1"),
+      API.get("/prices")
     ]);
+
     setOrders(o.data || []);
     setAccount(a.data);
+    setMarketRows(p.data.data || []);
   };
 
   useEffect(() => {
@@ -34,6 +39,39 @@ export default function Trade() {
 
   useEffect(() => { load().catch(() => {}); }, []);
   useFocusEffect(useCallback(() => { load().catch(() => {}); }, []));
+
+  const selectedMarket = useMemo(
+    () => (marketRows || []).find(x => x.symbol === symbol),
+    [marketRows, symbol]
+  );
+
+  const bestOfferPrice = Number(
+    selectedMarket?.offerPrice ||
+    selectedMarket?.bestOffer ||
+    selectedMarket?.price ||
+    selectedMarket?.lastPrice ||
+    price ||
+    0
+  );
+
+  const bestOfferQty = Number(
+    selectedMarket?.offerQty ||
+    selectedMarket?.offerQuantity ||
+    selectedMarket?.availableQty ||
+    100
+  );
+
+  const priceBand = useMemo(
+    () => getPriceBand(bestOfferPrice, 0.10, 0.10),
+    [bestOfferPrice]
+  );
+
+  useEffect(() => {
+    if (bestOfferPrice > 0) setPrice(String(bestOfferPrice));
+    if (bestOfferQty > 0) setQty(String(Math.min(bestOfferQty, 100)));
+  }, [symbol, bestOfferPrice]);
+
+  const priceAllowed = isPriceAllowed(price, priceBand);
 
   const orderValue = Number(price || 0) * Number(qty || 0);
   const brokerFee = orderValue * 0.015;
@@ -45,6 +83,14 @@ export default function Trade() {
   const estimatedProceeds = orderValue - totalFees;
 
   const submit = async () => {
+    if (!priceAllowed) {
+      Alert.alert(
+        "Invalid Price",
+        `${side} price must be between ${kes(priceBand.minPrice)} and ${kes(priceBand.maxPrice)}.`
+      );
+      return;
+    }
+
     try {
       const res = await API.post("/order", {
         userId: "u1",
@@ -57,13 +103,13 @@ export default function Trade() {
       setConfirmation({ ...res.data, ref: ref(symbol) });
       await load();
     } catch (e) {
-      alert(e.response?.data?.error || "Order failed");
+      Alert.alert("Order Failed", e.response?.data?.error || "Order failed");
     }
   };
 
   return (
     <Page>
-      <Header title="Trade" subtitle="Broker-grade order accounting" />
+      <Header title="Trade" subtitle="Limit price must be within allowed broker range" />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <Card>
@@ -72,17 +118,30 @@ export default function Trade() {
           {orders.slice(0, 5).map(o => <ActivityRow key={o.id} item={o} />)}
         </Card>
 
-        <Segments tabs={["SCOM", "KCB", "EQTY", "EABL", "COOP"]} active={symbol} onChange={setSymbol} />
+        <Segments tabs={["SCOM", "KCB", "EQTY", "EABL", "COOP", "KPLC"]} active={symbol} onChange={setSymbol} />
         <Segments tabs={["BUY", "SELL"]} active={side} onChange={setSide} />
         <Segments tabs={["Market", "Limit", "Stop"]} active={orderType} onChange={setOrderType} />
 
         <Card>
           <Text style={styles.section}>Place Trade</Text>
-          <Text style={styles.label}>Price</Text>
-          <TextInput value={price} onChangeText={setPrice} keyboardType="numeric" style={styles.input} />
 
           <Text style={styles.label}>Quantity</Text>
           <TextInput value={qty} onChangeText={setQty} keyboardType="numeric" style={styles.input} />
+          <Text style={styles.helpText}>Default quantity uses offer quantity when provided by market feed.</Text>
+
+          <Text style={styles.label}>Price</Text>
+          <TextInput
+            value={price}
+            onChangeText={setPrice}
+            keyboardType="numeric"
+            style={[styles.input, !priceAllowed && styles.inputError]}
+          />
+
+          <Text style={[styles.rangeText, !priceAllowed && styles.errorText]}>
+            Allowed price range: {priceBand.valid ? `${kes(priceBand.minPrice)} to ${kes(priceBand.maxPrice)}` : "Not available"}
+          </Text>
+
+          <Text style={styles.helpText}>Default price uses best offer/market price: {kes(bestOfferPrice)}</Text>
         </Card>
 
         <Card>
@@ -109,11 +168,6 @@ export default function Trade() {
             <Text style={styles.success}>✓ Order Sent</Text>
             <Text style={styles.body}>Reference: {confirmation.ref}</Text>
             <Text style={styles.body}>{confirmation.message || "Order routed to selected broker."}</Text>
-            {confirmation.accounting?.fees && (
-              <Text style={styles.body}>
-                Accounting posted: {side === "BUY" ? kes(confirmation.accounting.fees.cashRequired) : kes(confirmation.accounting.fees.estimatedProceeds)}
-              </Text>
-            )}
           </Card>
         )}
 
@@ -137,6 +191,10 @@ const styles = StyleSheet.create({
     color: P.color.text,
     fontWeight: "800"
   },
+  inputError: { borderColor: P.color.red },
+  rangeText: { color: P.color.green, fontSize: 12, marginTop: 7, fontWeight: "800" },
+  errorText: { color: P.color.red },
+  helpText: { color: P.color.muted, fontSize: 11, marginTop: 5, lineHeight: 16 },
   success: { color: P.color.green, fontSize: 18, fontWeight: "900", marginBottom: 8 },
   body: { color: P.color.text, lineHeight: 20, marginTop: 4 }
 });
