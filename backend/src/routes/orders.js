@@ -6,6 +6,7 @@ import { engine } from "../engine/orderBook.js";
 import { getBroker } from "../data/brokers.js";
 import { getUser, getHolding, getUserBrokerLink, state, audit, applyBuy, applySell } from "../store/state.js";
 import { broadcast } from "../ws/market.js";
+import { postBuyExecution, postSellExecution } from "../services/accounting/accountingEngine.js";
 
 export async function handleOrder(req, res) {
   try {
@@ -62,7 +63,13 @@ export async function handleOrder(req, res) {
     let trades = [];
     if (selectedBrokerId === "mock-broker") {
   if (cleanSide === "BUY") {
-    applyBuy(userId, cleanSymbol, cleanQty, cleanPrice, order.id);
+    postBuyExecution({
+  userId,
+  symbol: cleanSymbol,
+  qty: cleanQty,
+  price: cleanPrice,
+  orderId: order.id
+});
   } else {
     applySell(userId, cleanSymbol, cleanQty, cleanPrice, order.id);
   }

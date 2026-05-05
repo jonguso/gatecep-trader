@@ -162,16 +162,22 @@ export function postBuyExecution({ userId, symbol, qty, price, orderId }) {
 
   const h = getHolding(userId, symbol);
   const oldQty = Number(h.qty || 0);
-  const oldAvg = Number(h.avgPrice || 0);
-  const newQty = oldQty + Number(qty);
-  const oldCost = oldQty * oldAvg;
-const buyCostIncludingFees = fees.cashRequired;
+const oldAvgPrice = Number(h.avgPrice || 0);
+const newBuyQty = Number(qty);
+
+const oldInvestedValue = oldQty * oldAvgPrice;
+
+// This includes order value + all BUY fees
+const newBuyInvestedValue = fees.cashRequired;
+
+const newQty = oldQty + newBuyQty;
 
 h.avgPrice =
   newQty === 0
     ? 0
-    : Number(((oldCost + buyCostIncludingFees) / newQty).toFixed(4));
-  h.qty = newQty;
+    : Number(((oldInvestedValue + newBuyInvestedValue) / newQty).toFixed(4));
+
+h.qty = newQty;
   saveHolding(userId, h);
 
   ledgerEntry({
