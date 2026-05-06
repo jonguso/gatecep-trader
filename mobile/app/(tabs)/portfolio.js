@@ -1,16 +1,132 @@
-import { useEffect,useMemo,useState } from "react";
-import { ScrollView, Text, StyleSheet } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView } from "react-native";
+import { router } from "expo-router";
 import API from "../../src/api";
-import { Page, Card, InfoRow, Disclaimer } from "../../src/components/ProTradingUI";
-import GlobalBalanceCard from "../../src/components/GlobalBalanceCard";
-import { P } from "../../src/theme/proTheme"; import { kes } from "../../src/utils/money";
+import { Page, Header, CTA, Disclaimer } from "../../src/components/ProTradingUI";
+import GlobalAccountHeader from "../../src/components/GlobalAccountHeader";
+import PortfolioDetailsModal from "../../src/components/PortfolioDetailsModal";
+import {
+  AIInsightsCard,
+  DonutChartCard,
+  DrilldownPanel,
+  buildPortfolioAnalytics
+} from "../../src/components/PortfolioDrilldownCharts";
 
-export default function Portfolio(){
- const [account,setAccount]=useState({cash:0}); const [portfolio,setPortfolio]=useState([]); const [prices,setPrices]=useState([]);
- const load=async()=>{const [a,pf,pr]=await Promise.all([API.get("/account/u1"),API.get("/portfolio/u1"),API.get("/prices")]); setAccount(a.data); setPortfolio(pf.data||[]); setPrices(pr.data.data||[]);};
- useEffect(()=>{load().catch(()=>{}); const id=setInterval(()=>load().catch(()=>{}),3500); return()=>clearInterval(id);},[]);
- const holdings=useMemo(()=>portfolio.map(h=>{const p=prices.find(x=>x.symbol===h.symbol); const price=Number(p?.price||h.avgPrice||0); return {...h, marketPrice:price, marketValue:Number(h.qty)*price, investedValue:Number(h.qty)*Number(h.avgPrice)};}),[portfolio,prices]);
- const invested=holdings.reduce((s,h)=>s+h.investedValue,0); const current=holdings.reduce((s,h)=>s+h.marketValue,0); const pnl=current-invested; const total=Number(account?.cash||0)+current;
- return <Page><ScrollView><GlobalBalanceCard availableFunds={account?.cash||0} investedValue={invested} currentValue={current} pnl={pnl}/><Card><Text style={s.section}>Allocation by Securities</Text>{holdings.map(h=><Text key={h.symbol} style={s.row}>{h.symbol}: {kes(h.marketValue)}</Text>)}</Card><Card><Text style={s.section}>Portfolio Summary</Text><InfoRow label="Available Funds" value={kes(account?.cash||0)}/><InfoRow label="Holdings Current Value" value={kes(current)}/><InfoRow label="Invested Value" value={kes(invested)}/><InfoRow label="Unrealized P&L" value={kes(pnl)} tone={pnl>=0?"green":"red"}/><InfoRow label="Total Equity" value={kes(total)}/></Card><Disclaimer/></ScrollView></Page>
+function mergePortfolioWithPrices(portfolioRows, priceRows) {
+  const priceMap = Object.fromEntries(
+    (priceRows || []).map(x => [
+      x.symbol,
+      {
+        price: Number(x.price || x.lastPrice || x.marketPrice || 0),
+        sector: x.sector || x.industry || x.category || "Other",
+        name: x.name
+      }
+    ])
+  );
+
+  return (portfolioRows || [])
+    .filter(h => Number(h.qty || 0) > 0)
+    .map(h => {
+      const market = priceMap[h.symbol] || {};
+      const qty = Number(h.qty || 0);
+      const avgPrice = Number(h.avgPrice || 0);
+      const marketPrice = Number(h.marketPrice || market.price || avgPrice || 0);
+
+      return {
+        ...h,
+        name: h.name || market.name,
+        sector: h.sector || h.industry || market.sector || "Other",
+        qty,
+        avgPrice,
+        marketPrice,
+        marketValue: qty * marketPrice,
+        investedValue: qty * avgPrice
+      };
+    });
 }
-const s=StyleSheet.create({section:{color:P.color.text,fontSize:18,fontWeight:"900",marginBottom:8},row:{color:P.color.text,paddingVertical:8}});
+
+export default function Portfolio() {
+  const [account, setAccount] = useState({ cash: 0 });
+  const [portfolio, setPortfolio] = useState([]);
+  const [prices, setPrices] = useState([]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedAllocation, setSelectedAllocation] = useState(null);
+
+  const load = async () => {
+    try {
+      const [a, pf, p] = await Promise.all([
+        API.get("/account/u1"),
+        API.get("/portfolio/u1"),
+        API.get("/prices")
+      ]);
+
+      setAccount(a.data || { cash: 0 });
+      setPortfolio(pf.data || []);
+      setPrices(p.data?.data || []);
+    } catch {}
+  };
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const holdings = useMemo(
+    () => mergePortfolioWithPrices(portfolio, prices),
+    [portfolio, prices]
+  );
+
+  const analytics = useMemo(
+    () => buildPortfolioAnalytics({ holdings, availableFunds: Number(account?.cash || 0) }),
+    [holdings, account]
+  );
+
+  const openHolding = (h) => {
+    router.push({ pathname: "/trade", params: { symbol: h.symbol, side: "BUY" } });
+  };
+
+  return (
+    <Page>
+      <Header title="Portfolio" />
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <GlobalAccountHeader />
+
+        <DonutChartCard
+          title="Allocation by Securities"
+          data={analytics.bySecurity}
+          selected={selectedAllocation?.type === "security" ? selectedAllocation : null}
+          onSelect={(segment) => setSelectedAllocation(segment)}
+        />
+
+        <DonutChartCard
+          title="Allocation by Industries"
+          data={analytics.byIndustry}
+          selected={selectedAllocation?.type === "industry" ? selectedAllocation : null}
+          onSelect={(segment) => setSelectedAllocation(segment)}
+        />
+
+        <DrilldownPanel
+          selected={selectedAllocation}
+          holdings={holdings}
+          onClear={() => setSelectedAllocation(null)}
+          onOpenHolding={openHolding}
+        />
+
+        <AIInsightsCard analytics={analytics} />
+
+        <CTA onPress={() => setDetailsOpen(true)}>Portfolio Details</CTA>
+
+        <Disclaimer />
+      </ScrollView>
+
+      <PortfolioDetailsModal
+        visible={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        account={account}
+        holdings={holdings}
+      />
+    </Page>
+  );
+}

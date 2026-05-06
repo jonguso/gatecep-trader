@@ -12,9 +12,9 @@
     "axios": "latest",
     "expo": "latest",
     "expo-router": "latest",
+    "expo-status-bar": "~3.0.9",
     "react": "latest",
     "react-native": "latest",
-    "react-native-svg": "latest"
-  },
-  "devDependencies": {}
+    "react-native-svg": "^15.15.4"
+  }
 }

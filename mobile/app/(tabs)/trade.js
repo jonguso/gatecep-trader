@@ -3,14 +3,43 @@ import { ScrollView, Text, StyleSheet, Alert, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
 import API from "../../src/api";
-import { Page, Header, Card, CTA, ActivityRow, Disclaimer } from "../../src/components/ProTradingUI";
+import { Page, Header, Card, CTA, Disclaimer } from "../../src/components/ProTradingUI";
+import GlobalAccountHeader from "../../src/components/GlobalAccountHeader";
 import NSEOrderBook from "../../src/components/NSEOrderBook";
 import NSEOrderEntry from "../../src/components/NSEOrderEntry";
+import SecurityDropdownModal from "../../src/components/SecurityDropdownModal";
 import PortfolioImpactModal from "../../src/components/PortfolioImpactModal";
+import CoachGDecisionModal from "../../src/components/CoachGDecisionModal";
 import AISignalCard from "../../src/components/AISignalCard";
 import { P } from "../../src/theme/proTheme";
 import { ref } from "../../src/utils/money";
 import { getPriceBand, isPriceAllowed } from "../../src/utils/priceBands";
+
+function format2(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+}
+
+function cleanQty(value) {
+  const n = Math.floor(Number(value || 0));
+  return String(Math.max(1, n));
+}
+
+function getBestOffer(market) {
+  const ask = market?.depth?.asks?.[0];
+  return {
+    price: Number(ask?.price || market?.offerPrice || market?.bestOffer || market?.price || market?.lastPrice || 0),
+    qty: Number(ask?.qty || market?.offerQty || market?.offerQuantity || market?.volume || 100)
+  };
+}
+
+function getBestBid(market) {
+  const bid = market?.depth?.bids?.[0];
+  return {
+    price: Number(bid?.price || market?.bidPrice || market?.bestBid || market?.price || market?.lastPrice || 0),
+    qty: Number(bid?.qty || market?.bidQty || market?.bidQuantity || market?.volume || 100)
+  };
+}
 
 function isDuplicateOrder(orders, { symbol, side, qty, price }) {
   return (orders || []).some(o => {
@@ -30,15 +59,18 @@ export default function Trade() {
   const [orderType, setOrderType] = useState("LIMIT");
   const [validity, setValidity] = useState("DAY");
   const [mode, setMode] = useState("Delivery");
-  const [price, setPrice] = useState("15");
-  const [qty, setQty] = useState("100");
+  const [price, setPrice] = useState("0.00");
+  const [qty, setQty] = useState("1");
 
   const [orders, setOrders] = useState([]);
   const [account, setAccount] = useState(null);
   const [marketRows, setMarketRows] = useState([]);
   const [confirmation, setConfirmation] = useState(null);
   const [impactOpen, setImpactOpen] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
   const [coachRec, setCoachRec] = useState(null);
+  const [allowTrade, setAllowTrade] = useState(false);
   const [userOverride, setUserOverride] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState(0);
@@ -49,14 +81,15 @@ export default function Trade() {
       API.get("/account/u1"),
       API.get("/prices")
     ]);
+
     setOrders(o.data || []);
     setAccount(a.data);
-    setMarketRows(p.data.data || []);
+    setMarketRows(p.data?.data || []);
   };
 
   useEffect(() => {
-    if (params.symbol) setSymbol(params.symbol);
-    if (params.side) setSide(params.side);
+    if (params.symbol) setSymbol(String(params.symbol));
+    if (params.side) setSide(String(params.side));
   }, [params.symbol, params.side]);
 
   useEffect(() => { load().catch(() => {}); }, []);
@@ -68,6 +101,26 @@ export default function Trade() {
   );
 
   const selectedName = selectedMarket?.name || selectedMarket?.securityName || symbol;
+
+  const bestOffer = useMemo(() => getBestOffer(selectedMarket), [selectedMarket]);
+  const bestBid = useMemo(() => getBestBid(selectedMarket), [selectedMarket]);
+
+  const currentDefault = side === "SELL" ? bestBid : bestOffer;
+
+  const resetDefaults = (nextSide = side, market = selectedMarket) => {
+    const defaults = nextSide === "SELL" ? getBestBid(market) : getBestOffer(market);
+    setPrice(format2(defaults.price));
+    setQty(cleanQty(defaults.qty));
+  };
+
+  useEffect(() => {
+    if (selectedMarket) resetDefaults(side, selectedMarket);
+  }, [selectedMarket?.symbol]);
+
+  useEffect(() => {
+    if (selectedMarket) resetDefaults(side, selectedMarket);
+  }, [side]);
+
   const referencePrice = Number(selectedMarket?.offerPrice || selectedMarket?.bestOffer || selectedMarket?.price || selectedMarket?.lastPrice || price || 0);
   const priceBand = useMemo(() => getPriceBand(referencePrice, 0.10, 0.10), [referencePrice]);
   const priceAllowed = isPriceAllowed(price, priceBand);
@@ -83,37 +136,57 @@ export default function Trade() {
 
   const duplicate = isDuplicateOrder(orders, { symbol, side, qty, price });
   const inCooldown = Date.now() < cooldownUntil;
-  const canConfirm = (coachRec?.allowAutoEnable || userOverride) && !duplicate && !inCooldown && !isSubmitting && priceAllowed;
+  const canConfirm = allowTrade && !duplicate && !inCooldown && !isSubmitting && priceAllowed;
 
   useEffect(() => {
     setCoachRec(null);
+    setCoachOpen(false);
+    setAllowTrade(false);
     setUserOverride(false);
     setConfirmation(null);
   }, [symbol, side, price, qty, orderType]);
 
+  const selectSecurity = (item) => {
+    setSymbol(item.symbol);
+    setCoachRec(null);
+    setAllowTrade(false);
+    setConfirmation(null);
+    resetDefaults(side, item);
+  };
+
   const handlePickBuy = ({ price, qty }) => {
     setSide("BUY");
-    setPrice(String(price));
-    setQty(String(Math.min(Number(qty || 100), 1000)));
+    setPrice(format2(price));
+    setQty(cleanQty(qty));
   };
 
   const handlePickSell = ({ price, qty }) => {
     setSide("SELL");
-    setPrice(String(price));
-    setQty(String(Math.min(Number(qty || 100), 1000)));
+    setPrice(format2(price));
+    setQty(cleanQty(qty));
   };
 
   const openImpact = (nextSide) => {
     setSide(nextSide);
+
+    const defaults = nextSide === "SELL" ? bestBid : bestOffer;
+    if (!Number(price || 0)) {
+      setPrice(format2(defaults.price));
+      setQty(cleanQty(defaults.qty));
+    }
+
     if (!priceAllowed) {
-      Alert.alert("Invalid Price", "Price must be within allowed range.");
+      Alert.alert("Invalid Price", `Price must be between ${priceBand.minPrice?.toFixed(2)} and ${priceBand.maxPrice?.toFixed(2)}.`);
       return;
     }
+
     setImpactOpen(true);
   };
 
   const continueToCoach = async () => {
     setImpactOpen(false);
+    let rec;
+
     try {
       const res = await API.post("/ai/recommendation", {
         userId: "u1",
@@ -123,9 +196,9 @@ export default function Trade() {
         qty: Number(qty),
         cashRequired
       });
-      setCoachRec(res.data);
+      rec = res.data;
     } catch {
-      setCoachRec({
+      rec = {
         symbol,
         signal: "REVIEW",
         action: "REVIEW",
@@ -135,8 +208,23 @@ export default function Trade() {
         riskFlags: duplicate ? ["Duplicate order detected"] : [],
         reasons: ["Local fallback recommendation used."],
         allowAutoEnable: !duplicate && priceAllowed
-      });
+      };
     }
+
+    setCoachRec(rec);
+    setCoachOpen(true);
+  };
+
+  const acceptCoach = () => {
+    setAllowTrade(true);
+    setUserOverride(false);
+    setCoachOpen(false);
+  };
+
+  const overrideCoach = () => {
+    setAllowTrade(true);
+    setUserOverride(true);
+    setCoachOpen(false);
   };
 
   const submit = async () => {
@@ -147,17 +235,11 @@ export default function Trade() {
 
     setIsSubmitting(true);
     try {
-      const res = await API.post("/order", {
-        userId: "u1",
-        symbol,
-        side,
-        price: Number(price),
-        qty: Number(qty)
-      });
-
+      const res = await API.post("/order", { userId: "u1", symbol, side, price: Number(price), qty: Number(qty) });
       setConfirmation({ ...res.data, ref: ref(symbol) });
       setCooldownUntil(Date.now() + 2000);
       setCoachRec(null);
+      setAllowTrade(false);
       setUserOverride(false);
       await load();
     } catch (e) {
@@ -170,7 +252,10 @@ export default function Trade() {
   return (
     <Page>
       <Header title="Trade" subtitle="NSE-style order entry" />
+
       <ScrollView showsVerticalScrollIndicator={false}>
+        <GlobalAccountHeader />
+
         <NSEOrderBook symbol={symbol} name={selectedName} market={selectedMarket} onPickBuy={handlePickBuy} onPickSell={handlePickSell} />
 
         <NSEOrderEntry
@@ -190,16 +275,15 @@ export default function Trade() {
           setMode={setMode}
           priceBand={priceBand}
           onOpenImpact={openImpact}
+          onOpenSecurity={() => setSecurityOpen(true)}
+          onResetDefaults={() => resetDefaults(side, selectedMarket)}
         />
 
         <Card>
           <Text style={styles.section}>Coach G Decision</Text>
           <AISignalCard recommendation={coachRec} />
           {duplicate && <Text style={styles.warning}>You already placed this order with the same symbol, side, quantity, and price.</Text>}
-          {coachRec && !coachRec.allowAutoEnable && (
-            <CTA tone="ghost" onPress={() => setUserOverride(true)}>Ignore & Proceed Manually</CTA>
-          )}
-          {userOverride && <Text style={styles.override}>Manual override enabled.</Text>}
+          {allowTrade && <Text style={styles.override}>{userOverride ? "Manual override enabled." : "Coach G accepted. Confirmation enabled."}</Text>}
         </Card>
 
         <View style={[styles.submitWrap, !canConfirm && styles.disabled]}>
@@ -207,6 +291,8 @@ export default function Trade() {
             {isSubmitting ? "Processing..." : `Confirm ${side} Order`}
           </CTA>
         </View>
+
+        {!canConfirm && <Text style={styles.guardText}>Tap BUY/SELL, review Portfolio Impact, then accept Coach G or override to enable confirmation.</Text>}
 
         {confirmation && (
           <Card>
@@ -216,14 +302,16 @@ export default function Trade() {
           </Card>
         )}
 
-        <Card>
-          <Text style={styles.section}>Recent Activity</Text>
-          {orders.length === 0 && <Text style={styles.empty}>No recent trades</Text>}
-          {orders.slice(0, 5).map(o => <ActivityRow key={o.id} item={o} />)}
-        </Card>
-
         <Disclaimer />
       </ScrollView>
+
+      <SecurityDropdownModal
+        visible={securityOpen}
+        onClose={() => setSecurityOpen(false)}
+        securities={marketRows}
+        selectedSymbol={symbol}
+        onSelect={selectSecurity}
+      />
 
       <PortfolioImpactModal
         visible={impactOpen}
@@ -239,6 +327,14 @@ export default function Trade() {
         cashRequired={cashRequired}
         estimatedProceeds={estimatedProceeds}
       />
+
+      <CoachGDecisionModal
+        visible={coachOpen}
+        recommendation={coachRec}
+        onAccept={acceptCoach}
+        onOverride={overrideCoach}
+        onCancel={() => setCoachOpen(false)}
+      />
     </Page>
   );
 }
@@ -249,7 +345,7 @@ const styles = StyleSheet.create({
   override: { color: P.color.green, fontWeight: "900", marginTop: 10 },
   submitWrap: { marginHorizontal: 18 },
   disabled: { opacity: 0.45 },
+  guardText: { color: P.color.muted, fontSize: 11, lineHeight: 16, marginHorizontal: 18, marginBottom: 10 },
   success: { color: P.color.green, fontSize: 18, fontWeight: "900", marginBottom: 8 },
-  body: { color: P.color.text, lineHeight: 20, marginTop: 4 },
-  empty: { color: P.color.muted, lineHeight: 20 }
+  body: { color: P.color.text, lineHeight: 20, marginTop: 4 }
 });
