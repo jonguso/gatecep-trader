@@ -1,15 +1,63 @@
 import { useEffect, useState } from "react";
-import { ScrollView, View, Text, Pressable, StyleSheet, Alert } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import API from "../../src/api";
+import { ScrollView, View, Text, StyleSheet } from "react-native";
 import { Page } from "../../src/components/ProTradingUI";
 import BrokerHeader from "../../src/components/BrokerHeader";
+import { getBrokerFunds } from "../../src/services/brokerMirrorApi";
+import { kes } from "../../src/utils/money";
 
 export default function Funds() {
-  const [account,setAccount]=useState({cash:0});
-  useEffect(()=>{API.get("/account/u1").then(r=>setAccount(r.data||{cash:0})).catch(()=>{})},[]);
-  const cash=Number(account?.cash||0);
-  return <Page><BrokerHeader title="Available Funds"/><ScrollView style={styles.body}><View style={styles.hero}><View style={styles.circle}><Text style={styles.circleLabel}>Free{"\n"}Cash Balance</Text><Text style={styles.circleValue}>{cash.toLocaleString("en-KE",{minimumFractionDigits:2})}</Text></View></View><View style={styles.buttons}><Pressable onPress={()=>Alert.alert("Deposit","Deposit flow placeholder")} style={[styles.fundBtn,{backgroundColor:"#DCFCE7"}]}><Ionicons name="add-circle-outline" size={22} color="#166534"/><Text style={styles.fundText}>DEPOSIT</Text></Pressable><Pressable onPress={()=>Alert.alert("Withdraw","Withdraw flow placeholder")} style={[styles.fundBtn,{backgroundColor:"#FEE2E2"}]}><Ionicons name="remove-circle-outline" size={22} color="#991B1B"/><Text style={styles.fundText}>WITHDRAW</Text></Pressable></View><View style={styles.table}><View style={styles.tableHeader}><Text style={styles.th}>Description</Text><Text style={styles.th}>(KES) Amount</Text></View><Row label="Ledger Balance" value={cash}/><Row label="Pending Payments" value={0}/><Row label="Pending Buy Orders" value={0}/><Row label="Others" value={0}/><Row label="Funding Limit" value={0}/><View style={styles.tradingSpace}><Text style={styles.spaceText}>Trading Space KES</Text><Text style={styles.spaceValue}>{cash.toLocaleString("en-KE",{minimumFractionDigits:2})}</Text></View></View></ScrollView></Page>
+  const [payload, setPayload] = useState(null);
+
+  useEffect(() => {
+    getBrokerFunds("u1").then(setPayload).catch(() => {});
+  }, []);
+
+  const totals = payload?.totals || {};
+
+  return (
+    <Page>
+      <BrokerHeader title="Funds" subtitle="Broker mirrored balances" />
+      <ScrollView style={styles.body}>
+        <View style={styles.summary}>
+          <Text style={styles.label}>TOTAL AVAILABLE CASH</Text>
+          <Text style={styles.big}>{kes(totals.availableCash || 0)}</Text>
+          <Text style={styles.rowText}>Ledger Balance: {kes(totals.ledgerBalance || 0)}</Text>
+          <Text style={styles.rowText}>Pending Payments: {kes(totals.pendingPayments || 0)}</Text>
+          <Text style={styles.rowText}>Pending Buy Orders: {kes(totals.pendingBuyOrders || 0)}</Text>
+        </View>
+
+        <Text style={styles.section}>Broker Cash Balances</Text>
+
+        {(payload?.brokerFunds || []).map(f => (
+          <View key={f.brokerId} style={styles.card}>
+            <Text style={styles.broker}>{f.brokerName}</Text>
+            <Text style={styles.account}>Account: {f.accountNumber}</Text>
+            <Row label="Ledger Balance" value={f.ledgerBalance} />
+            <Row label="Available Cash" value={f.availableCash} />
+            <Row label="Pending Payments" value={f.pendingPayments} />
+            <Row label="Pending Buy Orders" value={f.pendingBuyOrders} />
+          </View>
+        ))}
+      </ScrollView>
+    </Page>
+  );
 }
-function Row({label,value}){return <View style={styles.row}><Text style={styles.rowLabel}>{label}</Text><Text style={styles.rowValue}>{Number(value||0).toLocaleString("en-KE",{minimumFractionDigits:2})}</Text></View>}
-const styles=StyleSheet.create({body:{backgroundColor:"#08111F"},hero:{backgroundColor:"#06154A",height:210,borderBottomLeftRadius:18,borderBottomRightRadius:18,alignItems:"center",justifyContent:"center"},circle:{width:150,height:150,borderRadius:75,borderWidth:6,borderColor:"#94A3B8",alignItems:"center",justifyContent:"center"},circleLabel:{color:"#94A3B8",textAlign:"center",lineHeight:20},circleValue:{color:"#fff",fontSize:18,fontWeight:"900",marginTop:8},buttons:{flexDirection:"row",justifyContent:"center",gap:24,marginTop:-22},fundBtn:{flexDirection:"row",alignItems:"center",gap:6,paddingHorizontal:18,paddingVertical:12,borderRadius:8,elevation:3},fundText:{color:"#111827",fontWeight:"900"},table:{marginHorizontal:24,marginTop:32,backgroundColor:"#111D35",borderRadius:16,overflow:"hidden"},tableHeader:{flexDirection:"row",backgroundColor:"#16233F",paddingVertical:14},th:{flex:1,textAlign:"center",color:"#94A3B8",fontWeight:"900"},row:{flexDirection:"row",borderBottomWidth:1,borderBottomColor:"rgba(148,163,184,.18)",paddingVertical:14},rowLabel:{flex:1,textAlign:"center",color:"#CBD5E1",fontWeight:"700"},rowValue:{flex:1,textAlign:"center",color:"#fff",fontWeight:"900"},tradingSpace:{backgroundColor:"#0878BF",flexDirection:"row",justifyContent:"center",gap:16,paddingVertical:16,marginTop:18},spaceText:{color:"#fff",fontWeight:"700"},spaceValue:{color:"#fff",fontWeight:"900",fontSize:18}});
+
+function Row({ label, value }) {
+  return <View style={styles.line}><Text style={styles.lineLabel}>{label}</Text><Text style={styles.lineValue}>{kes(value || 0)}</Text></View>
+}
+
+const styles = StyleSheet.create({
+  body:{backgroundColor:"#08111F",padding:16},
+  summary:{backgroundColor:"#111D35",borderRadius:16,padding:18,marginBottom:18},
+  label:{color:"#94A3B8",fontSize:11,fontWeight:"900"},
+  big:{color:"#fff",fontSize:30,fontWeight:"900",marginTop:6},
+  rowText:{color:"#CBD5E1",marginTop:8,fontWeight:"800"},
+  section:{color:"#fff",fontSize:18,fontWeight:"900",marginBottom:10},
+  card:{backgroundColor:"#111D35",borderRadius:14,padding:14,marginBottom:12,borderWidth:1,borderColor:"rgba(148,163,184,.22)"},
+  broker:{color:"#fff",fontSize:18,fontWeight:"900"},
+  account:{color:"#38BDF8",fontWeight:"800",marginTop:4,marginBottom:10},
+  line:{flexDirection:"row",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"rgba(148,163,184,.18)",paddingVertical:10},
+  lineLabel:{color:"#CBD5E1"},
+  lineValue:{color:"#fff",fontWeight:"900"}
+});
