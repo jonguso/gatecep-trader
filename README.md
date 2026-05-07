@@ -1,24 +1,26 @@
-# Gatecep Trade Security Dropdown + Defaults Fix
+# Gatecep Full NSE Securities Backend Fix
 
-Fixes the Trade page:
+The Watchlist is only showing 10 because `/prices` returns only 10 demo rows.
 
-- Security is now a dropdown.
-- Changing security refreshes:
-  - order book
-  - open/high/low/close/change
-  - price bands
-  - security name
-- Quantity defaults to best offer quantity for BUY.
-- Quantity defaults to best bid quantity for SELL.
-- Price defaults to best offer price for BUY.
-- Price defaults to best bid price for SELL.
-- Price input accepts up to 2 decimal places only.
-- Reset button resets price/quantity to current best bid/offer.
+This patch makes `/prices` return a full NSE security master merged with demo/live prices.
 
 Apply:
-
 ```bash
-copy mobile folder into your existing mobile/
-cd mobile
-npx expo start -c
+copy backend folder into your existing backend/
+cd backend
+npm start
+```
+
+Then test:
+```bash
+curl http://localhost:4000/prices
+```
+
+You should see `count` greater than 10.
+
+If mobile uses Railway, commit and push backend so Railway redeploys:
+```bash
+git add .
+git commit -m "Return full NSE securities in prices feed"
+git push
 ```
