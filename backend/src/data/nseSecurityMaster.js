@@ -314,3 +314,49 @@ export const NSE_SECURITY_MASTER = [
 export function normalizeSymbol(symbol) {
   return String(symbol || "").trim().toUpperCase();
 }
+
+export function mergeSecurityMasterWithPrices(priceRows = []) {
+  const priceMap = new Map();
+
+  for (const row of priceRows || []) {
+    const symbol = normalizeSymbol(row.symbol);
+    if (!symbol) continue;
+    priceMap.set(symbol, {
+      ...row,
+      symbol,
+      name: row.name || row.securityName || symbol,
+      sector: row.sector || row.industry || "Other",
+      hasLivePrice: true
+    });
+  }
+
+  for (const security of NSE_SECURITY_MASTER) {
+    const symbol = normalizeSymbol(security.symbol);
+    if (!priceMap.has(symbol)) {
+      priceMap.set(symbol, {
+        ...security,
+        symbol,
+        price: 0,
+        lastPrice: 0,
+        open: 0,
+        high: 0,
+        low: 0,
+        prevClose: 0,
+        change: 0,
+        changePct: 0,
+        volume: 0,
+        turnover: 0,
+        hasLivePrice: false
+      });
+    } else {
+      priceMap.set(symbol, {
+        ...security,
+        ...priceMap.get(symbol),
+        name: priceMap.get(symbol).name || security.name,
+        sector: priceMap.get(symbol).sector || security.sector
+      });
+    }
+  }
+
+  return Array.from(priceMap.values()).sort((a, b) => a.symbol.localeCompare(b.symbol));
+}
