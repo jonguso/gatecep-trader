@@ -13,7 +13,8 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="security/[symbol]" />
 	<Stack.Screen name="account-profile" />
-      <Stack.Screen name="settings" />
+        <Stack.Screen name="settings" />
+	<Stack.Screen name="brokers" />
       </Stack>
     </AuthProvider>
   );

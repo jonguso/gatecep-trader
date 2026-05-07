@@ -7,11 +7,13 @@ import { placeOrder, listOrders } from "./routes/orders.js";
 import { getTradeRecommendation } from "./routes/recommendations.js";
 import { getLedger, getBalances, clearPendingOrders } from "./routes/accounting.js";
 import { authRouter } from "./routes/authRoutes.js";
+import { brokerRouter } from "./routes/brokerRoutes.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/auth", authRouter);
+app.use("/brokers", brokerRouter);
 
 app.get("/", (req, res) => res.json({ ok: true, app: "gatecep-backend" }));
 app.get("/prices", async (req, res) => res.json(await marketDataGateway.getPrices()));

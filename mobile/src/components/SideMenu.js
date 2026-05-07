@@ -49,6 +49,11 @@ export default function SideMenu({ visible, onClose }) {
           <MenuItem icon="document-text-outline" label="Terms of Service" />
           <MenuItem icon="shield-checkmark-outline" label="Privacy Policy" />
           <MenuItem icon="help-circle-outline" label="Show Tutorial" />
+	  <MenuItem
+  icon="business-outline"
+  label="Brokers"
+  onPress={() => go("/brokers")}
+/>
 
           <Pressable onPress={signOut} style={styles.menuItem}>
             <Ionicons name="log-out-outline" size={26} color="#FFFFFF" />
