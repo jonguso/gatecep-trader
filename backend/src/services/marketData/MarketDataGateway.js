@@ -8,12 +8,40 @@ function round2(value) {
   return Number(Number(value || 0).toFixed(2));
 }
 
-function priceFor(symbol) {
-  const seed = String(symbol)
-    .split("")
-    .reduce((sum, c) => sum + c.charCodeAt(0), 0);
+const MARKET_BASE_PRICES = {
+  ABSA: 28.30,
+  AMAC: 8.50,
+  BAMB: 32.00,
+  BAT: 573.00,
+  BKG: 34.50,
+  BOC: 95.00,
+  BRIT: 16.38,
+  CARB: 28.50,
+  CGEN: 24.00,
+  CIC: 2.85,
+  COOP: 29.00,
+  DTB: 70.00,
+  EABL: 241.75,
+  EQTY: 74.50,
+  HFCK: 5.20,
+  IMH: 42.00,
+  KCB: 67.50,
+  KEGN: 8.20,
+  KPLC: 16.25,
+  KNRE: 2.30,
+  KQ: 4.15,
+  NCBA: 44.49,
+  NSE: 20.30,
+  SCBK: 210.00,
+  SCOM: 29.85,
+  SLAM: 8.90,
+  TOTL: 24.50
+};
 
-  return round2(5 + (seed % 580) + rand(-2, 2));
+function priceFor(symbol) {
+  const base = MARKET_BASE_PRICES[symbol] || 25;
+  const movement = ((symbol.charCodeAt(0) % 5) - 2) * 0.35;
+  return round2(base + movement);
 }
 
 class MarketDataGateway {
