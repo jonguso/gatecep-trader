@@ -1,61 +1,12 @@
 export const BROKERS = [
-  {
-    id: "mock-broker",
-    name: "GATECEP Mock Broker",
-    country: "Kenya",
-    status: "ACTIVE_DEMO",
-    supportsApiTrading: true,
-    supportsPortfolioSync: true,
-    accountLinkingMode: "INSTANT_DEMO",
-    fees: { commissionBps: 200, minFee: 50 },
-    notes: "Demo broker used for safe testing only."
-  },
-  {
-    id: "aib-axys",
-    name: "AIB-AXYS Africa",
-    country: "Kenya",
-    status: "PARTNER_PENDING",
-    supportsApiTrading: false,
-    supportsPortfolioSync: false,
-    accountLinkingMode: "MANUAL_VERIFICATION",
-    fees: { commissionBps: 210, minFee: 100 },
-    notes: "Adapter placeholder. Enable after signed API partnership."
-  },
-  {
-    id: "dyer-blair",
-    name: "Dyer & Blair Investment Bank",
-    country: "Kenya",
-    status: "PARTNER_PENDING",
-    supportsApiTrading: false,
-    supportsPortfolioSync: false,
-    accountLinkingMode: "MANUAL_VERIFICATION",
-    fees: { commissionBps: 210, minFee: 100 },
-    notes: "Adapter placeholder. Enable after signed API partnership."
-  },
-  {
-    id: "faida",
-    name: "Faida Investment Bank",
-    country: "Kenya",
-    status: "PARTNER_PENDING",
-    supportsApiTrading: false,
-    supportsPortfolioSync: false,
-    accountLinkingMode: "MANUAL_VERIFICATION",
-    fees: { commissionBps: 210, minFee: 100 },
-    notes: "Adapter placeholder. Enable after signed API partnership."
-  },
-  {
-    id: "ncba-invest",
-    name: "NCBA Investment Bank",
-    country: "Kenya",
-    status: "PARTNER_PENDING",
-    supportsApiTrading: false,
-    supportsPortfolioSync: false,
-    accountLinkingMode: "MANUAL_VERIFICATION",
-    fees: { commissionBps: 210, minFee: 100 },
-    notes: "Adapter placeholder. Enable after signed API partnership."
-  }
+  { id: "aib", name: "AIB-AXYS Africa", shortName: "AIB", market: "NSE", status: "SIGNUP_AVAILABLE", signupUrl: "https://www.aib-axysafrica.com/", supportsApiRouting: false },
+  { id: "abc", name: "ABC Capital", shortName: "ABC", market: "NSE", status: "SIGNUP_AVAILABLE", signupUrl: "https://www.abccapital.co.ke/", supportsApiRouting: false },
+  { id: "ncba", name: "NCBA Investment Bank", shortName: "NCBA", market: "NSE", status: "PLANNED", signupUrl: "", supportsApiRouting: false },
+  { id: "dyer", name: "Dyer & Blair Investment Bank", shortName: "Dyer", market: "NSE", status: "PLANNED", signupUrl: "", supportsApiRouting: false },
+  { id: "kingdom", name: "Kingdom Securities", shortName: "Kingdom", market: "NSE", status: "PLANNED", signupUrl: "", supportsApiRouting: false },
+  { id: "sib", name: "Standard Investment Bank", shortName: "SIB", market: "NSE", status: "PLANNED", signupUrl: "", supportsApiRouting: false }
 ];
 
-export function getBroker(brokerId) {
-  return BROKERS.find(b => b.id === brokerId);
+export function findBroker(id) {
+  return BROKERS.find(b => b.id === id);
 }
