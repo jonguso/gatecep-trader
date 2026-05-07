@@ -13,7 +13,7 @@ export default function useMarketData() {
 
   const loadHttp = async () => {
     try {
-      const r = await API.get("/market/snapshot").catch(() => API.get("/prices"));
+      const r = await API.get("/prices");
       setRows(r.data?.data || []);
     } catch {}
   };

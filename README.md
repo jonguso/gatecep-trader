@@ -1,26 +1,46 @@
-# Gatecep Full NSE Securities Backend Fix
+# Gatecep Signup Email + Password Flow
 
-The Watchlist is only showing 10 because `/prices` returns only 10 demo rows.
+Signup now works like this:
 
-This patch makes `/prices` return a full NSE security master merged with demo/live prices.
+1. User enters trading account, ID, and email.
+2. Backend creates a customer number.
+3. Email becomes the username.
+4. Backend generates a temporary password.
+5. Backend sends the password to the user's email.
+6. User logs in using email + temporary password.
 
-Apply:
+## Install backend email dependency
+
 ```bash
-copy backend folder into your existing backend/
 cd backend
-npm start
+npm install nodemailer
 ```
 
-Then test:
-```bash
-curl http://localhost:4000/prices
+## Add Railway / .env variables
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM="Gatecep Capital Markets <your_email@gmail.com>"
 ```
 
-You should see `count` greater than 10.
+For Gmail, use an App Password.
 
-If mobile uses Railway, commit and push backend so Railway redeploys:
-```bash
-git add .
-git commit -m "Return full NSE securities in prices feed"
-git push
+## Patch backend/server.js
+
+See:
+
+```text
+backend/src/docs/AUTH_SERVER_PATCH.md
+```
+
+## Mobile files updated
+
+```text
+mobile/src/auth/AuthContext.js
+mobile/app/signup.js
+mobile/app/login.js
 ```
