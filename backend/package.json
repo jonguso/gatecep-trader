@@ -9,6 +9,7 @@
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
+    "nodemailer": "^8.0.7",
     "uuid": "latest"
   }
 }

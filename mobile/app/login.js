@@ -12,22 +12,27 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const submit = async () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert("Login Required", "Enter email username and password.");
-      return;
-    }
+ const submit = async () => {
+  if (!username.trim() || !password.trim()) {
+    Alert.alert("Login Required", "Enter email username and password.");
+    return;
+  }
 
-    setBusy(true);
-    try {
-      await login({ username: username.trim().toLowerCase(), password });
-      router.replace("/(tabs)/dashboard");
-    } catch (err) {
-      Alert.alert("Login Failed", err.response?.data?.error || "Invalid username or password.");
-    } finally {
-      setBusy(false);
-    }
-  };
+  setBusy(true);
+
+  try {
+    await login({
+      username: username.trim().toLowerCase(),
+      password,
+    });
+
+    router.replace("/(tabs)/dashboard");
+  } catch (err) {
+    Alert.alert("Login Failed", err.response?.data?.error || "Invalid username or password.");
+  } finally {
+    setBusy(false);
+  }
+};
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
@@ -68,6 +73,11 @@ export default function Login() {
 
       <Text style={styles.linkCenter}>Open New Trading Account</Text>
       <Text style={styles.linkCenterBottom}>Follow Us On Social Media</Text>
+	
+	<Pressable onPress={submit} style={styles.primary}>
+  <Text style={styles.primaryText}>{busy ? "LOGIN..." : "LOGIN"}</Text>
+</Pressable>
+
     </ScrollView>
   );
 }

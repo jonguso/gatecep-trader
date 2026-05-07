@@ -1,46 +1,37 @@
-# Gatecep Signup Email + Password Flow
+# Gatecep Account Menu + Profile + Settings Logic
 
-Signup now works like this:
+Adds only logic/UI for:
+- Top-left hamburger menu
+- Side menu with Sign Out and Settings
+- Top-right account profile icon
+- Account Profile screen
+- Basic Settings screen
+- Logout using existing AuthContext
 
-1. User enters trading account, ID, and email.
-2. Backend creates a customer number.
-3. Email becomes the username.
-4. Backend generates a temporary password.
-5. Backend sends the password to the user's email.
-6. User logs in using email + temporary password.
+Does not change trading flow.
 
-## Install backend email dependency
+## New / updated files
+
+```text
+mobile/src/components/AppTopBar.js
+mobile/src/components/SideMenu.js
+mobile/app/account-profile.js
+mobile/app/settings.js
+mobile/app/(tabs)/dashboard.js
+```
+
+## Apply
+
+Copy `mobile` into your existing mobile folder.
+
+Then:
 
 ```bash
-cd backend
-npm install nodemailer
+cd mobile
+npx expo start -c
 ```
 
-## Add Railway / .env variables
+## Important
 
-```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_gmail_app_password
-SMTP_FROM="Gatecep Capital Markets <your_email@gmail.com>"
-```
-
-For Gmail, use an App Password.
-
-## Patch backend/server.js
-
-See:
-
-```text
-backend/src/docs/AUTH_SERVER_PATCH.md
-```
-
-## Mobile files updated
-
-```text
-mobile/src/auth/AuthContext.js
-mobile/app/signup.js
-mobile/app/login.js
-```
+Use `AppTopBar` on any screen where you want the hamburger + profile icon.
+This package updates Dashboard as the example.

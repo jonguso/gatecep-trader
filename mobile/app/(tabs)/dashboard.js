@@ -8,6 +8,8 @@ import BrokerHeader from "../../src/components/BrokerHeader";
 import useMarketData from "../../src/hooks/useMarketData";
 import { kes } from "../../src/utils/money";
 import { getMarketStatus, getStatusStyle } from "../../src/utils/marketStatus";
+import AppTopBar from "../../src/components/AppTopBar";
+import SideMenu from "../../src/components/SideMenu";
 
 export default function Dashboard() {
   const [tab, setTab] = useState("Gainers");
@@ -32,6 +34,7 @@ export default function Dashboard() {
 
   const status = getMarketStatus(now);
   const statusStyle = getStatusStyle(status);
+const [menuOpen, setMenuOpen] = useState(false);
 
   const marketMap = Object.fromEntries(rows.map(x => [x.symbol, x]));
   const invested = holdings.reduce((s, h) => s + Number(h.qty || 0) * Number(h.avgPrice || 0), 0);
@@ -61,10 +64,10 @@ export default function Dashboard() {
 
   return (
     <Page>
-      <BrokerHeader
-        title="Dashboard"
-        right={<Text style={[styles.badge, statusStyle]}>{status.label}</Text>}
-      />
+      <AppTopBar
+  title="Dashboard"
+  onMenuPress={() => setMenuOpen(true)}
+/>
 
       <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
@@ -139,6 +142,10 @@ export default function Dashboard() {
           )}
         </View>
       </ScrollView>
+<SideMenu
+  visible={menuOpen}
+  onClose={() => setMenuOpen(false)}
+/>
     </Page>
   );
 }
