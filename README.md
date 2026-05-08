@@ -1,54 +1,45 @@
-# Gatecep Broker Mirror Engine
+# Gatecep Unified Portfolio + Broker Mirror Engine
 
-This build changes the direction from local/demo portfolio to broker-mirrored architecture.
+This module turns Gatecep into a broker-agnostic portfolio mirror.
 
-## What it adds
+## Adds
 
 Backend:
-- Mock AIB broker adapter
-- Mock ABC broker adapter
-- Broker adapter factory
-- Broker mirror API routes
-- Portfolio/funds/orders mirrored from selected brokers
-- Buy/Sell routes through broker adapter
-- Cancel order placeholder
+- Unified portfolio aggregation service
+- Broker holdings merge by symbol
+- Broker exposure breakdown
+- Sector allocation breakdown
+- P&L and risk metrics
+- Unified portfolio API route
 
 Mobile:
-- Portfolio reads broker-side portfolio
-- Funds reads broker-side balances
-- Orders reads broker-side orders
-- Order entry can send brokerId/broker account info
-- Broker filter support
+- Unified Portfolio screen
+- Broker breakdown cards
+- Sector allocation cards
+- Security-level consolidated holdings
+- Coach G portfolio risk insights
 
-## Backend files
-
-```text
-backend/src/brokerAdapters/BrokerAdapter.js
-backend/src/brokerAdapters/MockAibAdapter.js
-backend/src/brokerAdapters/MockAbcAdapter.js
-backend/src/brokerAdapters/BrokerAdapterFactory.js
-backend/src/routes/brokerMirrorRoutes.js
-backend/src/docs/BROKER_MIRROR_SERVER_PATCH.md
-```
-
-## Mobile files
+## Files
 
 ```text
-mobile/src/services/brokerMirrorApi.js
+backend/src/services/portfolio/UnifiedPortfolioEngine.js
+backend/src/routes/unifiedPortfolioRoutes.js
+backend/src/docs/UNIFIED_PORTFOLIO_SERVER_PATCH.md
+
+mobile/src/services/unifiedPortfolioApi.js
 mobile/app/(tabs)/portfolio.js
-mobile/app/(tabs)/funds.js
-mobile/app/(tabs)/orders.js
 ```
 
 ## Patch backend server.js
 
-See:
+Add:
 
-```text
-backend/src/docs/BROKER_MIRROR_SERVER_PATCH.md
+```js
+import { unifiedPortfolioRouter } from "./routes/unifiedPortfolioRoutes.js";
+app.use("/unified-portfolio", unifiedPortfolioRouter);
 ```
 
-## Test backend
+## Test
 
 ```bash
 cd backend
@@ -58,12 +49,14 @@ npm start
 Open:
 
 ```text
-http://localhost:4000/broker-mirror/portfolio/u1
-http://localhost:4000/broker-mirror/funds/u1
-http://localhost:4000/broker-mirror/orders/u1
+http://localhost:4000/unified-portfolio/u1
 ```
 
-## Important
+## Result
 
-This is mock broker-side data, but the architecture is production-ready:
-replace MockAibAdapter / MockAbcAdapter with real broker APIs later.
+Gatecep will show:
+- Total portfolio value across AIB + ABC
+- Consolidated holdings e.g. SCOM from all brokers combined
+- Broker exposure
+- Sector exposure
+- Coach G risk summary

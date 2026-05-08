@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import API from "./api";
+import OrdersPage from "./pages/OrdersPage";
 
 const pages = ["Dashboard", "Markets", "Brokers", "Onboarding", "Trade", "Portfolio", "Orders", "Coach G", "Audit"];
 
@@ -167,6 +168,7 @@ function Trade({ symbol, load }) {
     </section>
   );
 }
+<OrdersPage />
 
 function Coach({ symbol, askCoach, answer }) {
   return <section><h1>Coach G</h1><div className="panel"><button onClick={askCoach}>Should I buy {symbol}?</button><p>{answer}</p></div></section>;
