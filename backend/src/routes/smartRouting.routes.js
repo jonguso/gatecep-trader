@@ -1,18 +1,19 @@
 import express from "express";
 
 import {
-  getPortfolio
-} from "../services/portfolio/portfolio.service.js";
+  getSmartRoutingRecommendation
+} from "../services/orders/smartRouter.service.js";
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const portfolio = await getPortfolio();
+    const recommendation =
+      await getSmartRoutingRecommendation();
 
     res.json({
       ok: true,
-      portfolio
+      recommendation
     });
   } catch (error) {
     res.status(500).json({

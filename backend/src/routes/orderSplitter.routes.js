@@ -1,18 +1,18 @@
 import express from "express";
 
 import {
-  getPortfolio
-} from "../services/portfolio/portfolio.service.js";
+  splitOrder
+} from "../services/orders/orderSplitter.service.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.post("/", (req, res) => {
   try {
-    const portfolio = await getPortfolio();
+    const result = splitOrder(req.body);
 
     res.json({
       ok: true,
-      portfolio
+      split: result
     });
   } catch (error) {
     res.status(500).json({

@@ -1,18 +1,19 @@
 import express from "express";
 
 import {
-  getPortfolio
-} from "../services/portfolio/portfolio.service.js";
+  getAdminDashboard
+} from "../services/admin/adminDashboard.service.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/dashboard", async (req, res) => {
   try {
-    const portfolio = await getPortfolio();
+    const dashboard =
+      await getAdminDashboard();
 
     res.json({
       ok: true,
-      portfolio
+      dashboard
     });
   } catch (error) {
     res.status(500).json({

@@ -1,18 +1,19 @@
 import express from "express";
 
 import {
-  getPortfolio
-} from "../services/portfolio/portfolio.service.js";
+  getComplianceAlerts
+} from "../services/compliance/compliance.service.js";
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const portfolio = await getPortfolio();
+    const compliance =
+      await getComplianceAlerts();
 
     res.json({
       ok: true,
-      portfolio
+      compliance
     });
   } catch (error) {
     res.status(500).json({

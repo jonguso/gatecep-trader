@@ -20,6 +20,21 @@ import executionRouter from "./routes/execution.routes.js";
 import http from "http";
 import { Server } from "socket.io";
 import { initOrderSocket } from "./websocket/orders.socket.js";
+import analyticsRouter from "./routes/analytics.routes.js";
+import smartRoutingRouter from "./routes/smartRouting.routes.js";
+import brokerHealthRouter from "./routes/brokerHealth.routes.js";
+import omsAlertsRouter from "./routes/omsAlerts.routes.js";
+import orderHistoryRouter from "./routes/orderHistory.routes.js";
+import riskRouter from "./routes/risk.routes.js";
+import orderBookRouter from "./routes/orderBook.routes.js";
+import executionAdvisorRouter from "./routes/executionAdvisor.routes.js";
+import orderSplitterRouter from "./routes/orderSplitter.routes.js";
+import childOrdersRouter from "./routes/childOrders.routes.js";
+import portfolioRouter from "./routes/portfolio.routes.js";
+import performanceRouter from "./routes/performance.routes.js";
+import settlementRouter from "./routes/settlement.routes.js";
+import complianceRouter from "./routes/compliance.routes.js";
+import adminRouter from "./routes/admin.routes.js";
 
 const app = express();
 
@@ -29,11 +44,35 @@ app.use(express.json());
 app.use("/auth", authRouter);
 app.use("/brokers", brokerRouter);
 app.use("/execution", executionRouter);
+app.use("/execution", analyticsRouter);
+app.use("/execution/smart-routing", smartRoutingRouter);
+app.use("/broker-health", brokerHealthRouter);
+app.use("/oms-alerts", omsAlertsRouter);
+app.use("/order-history", orderHistoryRouter);
+app.use("/risk", riskRouter);
+app.use("/order-book", orderBookRouter);
+app.use("/execution-advisor", executionAdvisorRouter);
+app.use("/order-splitter", orderSplitterRouter);
+app.use("/child-orders", childOrdersRouter);
+app.use("/portfolio-live", portfolioRouter);
+app.use("/portfolio-performance", performanceRouter);
+app.use("/settlement-ledger", settlementRouter);
+app.use("/compliance", complianceRouter);
+app.use("/admin", adminRouter);
 
 app.get("/", (req, res) => {
   res.json({
     ok: true,
     app: "gatecep-backend"
+  });
+});
+
+app.get("/health", (req, res) => {
+  res.json({
+    ok: true,
+    app: "gatecep-backend",
+    status: "ONLINE",
+    timestamp: new Date().toISOString()
   });
 });
 

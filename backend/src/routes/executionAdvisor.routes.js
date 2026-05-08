@@ -1,18 +1,20 @@
 import express from "express";
 
 import {
-  getPortfolio
-} from "../services/portfolio/portfolio.service.js";
+  getExecutionAdvice
+} from "../services/ai/executionAdvisor.service.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+router.get("/:symbol", (req, res) => {
   try {
-    const portfolio = await getPortfolio();
+    const advice = getExecutionAdvice(
+      req.params.symbol
+    );
 
     res.json({
       ok: true,
-      portfolio
+      advice
     });
   } catch (error) {
     res.status(500).json({
