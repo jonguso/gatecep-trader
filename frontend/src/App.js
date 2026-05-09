@@ -7,81 +7,185 @@ import {
   Link
 } from "react-router-dom";
 
-import ExecutionAnalyticsPage from "./pages/ExecutionAnalyticsPage";
-import LiveOrderExecutionPanel from "./components/orders/LiveOrderExecutionPanel";
-import TradeBlotterPage from "./pages/TradeBlotterPage";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+
+import ProtectedRoute from "./components/ProtectedRoute";
+import LoginPage from "./pages/LoginPage";
+
+import AdminControlCenter from "./components/AdminControlCenter";
 import PortfolioDashboard from "./components/PortfolioDashboard";
 import PortfolioPerformanceChart from "./components/PortfolioPerformanceChart";
 import SettlementLedgerPanel from "./components/SettlementLedgerPanel";
 import ComplianceSurveillancePanel from "./components/ComplianceSurveillancePanel";
-import AdminControlCenter from "./components/AdminControlCenter";
+
+import LiveOrderExecutionPanel from "./components/orders/LiveOrderExecutionPanel";
+import ExecutionAnalyticsPage from "./pages/ExecutionAnalyticsPage";
+import TradeBlotterPage from "./pages/TradeBlotterPage";
+
+import OrderSplitterPanel from "./components/OrderSplitterPanel";
+import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
+import LiveMarketTicker from "./components/LiveMarketTicker";
+import ProfessionalChart from "./components/ProfessionalChart";
+import CoachGSignalsPanel from "./components/CoachGSignalsPanel";
+import WatchlistPanel from "./components/WatchlistPanel";
+import BrokerAccountsPanel from "./components/BrokerAccountsPanel";
+import PnlAnalyticsPanel from "./components/PnlAnalyticsPanel";
+import FixSessionPanel from "./components/FixSessionPanel";
+import AuditExportCenter from "./components/AuditExportCenter";
+import NotificationCenter from "./components/NotificationCenter";
+import RebalancerPanel from "./components/RebalancerPanel";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function HomePage() {
   return (
     <div className="p-6 bg-slate-950 min-h-screen text-white">
-      <h1 className="text-3xl font-bold mb-6">
-        Gatecep OMS Dashboard
-      </h1>
       <AdminControlCenter />
+      
+      <NotificationCenter />
+      
+      <RebalancerPanel />
+     
+      <ProfessionalChart />
+
+      <CoachGSignalsPanel />
+
+      <WatchlistPanel />
+
+      <BrokerAccountsPanel />
+
+      <FixSessionPanel />
+
+     <AuditExportCenter />
+
       <PortfolioDashboard />
+
       <PortfolioPerformanceChart />
+
       <SettlementLedgerPanel />
+
+      <PnlAnalyticsPanel />
+
       <ComplianceSurveillancePanel />
+
       <LiveOrderExecutionPanel />
+
+      <OrderSplitterPanel />
+
+      <ChildOrderExecutionPanel />
     </div>
   );
 }
 
 function Navigation() {
+  const { user, logout } = useAuth();
+
   return (
-    <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex gap-6">
-      <Link
-        to="/"
-        className="text-white hover:text-cyan-400 font-medium"
-      >
-        Execution Queue
-      </Link>
+    <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
+      <div className="flex gap-6">
+        <Link
+          to="/"
+          className="text-white hover:text-cyan-400 font-medium"
+        >
+          Dashboard
+        </Link>
 
-      <Link
-        to="/execution-analytics"
-        className="text-white hover:text-cyan-400 font-medium"
-      >
-        OMS Analytics
-      </Link>
+        <Link
+          to="/execution-analytics"
+          className="text-white hover:text-cyan-400 font-medium"
+        >
+          OMS Analytics
+        </Link>
 
-      <Link
-        to="/trade-blotter"
-        className="text-white hover:text-cyan-400 font-medium"
-      >
-        Trade Blotter
-      </Link>
+        <Link
+          to="/trade-blotter"
+          className="text-white hover:text-cyan-400 font-medium"
+        >
+          Trade Blotter
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="text-sm text-slate-300">
+          {user?.username} ({user?.role})
+        </div>
+
+        <button
+          onClick={logout}
+          className="bg-red-600 hover:bg-red-500 rounded-lg px-4 py-2 text-sm font-bold"
+        >
+          Logout
+        </button>
+      </div>
     </div>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <>
+           <LiveMarketTicker />
+              <Navigation />
+              <HomePage />
+            </>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/execution-analytics"
+        element={
+          <ProtectedRoute
+            roles={[
+              "ADMIN",
+              "TRADER",
+              "RISK_MANAGER"
+            ]}
+          >
+            <>
+              <Navigation />
+              <ExecutionAnalyticsPage />
+            </>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/trade-blotter"
+        element={
+          <ProtectedRoute
+            roles={[
+              "ADMIN",
+              "TRADER",
+              "COMPLIANCE"
+            ]}
+          >
+            <>
+              <Navigation />
+              <TradeBlotterPage />
+                         
+            </>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }
 
 export default function App() {
   return (
+    <ErrorBoundary>
+  <AuthProvider>
     <Router>
-      <div className="min-h-screen bg-slate-950">
-        <Navigation />
-
-        <Routes>
-          <Route
-            path="/"
-            element={<HomePage />}
-          />
-
-          <Route
-            path="/execution-analytics"
-            element={<ExecutionAnalyticsPage />}
-          />
-
-          <Route
-            path="/trade-blotter"
-            element={<TradeBlotterPage />}
-          />
-        </Routes>
-      </div>
+      <AppRoutes />
     </Router>
+  </AuthProvider>
+</ErrorBoundary>
   );
 }

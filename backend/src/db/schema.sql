@@ -26,3 +26,25 @@ CREATE TABLE IF NOT EXISTS order_events (
   message TEXT NOT NULL,
   timestamp TIMESTAMP NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS broker_accounts (
+  broker TEXT PRIMARY KEY,
+  account_number TEXT NOT NULL,
+  cash_balance NUMERIC DEFAULT 0,
+  portfolio_value NUMERIC DEFAULT 0,
+  buying_power NUMERIC DEFAULT 0,
+  connected BOOLEAN DEFAULT true,
+  preferred BOOLEAN DEFAULT false,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS pnl_ledger (
+  id TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  quantity NUMERIC NOT NULL,
+  average_cost NUMERIC NOT NULL,
+  sell_price NUMERIC NOT NULL,
+  broker TEXT,
+  realized_pnl NUMERIC NOT NULL,
+  realized_at TIMESTAMP NOT NULL
+);

@@ -14,7 +14,6 @@ import {
   clearPendingOrders
 } from "./routes/accounting.js";
 
-import { authRouter } from "./routes/authRoutes.js";
 import { brokerRouter } from "./routes/brokerRoutes.js";
 import executionRouter from "./routes/execution.routes.js";
 import http from "http";
@@ -35,13 +34,28 @@ import performanceRouter from "./routes/performance.routes.js";
 import settlementRouter from "./routes/settlement.routes.js";
 import complianceRouter from "./routes/compliance.routes.js";
 import adminRouter from "./routes/admin.routes.js";
+import authRouter from "./routes/auth.routes.js";
+import { initMarketDataSocket } from "./websocket/marketData.socket.js";
+import aiRouter from "./routes/ai.routes.js";
+import watchlistRouter from "./routes/watchlist.routes.js";
+import brokerAccountsRouter from "./routes/brokerAccounts.routes.js";
+import pnlRouter from "./routes/pnl.routes.js";
+import redisQueueRouter from "./routes/redisQueue.routes.js";
+import fixRouter from "./routes/fix.routes.js";
+import exportRouter from "./routes/export.routes.js";
+import notificationRouter from "./routes/notification.routes.js";
+import rebalancerRouter from "./routes/rebalancer.routes.js";
+import { validateEnv } from "./config/validateEnv.js";
+import { requestLogger } from "./middleware/requestLogger.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+
+validateEnv();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.use("/auth", authRouter);
 app.use("/brokers", brokerRouter);
 app.use("/execution", executionRouter);
 app.use("/execution", analyticsRouter);
@@ -59,6 +73,18 @@ app.use("/portfolio-performance", performanceRouter);
 app.use("/settlement-ledger", settlementRouter);
 app.use("/compliance", complianceRouter);
 app.use("/admin", adminRouter);
+app.use("/auth", authRouter);
+app.use("/ai", aiRouter);
+app.use("/watchlist", watchlistRouter);
+app.use("/broker-accounts", brokerAccountsRouter);
+app.use("/pnl", pnlRouter);
+app.use("/redis-queue", redisQueueRouter);
+app.use("/fix", fixRouter);
+app.use("/exports", exportRouter);
+app.use("/notifications", notificationRouter);
+app.use("/rebalancer", rebalancerRouter);
+
+app.use(requestLogger);
 
 app.get("/", (req, res) => {
   res.json({
@@ -138,6 +164,9 @@ const io = new Server(server, {
 });
 
 initOrderSocket(io);
+initMarketDataSocket(io);
+
+app.use(errorHandler);
 
 server.listen(PORT, () => {
   console.log(`Gatecep backend running on port ${PORT}`);

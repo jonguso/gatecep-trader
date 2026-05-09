@@ -4,6 +4,15 @@ import {
   saveOrderEvent,
   loadOrders
 } from "../../repositories/order.repository.js";
+import {
+  getPreferredBroker,
+  debitBrokerBuyingPower,
+  creditBrokerBuyingPower
+} from "../brokers/brokerAccounts.service.js";
+import {
+  recordRealizedTrade
+} from "../pnl/realizedPnl.service.js";
+import { enqueueExecutionJob } from "../queue/redisExecutionQueue.service.js";
 
 const executionQueue = [];
 
@@ -41,6 +50,49 @@ function addExecutionEvent(order, status, message) {
 export function queueOrder(order) {
   const quantity = Number(order.quantity || 0);
   const price = Number(order.price || 0);
+  const selectedBroker = order.broker || order.brokerId || getPreferredBroker();
+  const estimatedTradeValue = quantity * price;
+
+  if (order.side === "BUY") {
+    const debit = debitBrokerBuyingPower(selectedBroker, estimatedTradeValue);
+
+    if (!debit.ok) {
+      const rejectedOrder = {
+        id: `ORD-${Date.now()}`,
+        symbol: order.symbol,
+        side: order.side,
+        quantity,
+        price,
+        broker: selectedBroker,
+        status: "REJECTED",
+        brokerStatus: "REJECTED",
+        filledQuantity: 0,
+        remainingQuantity: quantity,
+        averageFillPrice: 0,
+        fillPercent: 0,
+        retryCount: 0,
+        maxRetries: 1,
+        rejectionReason: debit.error,
+        lastBrokerAttempt: selectedBroker,
+        executionEvents: [],
+        createdAt: now(),
+        updatedAt: now()
+      };
+
+      executionQueue.push(rejectedOrder);
+
+      addExecutionEvent(
+        rejectedOrder,
+        "REJECTED",
+        `Order rejected: ${debit.error}.`
+      );
+
+      emitOrderUpdate(rejectedOrder);
+      persistOrder(rejectedOrder);
+
+      return rejectedOrder;
+    }
+  }
 
   const queuedOrder = {
     id: `ORD-${Date.now()}`,
@@ -48,36 +100,35 @@ export function queueOrder(order) {
     side: order.side,
     quantity,
     price,
-    broker: order.broker || order.brokerId || "ABC",
-
+    broker: selectedBroker,
     status: "QUEUED",
     brokerStatus: "PENDING",
-
     filledQuantity: 0,
     remainingQuantity: quantity,
     averageFillPrice: 0,
     fillPercent: 0,
-
     retryCount: 0,
     maxRetries: 1,
     rejectionReason: null,
-    lastBrokerAttempt: order.broker || order.brokerId || "ABC",
-
+    lastBrokerAttempt: selectedBroker,
     executionEvents: [],
     createdAt: now(),
     updatedAt: now()
   };
 
-executionQueue.push(queuedOrder);
+  executionQueue.push(queuedOrder);
 
-addExecutionEvent(
-  queuedOrder,
-  "QUEUED",
-  "Order queued inside Gatecep execution engine."
-);
+  addExecutionEvent(
+    queuedOrder,
+    "QUEUED",
+    "Order queued inside Gatecep execution engine."
+  );
 
-emitOrderUpdate(queuedOrder);
-persistOrder(queuedOrder); 
+  emitOrderUpdate(queuedOrder);
+  persistOrder(queuedOrder);
+enqueueExecutionJob(queuedOrder).catch((error) => {
+  console.error("Failed to enqueue Redis execution job:", error.message);
+});
 
   simulateExecution(queuedOrder.id);
 
@@ -102,6 +153,7 @@ export async function getExecutionQueue() {
 
   return executionQueue;
 }
+
 export function getOrderById(orderId) {
   return executionQueue.find((o) => o.id === orderId);
 }
@@ -125,6 +177,12 @@ export function cancelOrder(orderId) {
       error: `Cannot cancel order with status ${order.status}`
     };
   }
+if (order.side === "BUY" && order.remainingQuantity > 0) {
+  const refundAmount =
+    Number(order.remainingQuantity || 0) * Number(order.price || 0);
+
+  creditBrokerBuyingPower(order.broker, refundAmount);
+}
 
   order.status = "CANCELLED";
   order.brokerStatus = "CANCEL_REQUEST_ACCEPTED";
@@ -163,6 +221,19 @@ function updateOrder(orderId, updates, eventMessage) {
 }
 
 function rejectOrder(orderId, reason) {
+  const order = getOrderById(orderId);
+
+  if (
+    order &&
+    order.side === "BUY" &&
+    order.remainingQuantity > 0
+  ) {
+    const refundAmount =
+      Number(order.remainingQuantity || 0) * Number(order.price || 0);
+
+    creditBrokerBuyingPower(order.broker, refundAmount);
+  }
+
   updateOrder(
     orderId,
     {
@@ -173,7 +244,6 @@ function rejectOrder(orderId, reason) {
     `Order rejected: ${reason}.`
   );
 }
-
 function retryOrder(orderId, reason) {
   const order = getOrderById(orderId);
 
@@ -234,6 +304,19 @@ function applyFill(orderId, fillQty, fillPrice) {
     order.status === "FILLED" ? "FULLY_FILLED" : "PARTIALLY_FILLED";
 
   order.updatedAt = now();
+
+if (
+  order.side === "SELL" &&
+  order.status === "FILLED"
+) {
+  recordRealizedTrade({
+    symbol: order.symbol,
+    quantity: order.filledQuantity,
+    averageCost: 18.45,
+    sellPrice: order.averageFillPrice,
+    broker: order.broker
+  });
+}
 
   addExecutionEvent(
     order,
