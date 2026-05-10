@@ -1,5 +1,9 @@
 import { queueOrder } from "./executionQueue.service.js";
 import { splitOrder } from "./orderSplitter.service.js";
+import {
+  saveParentExecution,
+  saveChildOrder
+} from "../../repositories/executionPersistence.repository.js";
 
 const parentExecutions = [];
 
@@ -28,6 +32,10 @@ export function executeSplitOrder({
     createdAt: new Date().toISOString()
   };
 
+saveParentExecution(parentExecution).catch((error) => {
+  console.error("Failed to persist parent execution:", error.message);
+});
+
   split.childOrders.forEach((child, index) => {
     setTimeout(() => {
       const queued = queueOrder({
@@ -44,6 +52,18 @@ export function executeSplitOrder({
         quantity: child.quantity,
         status: queued.status
       });
+saveChildOrder(
+  parentExecution.parentId,
+  {
+    childId: child.childId,
+    quantity: child.quantity,
+    status: queued.status,
+    createdAt: new Date().toISOString()
+  },
+  split.recommendedBroker
+).catch((error) => {
+  console.error("Failed to persist child order:", error.message);
+});
 
       parentExecution.completedChildren += 1;
 
@@ -54,6 +74,9 @@ export function executeSplitOrder({
             parentExecution.totalChildren
           ) * 100
         );
+saveParentExecution(parentExecution).catch((error) => {
+  console.error("Failed to update parent execution:", error.message);
+});
 
       if (
         parentExecution.completedChildren >=

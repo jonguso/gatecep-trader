@@ -48,3 +48,36 @@ CREATE TABLE IF NOT EXISTS pnl_ledger (
   realized_pnl NUMERIC NOT NULL,
   realized_at TIMESTAMP NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS parent_executions (
+  id SERIAL PRIMARY KEY,
+  parent_id TEXT UNIQUE NOT NULL,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL,
+  parent_quantity NUMERIC NOT NULL,
+  execution_style TEXT,
+  status TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS child_orders (
+  id SERIAL PRIMARY KEY,
+  child_id TEXT UNIQUE NOT NULL,
+  parent_id TEXT NOT NULL,
+  quantity NUMERIC NOT NULL,
+  status TEXT,
+  broker TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS execution_fills (
+  id SERIAL PRIMARY KEY,
+  fill_id TEXT UNIQUE NOT NULL,
+  order_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  quantity NUMERIC NOT NULL,
+  price NUMERIC NOT NULL,
+  broker TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+

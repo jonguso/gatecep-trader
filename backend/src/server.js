@@ -48,6 +48,8 @@ import rebalancerRouter from "./routes/rebalancer.routes.js";
 import { validateEnv } from "./config/validateEnv.js";
 import { requestLogger } from "./middleware/requestLogger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { seedDefaultAdmin } from "./services/auth/auth.service.js";
+import { initializeSocketGateway } from "./websocket/socketGateway.js";
 
 validateEnv();
 
@@ -163,10 +165,14 @@ const io = new Server(server, {
   }
 });
 
+initializeSocketGateway(io);
+
 initOrderSocket(io);
 initMarketDataSocket(io);
 
 app.use(errorHandler);
+
+await seedDefaultAdmin();
 
 server.listen(PORT, () => {
   console.log(`Gatecep backend running on port ${PORT}`);

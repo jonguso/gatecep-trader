@@ -1,18 +1,28 @@
 import { emitOrderUpdate } from "../../websocket/orders.socket.js";
+
 import {
   saveOrder,
   saveOrderEvent,
   loadOrders
 } from "../../repositories/order.repository.js";
+
 import {
   getPreferredBroker,
   debitBrokerBuyingPower,
   creditBrokerBuyingPower
 } from "../brokers/brokerAccounts.service.js";
+
 import {
   recordRealizedTrade
 } from "../pnl/realizedPnl.service.js";
+
 import { enqueueExecutionJob } from "../queue/redisExecutionQueue.service.js";
+
+import {
+  savePersistentOrder
+} from "../../repositories/persistentOrders.repository.js";
+
+import { publishEvent } from "../events/eventBus.service.js";
 
 const executionQueue = [];
 
@@ -25,9 +35,21 @@ function now() {
   return new Date().toISOString();
 }
 
+function publishOrder(order) {
+  emitOrderUpdate(order);
+
+  publishEvent("order:update", order).catch((error) => {
+    console.error("Order event publish failed:", error.message);
+  });
+}
+
 function persistOrder(order) {
   saveOrder(order).catch((error) => {
     console.error("Failed to save order:", error.message);
+  });
+
+  savePersistentOrder(order).catch((error) => {
+    console.error("Failed to save persistent order:", error.message);
   });
 }
 
@@ -45,16 +67,28 @@ function addExecutionEvent(order, status, message) {
     .catch((error) => {
       console.error("Failed to save order/order event:", error.message);
     });
+
+  publishEvent("execution:event", {
+    orderId: order.id,
+    ...event
+  }).catch((error) => {
+    console.error("Execution event publish failed:", error.message);
+  });
 }
 
 export function queueOrder(order) {
   const quantity = Number(order.quantity || 0);
   const price = Number(order.price || 0);
-  const selectedBroker = order.broker || order.brokerId || getPreferredBroker();
+  const selectedBroker =
+    order.broker || order.brokerId || getPreferredBroker();
+
   const estimatedTradeValue = quantity * price;
 
   if (order.side === "BUY") {
-    const debit = debitBrokerBuyingPower(selectedBroker, estimatedTradeValue);
+    const debit = debitBrokerBuyingPower(
+      selectedBroker,
+      estimatedTradeValue
+    );
 
     if (!debit.ok) {
       const rejectedOrder = {
@@ -87,7 +121,7 @@ export function queueOrder(order) {
         `Order rejected: ${debit.error}.`
       );
 
-      emitOrderUpdate(rejectedOrder);
+      publishOrder(rejectedOrder);
       persistOrder(rejectedOrder);
 
       return rejectedOrder;
@@ -124,11 +158,12 @@ export function queueOrder(order) {
     "Order queued inside Gatecep execution engine."
   );
 
-  emitOrderUpdate(queuedOrder);
+  publishOrder(queuedOrder);
   persistOrder(queuedOrder);
-enqueueExecutionJob(queuedOrder).catch((error) => {
-  console.error("Failed to enqueue Redis execution job:", error.message);
-});
+
+  enqueueExecutionJob(queuedOrder).catch((error) => {
+    console.error("Failed to enqueue Redis execution job:", error.message);
+  });
 
   simulateExecution(queuedOrder.id);
 
@@ -177,12 +212,13 @@ export function cancelOrder(orderId) {
       error: `Cannot cancel order with status ${order.status}`
     };
   }
-if (order.side === "BUY" && order.remainingQuantity > 0) {
-  const refundAmount =
-    Number(order.remainingQuantity || 0) * Number(order.price || 0);
 
-  creditBrokerBuyingPower(order.broker, refundAmount);
-}
+  if (order.side === "BUY" && order.remainingQuantity > 0) {
+    const refundAmount =
+      Number(order.remainingQuantity || 0) * Number(order.price || 0);
+
+    creditBrokerBuyingPower(order.broker, refundAmount);
+  }
 
   order.status = "CANCELLED";
   order.brokerStatus = "CANCEL_REQUEST_ACCEPTED";
@@ -195,7 +231,7 @@ if (order.side === "BUY" && order.remainingQuantity > 0) {
     `Order cancelled successfully while previous status was ${previousStatus}.`
   );
 
-  emitOrderUpdate(order);
+  publishOrder(order);
   persistOrder(order);
 
   return {
@@ -216,7 +252,7 @@ function updateOrder(orderId, updates, eventMessage) {
     addExecutionEvent(order, updates.status || order.status, eventMessage);
   }
 
-  emitOrderUpdate(order);
+  publishOrder(order);
   persistOrder(order);
 }
 
@@ -244,6 +280,7 @@ function rejectOrder(orderId, reason) {
     `Order rejected: ${reason}.`
   );
 }
+
 function retryOrder(orderId, reason) {
   const order = getOrderById(orderId);
 
@@ -298,25 +335,38 @@ function applyFill(orderId, fillQty, fillPrice) {
       ? Math.round((order.filledQuantity / order.quantity) * 100)
       : 0;
 
-  order.status = order.remainingQuantity === 0 ? "FILLED" : "PARTIAL_FILL";
+  order.status =
+    order.remainingQuantity === 0 ? "FILLED" : "PARTIAL_FILL";
 
   order.brokerStatus =
-    order.status === "FILLED" ? "FULLY_FILLED" : "PARTIALLY_FILLED";
+    order.status === "FILLED"
+      ? "FULLY_FILLED"
+      : "PARTIALLY_FILLED";
 
   order.updatedAt = now();
 
-if (
-  order.side === "SELL" &&
-  order.status === "FILLED"
-) {
-  recordRealizedTrade({
+  const fill = {
+    orderId: order.id,
     symbol: order.symbol,
-    quantity: order.filledQuantity,
-    averageCost: 18.45,
-    sellPrice: order.averageFillPrice,
-    broker: order.broker
+    quantity: newFilled - previousFilled,
+    price: fillPrice,
+    broker: order.broker,
+    timestamp: now()
+  };
+
+  publishEvent("execution:fill", fill).catch((error) => {
+    console.error("Fill publish failed:", error.message);
   });
-}
+
+  if (order.side === "SELL" && order.status === "FILLED") {
+    recordRealizedTrade({
+      symbol: order.symbol,
+      quantity: order.filledQuantity,
+      averageCost: 18.45,
+      sellPrice: order.averageFillPrice,
+      broker: order.broker
+    });
+  }
 
   addExecutionEvent(
     order,
@@ -326,7 +376,7 @@ if (
     } shares @ KES ${fillPrice}.`
   );
 
-  emitOrderUpdate(order);
+  publishOrder(order);
   persistOrder(order);
 }
 
@@ -388,7 +438,11 @@ function simulateExecution(orderId) {
       return;
     }
 
-    const firstFillQty = Math.max(1, Math.floor(order.quantity * 0.45));
+    const firstFillQty = Math.max(
+      1,
+      Math.floor(order.quantity * 0.45)
+    );
+
     applyFill(orderId, firstFillQty, order.price);
   }, 5000);
 
@@ -470,6 +524,10 @@ function continueExecutionAfterRetry(orderId) {
       return;
     }
 
-    applyFill(orderId, refreshedOrder.remainingQuantity, refreshedOrder.price);
+    applyFill(
+      orderId,
+      refreshedOrder.remainingQuantity,
+      refreshedOrder.price
+    );
   }, 5500);
 }

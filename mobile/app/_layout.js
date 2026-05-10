@@ -1,21 +1,34 @@
+import React from "react";
+import { ActivityIndicator, View } from "react-native";
 import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { AuthProvider } from "../src/auth/AuthContext";
+
+import { AuthProvider, useAuth } from "../src/context/AuthContext";
+
+function RootLayoutContent() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#020617",
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+      >
+        <ActivityIndicator size="large" color="#22d3ee" />
+      </View>
+    );
+  }
+
+  return <Stack screenOptions={{ headerShown: false }} />;
+}
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="login" />
-        <Stack.Screen name="signup" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="security/[symbol]" />
-	<Stack.Screen name="account-profile" />
-        <Stack.Screen name="settings" />
-	<Stack.Screen name="brokers" />
-      </Stack>
+      <RootLayoutContent />
     </AuthProvider>
   );
 }

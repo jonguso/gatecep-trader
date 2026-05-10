@@ -1,72 +1,76 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import {
+  findUserByUsername,
+  createUser,
+  countUsers
+} from "../../repositories/user.repository.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "gatecep-secret";
 
-const users = [
-  {
-    id: 1,
-    username: "admin",
-    passwordHash: bcrypt.hashSync("admin123", 10),
-    role: "ADMIN"
-  },
-  {
-    id: 2,
-    username: "trader",
-    passwordHash: bcrypt.hashSync("trader123", 10),
-    role: "TRADER"
-  },
-  {
-    id: 3,
-    username: "risk",
-    passwordHash: bcrypt.hashSync("risk123", 10),
-    role: "RISK_MANAGER"
-  },
-  {
-    id: 4,
-    username: "compliance",
-    passwordHash: bcrypt.hashSync("compliance123", 10),
-    role: "COMPLIANCE"
-  }
-];
+export async function registerUser({
+  username,
+  password,
+  role = "TRADER"
+}) {
+  const existing = await findUserByUsername(username);
 
-export async function login(username, password) {
-  const user = users.find(
-    (u) => u.username === username
-  );
+  if (existing) {
+    throw new Error("Username already exists");
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await createUser({
+    username,
+    passwordHash,
+    role
+  });
+
+  return user;
+}
+
+export async function authenticateUser({
+  username,
+  password
+}) {
+  const user = await findUserByUsername(username);
 
   if (!user) {
-    throw new Error("Invalid credentials");
+    throw new Error("Invalid username or password");
   }
 
   const valid = await bcrypt.compare(
     password,
-    user.passwordHash
+    user.password_hash
   );
 
   if (!valid) {
-    throw new Error("Invalid credentials");
+    throw new Error("Invalid username or password");
   }
 
-  const token = jwt.sign(
-    {
-      id: user.id,
-      username: user.username,
-      role: user.role
-    },
-    JWT_SECRET,
-    {
-      expiresIn: "12h"
-    }
-  );
-
   return {
-    token,
-    user: {
-      id: user.id,
-      username: user.username,
-      role: user.role
-    }
+    id: user.id,
+    username: user.username,
+    role: user.role
   };
+}
+
+export async function seedDefaultAdmin() {
+  const totalUsers = await countUsers();
+
+  if (totalUsers > 0) {
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash("admin123", 10);
+
+  await createUser({
+    username: "admin",
+    passwordHash,
+    role: "ADMIN"
+  });
+
+  console.log("Default admin user seeded.");
 }
