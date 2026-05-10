@@ -55,7 +55,25 @@ validateEnv();
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN,
+  "http://localhost:3000",
+  "http://localhost:19006",
+  "http://localhost:8081"
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true
+  })
+);
 app.use(express.json());
 
 app.use("/brokers", brokerRouter);
@@ -160,11 +178,10 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: allowedOrigins,
+    credentials: true
   }
 });
-
 initializeSocketGateway(io);
 
 initOrderSocket(io);
