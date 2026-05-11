@@ -51,6 +51,9 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { seedDefaultAdmin } from "./services/auth/auth.service.js";
 import { initializeSocketGateway } from "./websocket/socketGateway.js";
 import { initDb } from "./db/initDb.js";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import morgan from "morgan";
 
 validateEnv();
 
@@ -106,6 +109,16 @@ app.use("/notifications", notificationRouter);
 app.use("/rebalancer", rebalancerRouter);
 
 app.use(requestLogger);
+app.use(helmet());
+
+app.use(morgan("combined"));
+
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300
+  })
+);
 
 app.get("/", (req, res) => {
   res.json({
