@@ -14,7 +14,23 @@ import { getSmartRoutingRecommendation } from "../services/orders/smartRouter.se
 const router = express.Router();
 
 router.post("/execute", (req, res) => {
-  const order = queueOrder(req.body);
+  const { symbol, side, quantity, price, broker } = req.body;
+
+  if (!symbol || !side || !quantity || !price) {
+    return res.status(400).json({
+      ok: false,
+      error: "symbol, side, quantity, and price are required",
+      received: req.body
+    });
+  }
+
+  const order = queueOrder({
+    symbol,
+    side,
+    quantity,
+    price,
+    broker
+  });
 
   res.json({
     ok: true,
