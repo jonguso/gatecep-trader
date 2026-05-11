@@ -52,6 +52,7 @@ import fixRouter from "./routes/fix.routes.js";
 import exportRouter from "./routes/export.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import rebalancerRouter from "./routes/rebalancer.routes.js";
+import positionsRouter from "./routes/positions.routes.js";
 
 import { initOrderSocket } from "./websocket/orders.socket.js";
 import { initMarketDataSocket } from "./websocket/marketData.socket.js";
@@ -66,6 +67,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { seedDefaultAdmin } from "./services/auth/auth.service.js";
 
 import { initDb } from "./db/initDb.js";
+
 
 validateEnv();
 
@@ -199,6 +201,7 @@ app.use("/fix", fixRouter);
 app.use("/exports", exportRouter);
 app.use("/notifications", notificationRouter);
 app.use("/rebalancer", rebalancerRouter);
+app.use("/positions", positionsRouter);
 
 app.use(errorHandler);
 

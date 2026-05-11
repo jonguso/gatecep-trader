@@ -23,6 +23,9 @@ import {
 } from "../../repositories/persistentOrders.repository.js";
 
 import { publishEvent } from "../events/eventBus.service.js";
+import {
+  updatePositionFromFill
+} from "../positions/position.service.js";
 
 const executionQueue = [];
 
@@ -311,7 +314,7 @@ function retryOrder(orderId, reason) {
   }, 1500);
 }
 
-function applyFill(orderId, fillQty, fillPrice) {
+async function applyFill(orderId, fillQty, fillPrice) {
   const order = getOrderById(orderId);
 
   if (!order || order.status === "CANCELLED") return;
@@ -353,6 +356,14 @@ function applyFill(orderId, fillQty, fillPrice) {
     broker: order.broker,
     timestamp: now()
   };
+
+  await updatePositionFromFill({
+  symbol: order.symbol,
+  side: order.side,
+  quantity: newFilled - previousFilled,
+  price: fillPrice,
+  broker: order.broker
+});
 
   publishEvent("execution:fill", fill).catch((error) => {
     console.error("Fill publish failed:", error.message);
