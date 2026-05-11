@@ -50,6 +50,7 @@ import { requestLogger } from "./middleware/requestLogger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { seedDefaultAdmin } from "./services/auth/auth.service.js";
 import { initializeSocketGateway } from "./websocket/socketGateway.js";
+import { initDb } from "./db/initDb.js";
 
 validateEnv();
 
@@ -188,6 +189,8 @@ initOrderSocket(io);
 initMarketDataSocket(io);
 
 app.use(errorHandler);
+
+await initDb();
 
 await seedDefaultAdmin();
 
