@@ -1,6 +1,16 @@
 import "dotenv/config";
+
 import express from "express";
 import cors from "cors";
+import http from "http";
+
+import { Server } from "socket.io";
+
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import morgan from "morgan";
+
+import { logger } from "./utils/logger.js";
 
 import { state } from "./store/state.js";
 import { marketDataGateway } from "./services/marketData/MarketDataGateway.js";
@@ -15,10 +25,8 @@ import {
 } from "./routes/accounting.js";
 
 import { brokerRouter } from "./routes/brokerRoutes.js";
+
 import executionRouter from "./routes/execution.routes.js";
-import http from "http";
-import { Server } from "socket.io";
-import { initOrderSocket } from "./websocket/orders.socket.js";
 import analyticsRouter from "./routes/analytics.routes.js";
 import smartRoutingRouter from "./routes/smartRouting.routes.js";
 import brokerHealthRouter from "./routes/brokerHealth.routes.js";
@@ -35,7 +43,6 @@ import settlementRouter from "./routes/settlement.routes.js";
 import complianceRouter from "./routes/compliance.routes.js";
 import adminRouter from "./routes/admin.routes.js";
 import authRouter from "./routes/auth.routes.js";
-import { initMarketDataSocket } from "./websocket/marketData.socket.js";
 import aiRouter from "./routes/ai.routes.js";
 import watchlistRouter from "./routes/watchlist.routes.js";
 import brokerAccountsRouter from "./routes/brokerAccounts.routes.js";
@@ -45,16 +52,20 @@ import fixRouter from "./routes/fix.routes.js";
 import exportRouter from "./routes/export.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
 import rebalancerRouter from "./routes/rebalancer.routes.js";
+
+import { initOrderSocket } from "./websocket/orders.socket.js";
+import { initMarketDataSocket } from "./websocket/marketData.socket.js";
+import { initializeSocketGateway } from "./websocket/socketGateway.js";
+import { socketAuth } from "./websocket/socketAuth.js";
+
 import { validateEnv } from "./config/validateEnv.js";
+
 import { requestLogger } from "./middleware/requestLogger.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+
 import { seedDefaultAdmin } from "./services/auth/auth.service.js";
-import { initializeSocketGateway } from "./websocket/socketGateway.js";
+
 import { initDb } from "./db/initDb.js";
-import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import morgan from "morgan";
-import { socketAuth } from "./websocket/socketAuth.js";
 
 validateEnv();
 
@@ -79,37 +90,9 @@ app.use(
     credentials: true
   })
 );
+
 app.use(express.json());
 
-app.use("/brokers", brokerRouter);
-app.use("/execution", executionRouter);
-app.use("/execution", analyticsRouter);
-app.use("/execution/smart-routing", smartRoutingRouter);
-app.use("/broker-health", brokerHealthRouter);
-app.use("/oms-alerts", omsAlertsRouter);
-app.use("/order-history", orderHistoryRouter);
-app.use("/risk", riskRouter);
-app.use("/order-book", orderBookRouter);
-app.use("/execution-advisor", executionAdvisorRouter);
-app.use("/order-splitter", orderSplitterRouter);
-app.use("/child-orders", childOrdersRouter);
-app.use("/portfolio-live", portfolioRouter);
-app.use("/portfolio-performance", performanceRouter);
-app.use("/settlement-ledger", settlementRouter);
-app.use("/compliance", complianceRouter);
-app.use("/admin", adminRouter);
-app.use("/auth", authRouter);
-app.use("/ai", aiRouter);
-app.use("/watchlist", watchlistRouter);
-app.use("/broker-accounts", brokerAccountsRouter);
-app.use("/pnl", pnlRouter);
-app.use("/redis-queue", redisQueueRouter);
-app.use("/fix", fixRouter);
-app.use("/exports", exportRouter);
-app.use("/notifications", notificationRouter);
-app.use("/rebalancer", rebalancerRouter);
-
-app.use(requestLogger);
 app.use(helmet());
 
 app.use(morgan("combined"));
@@ -120,6 +103,8 @@ app.use(
     max: 300
   })
 );
+
+app.use(requestLogger);
 
 app.get("/", (req, res) => {
   res.json({
@@ -187,6 +172,36 @@ app.get("/market/rankings", async (req, res) => {
   });
 });
 
+app.use("/brokers", brokerRouter);
+app.use("/execution", executionRouter);
+app.use("/execution", analyticsRouter);
+app.use("/execution/smart-routing", smartRoutingRouter);
+app.use("/broker-health", brokerHealthRouter);
+app.use("/oms-alerts", omsAlertsRouter);
+app.use("/order-history", orderHistoryRouter);
+app.use("/risk", riskRouter);
+app.use("/order-book", orderBookRouter);
+app.use("/execution-advisor", executionAdvisorRouter);
+app.use("/order-splitter", orderSplitterRouter);
+app.use("/child-orders", childOrdersRouter);
+app.use("/portfolio-live", portfolioRouter);
+app.use("/portfolio-performance", performanceRouter);
+app.use("/settlement-ledger", settlementRouter);
+app.use("/compliance", complianceRouter);
+app.use("/admin", adminRouter);
+app.use("/auth", authRouter);
+app.use("/ai", aiRouter);
+app.use("/watchlist", watchlistRouter);
+app.use("/broker-accounts", brokerAccountsRouter);
+app.use("/pnl", pnlRouter);
+app.use("/redis-queue", redisQueueRouter);
+app.use("/fix", fixRouter);
+app.use("/exports", exportRouter);
+app.use("/notifications", notificationRouter);
+app.use("/rebalancer", rebalancerRouter);
+
+app.use(errorHandler);
+
 const PORT = process.env.PORT || 4000;
 
 const server = http.createServer(app);
@@ -197,18 +212,18 @@ const io = new Server(server, {
     credentials: true
   }
 });
+
 io.use(socketAuth);
+
 initializeSocketGateway(io);
 
 initOrderSocket(io);
 initMarketDataSocket(io);
-
-app.use(errorHandler);
 
 await initDb();
 
 await seedDefaultAdmin();
 
 server.listen(PORT, () => {
-  console.log(`Gatecep backend running on port ${PORT}`);
+  logger.info(`Gatecep backend running on port ${PORT}`);
 });
