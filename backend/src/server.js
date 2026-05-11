@@ -68,6 +68,8 @@ import { seedDefaultAdmin } from "./services/auth/auth.service.js";
 
 import { initDb } from "./db/initDb.js";
 
+import { initializePositions } from "./services/positions/position.service.js";
+
 
 validateEnv();
 
@@ -224,6 +226,8 @@ initOrderSocket(io);
 initMarketDataSocket(io);
 
 await initDb();
+
+await initializePositions();
 
 await seedDefaultAdmin();
 

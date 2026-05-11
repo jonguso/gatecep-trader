@@ -88,4 +88,14 @@ CREATE TABLE IF NOT EXISTS execution_fills (
   broker TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS positions (
+  id SERIAL PRIMARY KEY,
+  broker TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  quantity NUMERIC DEFAULT 0,
+  average_cost NUMERIC DEFAULT 0,
+  realized_pnl NUMERIC DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (broker, symbol)
+);
 

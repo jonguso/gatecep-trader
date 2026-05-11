@@ -1,59 +1,69 @@
+import {
+  savePosition,
+  loadPositions
+} from "../../repositories/position.repository.js";
+
 const positions = new Map();
 
-export function updatePositionFromFill({
-  symbol,
-  side,
-  quantity,
-  price,
-  broker
-}) {
-  const key = `${broker}:${symbol}`;
+function key(broker, symbol) {
+  return `${broker}:${symbol}`;
+}
+
+export async function initializePositions() {
+  const saved = await loadPositions();
+
+  for (const position of saved) {
+    positions.set(
+      key(position.broker, position.symbol),
+      position
+    );
+  }
+
+  console.log(`Loaded ${saved.length} persistent positions`);
+}
+
+export async function updatePositionFromFill(fill) {
+  const mapKey = key(fill.broker, fill.symbol);
 
   const existing =
-    positions.get(key) || {
-      symbol,
-      broker,
+    positions.get(mapKey) || {
+      symbol: fill.symbol,
+      broker: fill.broker,
       quantity: 0,
       averageCost: 0,
       realizedPnL: 0,
       updatedAt: new Date().toISOString()
     };
 
-  if (side === "BUY") {
-    const oldValue =
-      existing.quantity * existing.averageCost;
+  if (fill.side === "BUY") {
+    const totalCost =
+      existing.quantity * existing.averageCost +
+      fill.quantity * fill.price;
 
-    const buyValue =
-      quantity * price;
-
-    const newQuantity =
-      existing.quantity + quantity;
+    existing.quantity += fill.quantity;
 
     existing.averageCost =
-      newQuantity > 0
-        ? Number(((oldValue + buyValue) / newQuantity).toFixed(2))
+      existing.quantity > 0
+        ? Number((totalCost / existing.quantity).toFixed(2))
         : 0;
+  } else {
+    const pnl =
+      (fill.price - existing.averageCost) * fill.quantity;
 
-    existing.quantity = newQuantity;
-  }
+    existing.realizedPnL += pnl;
 
-  if (side === "SELL") {
-    const sellQuantity =
-      Math.min(existing.quantity, quantity);
+    existing.quantity -= fill.quantity;
 
-    const realized =
-      (price - existing.averageCost) * sellQuantity;
-
-    existing.realizedPnL =
-      Number((existing.realizedPnL + realized).toFixed(2));
-
-    existing.quantity =
-      Math.max(existing.quantity - sellQuantity, 0);
+    if (existing.quantity < 0) {
+      existing.quantity = 0;
+    }
   }
 
   existing.updatedAt = new Date().toISOString();
 
-  positions.set(key, existing);
+  positions.set(mapKey, existing);
+
+  await savePosition(existing);
 
   return existing;
 }
