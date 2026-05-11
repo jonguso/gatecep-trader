@@ -10,6 +10,8 @@ export default function LiveMarketTicker() {
   useEffect(() => {
     const socket = io(API_URL, {
       transports: ["websocket"]
+       auth: {
+        token
     });
 
     socket.on("market:tick", (data) => {

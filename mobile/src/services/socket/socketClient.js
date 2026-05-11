@@ -1,27 +1,37 @@
 import { io } from "socket.io-client";
+
 import { API_URL } from "../../config/api";
 
 let socket = null;
 
-export function getSocket() {
-  if (!socket) {
-    socket = io(API_URL, {
-      transports: ["websocket"]
-    });
-
-    socket.on("connect", () => {
-      console.log("Mobile socket connected:", socket.id);
-    });
-
-    socket.on("connect_error", (error) => {
-      console.log("Mobile socket error:", error.message);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Mobile socket disconnected");
-    });
+export function connectSocket(token) {
+  if (socket) {
+    return socket;
   }
 
+  socket = io(API_URL, {
+    transports: ["websocket"],
+    auth: {
+      token
+    }
+  });
+
+  socket.on("connect", () => {
+    console.log("Socket connected:", socket.id);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected");
+  });
+
+  socket.on("connect_error", (error) => {
+    console.log("Socket auth error:", error.message);
+  });
+
+  return socket;
+}
+
+export function getSocket() {
   return socket;
 }
 

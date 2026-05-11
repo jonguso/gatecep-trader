@@ -54,6 +54,7 @@ import { initDb } from "./db/initDb.js";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import morgan from "morgan";
+import { socketAuth } from "./websocket/socketAuth.js";
 
 validateEnv();
 
@@ -196,6 +197,7 @@ const io = new Server(server, {
     credentials: true
   }
 });
+io.use(socketAuth);
 initializeSocketGateway(io);
 
 initOrderSocket(io);

@@ -11,12 +11,12 @@ import { router } from "expo-router";
 
 import { API_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
-import { getSocket } from "../services/socket/socketClient";
+import { connectSocket } from "../services/socket/socketClient";
 import { sendLocalNotification } from "../services/notifications/notificationService";
 import { registerForPushNotifications } from "../services/notifications/notificationService";
 
 export default function MobileDashboardScreen() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const [portfolio, setPortfolio] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
@@ -59,11 +59,13 @@ export default function MobileDashboardScreen() {
   }
 
   useEffect(() => {
+  if (!token) return;   
+ 
     loadDashboard();
 
     const interval = setInterval(loadDashboard, 5000);
 
-    const socket = getSocket();
+    const socket = connectSocket(token);
 	
 	registerForPushNotifications();
 

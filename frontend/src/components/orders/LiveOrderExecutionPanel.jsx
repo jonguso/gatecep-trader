@@ -115,6 +115,8 @@ async function cancelOrder(orderId) {
 
     const socket = io(API_URL, {
       transports: ["websocket"]
+         auth: {
+         token
     });
 
     socket.on("connect", () => {
