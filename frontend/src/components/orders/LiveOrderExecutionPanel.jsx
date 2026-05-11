@@ -113,11 +113,12 @@ async function cancelOrder(orderId) {
   useEffect(() => {
     loadOrders();
 
-    const socket = io(API_URL, {
-      transports: ["websocket"]
-         auth: {
-         token
-    });
+   io(API_URL, {
+  transports: ["websocket"],
+  auth: {
+    token
+  }
+});
 
     socket.on("connect", () => {
       console.log("Connected to order socket");

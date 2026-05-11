@@ -8,11 +8,12 @@ export default function LiveMarketTicker() {
   const [ticks, setTicks] = useState([]);
 
   useEffect(() => {
-    const socket = io(API_URL, {
-      transports: ["websocket"]
-       auth: {
-        token
-    });
+   io(API_URL, {
+  transports: ["websocket"],
+  auth: {
+    token
+  }
+});
 
     socket.on("market:tick", (data) => {
       setTicks(data);
