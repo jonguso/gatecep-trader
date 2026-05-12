@@ -58,11 +58,13 @@ import portfolioAnalyticsRoutes from "./routes/portfolioAnalytics.routes.js";
 import sectorAllocationRouter from "./routes/sectorAllocation.routes.js";
 import riskAnalysisRouter from "./routes/riskAnalysis.routes.js";
 import coachGRouter from "./routes/coachG.routes.js";
+import coachGAlertsRouter from "./routes/coachGAlerts.routes.js";
 
 import { initOrderSocket } from "./websocket/orders.socket.js";
 import { initMarketDataSocket } from "./websocket/marketData.socket.js";
 import { initializeSocketGateway } from "./websocket/socketGateway.js";
 import { socketAuth } from "./websocket/socketAuth.js";
+import { initPortfolioSocket } from "./websocket/portfolio.socket.js";
 
 import { validateEnv } from "./config/validateEnv.js";
 
@@ -146,6 +148,7 @@ app.use("/portfolio", portfolioAnalyticsRoutes);
 app.use("/portfolio/sectors", sectorAllocationRouter);
 app.use("/portfolio/risk", riskAnalysisRouter);
 app.use("/coach-g", coachGRouter);
+app.use("/coach-g-alerts", coachGAlertsRouter);
 
 app.get("/portfolio/:userId", (req, res) => {
   res.json(state.holdings[req.params.userId] || []);
@@ -237,6 +240,7 @@ initializeSocketGateway(io);
 
 initOrderSocket(io);
 initMarketDataSocket(io);
+initPortfolioSocket(io);
 
 await initDb();
 
