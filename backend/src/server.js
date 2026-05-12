@@ -57,6 +57,7 @@ import unifiedPortfolioRouter from "./routes/unifiedPortfolio.routes.js";
 import portfolioAnalyticsRoutes from "./routes/portfolioAnalytics.routes.js";
 import sectorAllocationRouter from "./routes/sectorAllocation.routes.js";
 import riskAnalysisRouter from "./routes/riskAnalysis.routes.js";
+import coachGRouter from "./routes/coachG.routes.js";
 
 import { initOrderSocket } from "./websocket/orders.socket.js";
 import { initMarketDataSocket } from "./websocket/marketData.socket.js";
@@ -144,6 +145,7 @@ app.use("/portfolio", unifiedPortfolioRouter);
 app.use("/portfolio", portfolioAnalyticsRoutes);
 app.use("/portfolio/sectors", sectorAllocationRouter);
 app.use("/portfolio/risk", riskAnalysisRouter);
+app.use("/coach-g", coachGRouter);
 
 app.get("/portfolio/:userId", (req, res) => {
   res.json(state.holdings[req.params.userId] || []);

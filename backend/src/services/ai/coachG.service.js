@@ -1,3 +1,7 @@
+import { getPortfolioRiskAnalysis } from "../portfolio/riskAnalysis.service.js";
+import { getSectorAllocation } from "../portfolio/sectorAllocation.service.js";
+import { getUnifiedPortfolio } from "../portfolio/unifiedPortfolio.service.js";
+
 const symbols = ["SCOM", "EQTY", "KCB", "COOP"];
 
 function randomSignal() {
@@ -57,4 +61,59 @@ export function generateCoachGSignals() {
         new Date().toISOString()
     };
   });
+}
+export async function getCoachGPortfolioAdvice() {
+  const portfolio = await getUnifiedPortfolio();
+
+  const risk = await getPortfolioRiskAnalysis();
+
+  const sectors = await getSectorAllocation();
+
+  const advice = [];
+
+  if (risk.concentrationRisk === "HIGH") {
+    advice.push(
+      "Portfolio concentration is high. Add more NSE counters."
+    );
+  }
+
+  if (risk.brokerRisk === "HIGH") {
+    advice.push(
+      "Single broker exposure detected. Add another broker."
+    );
+  }
+
+  const bankingExposure =
+    sectors.sectors.find(
+      (x) => x.sector === "Banking"
+    );
+
+  if (bankingExposure?.weight > 60) {
+    advice.push(
+      "Banking sector exposure exceeds 60%."
+    );
+  }
+
+  if (portfolio.totalUnrealizedPnL < 0) {
+    advice.push(
+      "Portfolio currently has unrealized losses."
+    );
+  }
+
+  if (advice.length === 0) {
+    advice.push(
+      "Portfolio structure currently looks healthy."
+    );
+  }
+
+  return {
+    coach: "Coach G",
+    diversificationScore:
+      risk.diversificationScore,
+    portfolioValue:
+      portfolio.totalMarketValue,
+    advice,
+    generatedAt:
+      new Date().toISOString()
+  };
 }
