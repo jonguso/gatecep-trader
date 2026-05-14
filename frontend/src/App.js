@@ -219,12 +219,11 @@ function AppRoutes() {
     </ProtectedRoute>
   }
 />
-
 <Route
   path="/mobile/order/:symbol/:side"
   element={
     <ProtectedRoute>
-      <MobileOrderConfirm />
+      <MobileOrderTicket />
     </ProtectedRoute>
   }
 />
@@ -244,15 +243,6 @@ function AppRoutes() {
       <MobileStockDetails />
     </ProtectedRoute>
   }
-/>
-<Route
-  path="/mobile/order/:symbol/:side"
-  element={
-    <ProtectedRoute>
-      <MobileOrderTicket />
-    </ProtectedRoute>
-  }
-/>
     </Routes>
   );
 }

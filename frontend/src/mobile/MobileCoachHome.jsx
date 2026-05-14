@@ -78,27 +78,32 @@ export default function MobileCoachHome() {
     }
   }
 
-  function askCoachG() {
-    const text = question.toUpperCase();
+  async function askCoachG() {
+  try {
+    setAiAnswer("Coach G is analyzing...");
 
-    if (text.includes("SCOM")) {
-      setAiAnswer(
-        "Coach G: SCOM looks stable with strong liquidity and low spread risk. Consider a small BUY only if your portfolio is not already overexposed to telecoms."
-      );
+    const res = await fetch(`${API_URL}/coach/ask`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        question
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.ok) {
+      setAiAnswer("Coach G could not analyze this request.");
       return;
     }
 
-    if (text.includes("KCB")) {
-      setAiAnswer(
-        "Coach G: KCB has moderate momentum. HOLD for now unless price breaks above resistance with stronger volume."
-      );
-      return;
-    }
-
-    setAiAnswer(
-      "Coach G: I recommend checking liquidity, spread, confidence score, and portfolio concentration before executing any trade."
-    );
+    setAiAnswer(data.answer);
+  } catch (error) {
+    setAiAnswer(error.message);
   }
+}
 
   useEffect(() => {
     loadSignals();

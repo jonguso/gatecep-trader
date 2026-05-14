@@ -65,6 +65,7 @@ import { getCandles } from "./routes/candles.js";
 import matchingRouter from "./routes/matching.routes.js";
 import timeSalesRouter from "./routes/timeSales.routes.js";
 import executionQualityRouter from "./routes/executionQuality.routes.js";
+import coachRouter from "./routes/coach.routes.js";
 import { initCoachGSocket } from "./websocket/coachG.socket.js";
 
 import { initOrderSocket } from "./websocket/orders.socket.js";
@@ -162,6 +163,7 @@ app.use("/smart-broker", smartBrokerRouter);
 app.use("/matching", matchingRouter);
 app.use("/time-sales", timeSalesRouter);
 app.use("/execution-quality", executionQualityRouter);
+app.use("/coach", coachRouter);
 
 app.get("/portfolio/:userId", (req, res) => {
   res.json(state.holdings[req.params.userId] || []);
