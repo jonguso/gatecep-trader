@@ -1,3 +1,4 @@
+import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
@@ -134,6 +135,12 @@ export default function MobileStockDetails() {
           <div className="text-cyan-400 font-bold mb-2">
             Coach G Analysis
           </div>
+<div className="flex justify-center mb-4">
+  <AIConfidenceRing
+    value={92}
+    size={120}
+  />
+</div>
 
           <p className="text-sm text-slate-200 leading-6">
             {symbol} has healthy liquidity and manageable spread risk.
