@@ -1,3 +1,4 @@
+import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
 import { useEffect, useState } from "react";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 
@@ -219,11 +220,12 @@ export default function MobileCoachHome() {
                   {aiReason(item)}
                 </div>
 
-                <div className="mt-4">
-                  <div className="flex justify-between text-xs text-slate-400 mb-1">
-                    <span>AI Confidence</span>
-                    <span>{confidence}%</span>
-                  </div>
+                <div className="mt-4 flex justify-center">
+  <AIConfidenceRing
+    value={confidence}
+    size={100}
+  />
+</div>
 
                   <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                     <div
@@ -235,7 +237,7 @@ export default function MobileCoachHome() {
                       }}
                     />
                   </div>
-                </div>
+                
 
                 <div className="grid grid-cols-3 gap-2 mt-4">
                   <div className="bg-slate-800 rounded-xl p-2">
