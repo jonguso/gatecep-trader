@@ -18,19 +18,8 @@ export default function FloatingCoachG() {
       setLoading(true);
       setAnswer("Coach G is analyzing...");
       setMeta(null);
-
-const upperPrompt = String(promptText || "").toUpperCase();
-
-if (upperPrompt.includes("SCOM") && data.recommendation === "BUY") {
-  setRecommendedSymbol("SCOM");
-  setRecommendedSide("BUY");
-} else if (upperPrompt.includes("KCB") && data.recommendation === "BUY") {
-  setRecommendedSymbol("KCB");
-  setRecommendedSide("BUY");
-} else {
-  setRecommendedSymbol(null);
-  setRecommendedSide(null);
-}
+      setRecommendedSymbol(null);
+      setRecommendedSide(null);
 
       const res = await fetch(`${API_URL}/coach/ask`, {
         method: "POST",
@@ -46,28 +35,36 @@ if (upperPrompt.includes("SCOM") && data.recommendation === "BUY") {
 
       if (!data.ok) {
         setAnswer("Coach G could not analyze this request.");
-        setMeta(null);
         return;
       }
 
       setAnswer(data.answer);
+
       setMeta({
         confidence: data.confidence,
         recommendation: data.recommendation
       });
+
+      const upperPrompt = String(promptText || "").toUpperCase();
+
+      if (
+        upperPrompt.includes("SCOM") &&
+        data.recommendation === "BUY"
+      ) {
+        setRecommendedSymbol("SCOM");
+        setRecommendedSide("BUY");
+      } else if (
+        upperPrompt.includes("KCB") &&
+        data.recommendation === "BUY"
+      ) {
+        setRecommendedSymbol("KCB");
+        setRecommendedSide("BUY");
+      }
     } catch (error) {
       setAnswer(error.message);
       setMeta(null);
     } finally {
       setLoading(false);
-{recommendedSymbol && recommendedSide && (
-  <a
-    href={`/mobile/order/${recommendedSymbol}/${recommendedSide}`}
-    className="block mt-3 text-center bg-green-600 hover:bg-green-500 rounded-xl py-3 font-bold"
-  >
-    Execute Recommendation
-  </a>
-)}
     }
   }
 
@@ -155,6 +152,15 @@ if (upperPrompt.includes("SCOM") && data.recommendation === "BUY") {
                 )}
 
                 {answer}
+
+                {recommendedSymbol && recommendedSide && (
+                  <a
+                    href={`/mobile/order/${recommendedSymbol}/${recommendedSide}`}
+                    className="block mt-3 text-center bg-green-600 hover:bg-green-500 rounded-xl py-3 font-bold"
+                  >
+                    Execute Recommendation
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -163,7 +169,7 @@ if (upperPrompt.includes("SCOM") && data.recommendation === "BUY") {
 
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-24 right-4 z-50 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-full shadow-2xl w-16 h-16 flex items-center justify-center text-2xl font-bold border-4 border-cyan-300 animate-pulse"
+        className="fixed bottom-24 right-4 z-50 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-full shadow-2xl shadow-[0_0_30px_rgba(34,211,238,0.45)] w-16 h-16 flex items-center justify-center text-2xl font-bold border-4 border-cyan-300 animate-pulse"
       >
         G
       </button>

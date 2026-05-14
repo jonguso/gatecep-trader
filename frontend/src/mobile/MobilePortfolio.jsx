@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
+import { motion } from "framer-motion";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -27,7 +28,12 @@ export default function MobilePortfolio() {
   }, []);
 
   return (
-    <div className="bg-slate-950 min-h-screen text-white pb-24">
+    <motion.div
+  initial={{ opacity: 0, y: 12 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.25 }}
+  className="bg-slate-950 min-h-screen text-white pb-24"
+>
       <MobileBuyingPowerBar />
 
       <div className="p-4">
@@ -123,7 +129,7 @@ export default function MobilePortfolio() {
           </p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 import SwipeTradeButton from "../components/mobile/SwipeTradeButton";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
+import { motion } from "framer-motion";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -19,6 +20,7 @@ export default function MobileOrderTicket() {
   const [message, setMessage] = useState("");
   const [orderId, setOrderId] = useState(null);
   const [execution, setExecution] = useState(null);
+  const [success, setSuccess] = useState(false);
 
   const estimatedValue =
     Number(quantity || 0) * Number(price || 0);
@@ -57,6 +59,7 @@ export default function MobileOrderTicket() {
       setOrderId(data.order.id);
       setExecution(data.order);
       setMessage(`Order submitted: ${data.order.id}`);
+      setSuccess(true);
 
 setTimeout(() => {
   navigate(`/mobile/stock/${symbol}`);
@@ -95,7 +98,12 @@ setTimeout(() => {
   }, [orderId]);
 
   return (
-    <div className="bg-slate-950 min-h-screen text-white pb-24">
+   <motion.div
+  initial={{ opacity: 0, y: 12 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.25 }}
+  className="bg-slate-950 min-h-screen text-white pb-24"
+>
       <MobileBuyingPowerBar />
 
       <div className="p-4">
@@ -221,11 +229,30 @@ setTimeout(() => {
           </div>
 
           {message && (
+
             <div className="mt-4 bg-slate-800 rounded-xl p-3 text-sm text-cyan-300">
               {message}
             </div>
           )}
+
         </div>
+{success && (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.92 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="mt-4 bg-green-500/10 border border-green-500 rounded-2xl p-5 text-center shadow-[0_0_30px_rgba(34,197,94,0.25)]"
+  >
+    <div className="text-4xl mb-2">✓</div>
+
+    <div className="text-green-400 font-bold text-lg">
+      {side} ORDER SUBMITTED
+    </div>
+
+    <div className="text-sm text-slate-300 mt-1">
+      Coach G Smart Routing Active
+    </div>
+  </motion.div>
+)}
 
         {execution && (
           <div className="bg-slate-900 rounded-2xl p-5 mt-5 border border-cyan-500/30">
@@ -279,7 +306,7 @@ setTimeout(() => {
                         {event.message}
                       </div>
                     </div>
-		<MobileBottomNav />
+		
                   </div>
                 )
               )}
@@ -287,6 +314,7 @@ setTimeout(() => {
           </div>
         )}
       </div>
-    </div>
+<MobileBottomNav />
+   </motion.div>
   );
 }

@@ -3,6 +3,7 @@ import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
 import { useEffect, useState } from "react";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
+import { motion } from "framer-motion";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -114,7 +115,12 @@ export default function MobileCoachHome() {
   }, []);
 
   return (
-    <div className="bg-slate-950 min-h-screen text-white pb-24">
+   <motion.div
+  initial={{ opacity: 0, y: 12 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.25 }}
+  className="bg-slate-950 min-h-screen text-white pb-24"
+>
       <MobileBuyingPowerBar />
 
       <div className="p-4">
@@ -327,7 +333,7 @@ export default function MobileCoachHome() {
 
       <FloatingCoachG />
       <MobileBottomNav />
-    </div>
+  </motion.div>
   );
 }
 
@@ -414,7 +420,7 @@ function FloatingCoachG() {
 
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-24 right-4 z-50 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-full shadow-2xl w-16 h-16 flex items-center justify-center text-2xl font-bold border-4 border-cyan-300"
+        className="fixed bottom-24 right-4 z-50 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-full shadow-2xl shadow-[0_0_30px_rgba(34,211,238,0.45)] w-16 h-16 flex items-center justify-center text-2xl font-bold border-4 border-cyan-300 animate-pulse"
       >
         G
       </button>
