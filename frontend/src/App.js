@@ -27,7 +27,6 @@ import MarketMoversPanel from "./components/MarketMoversPanel";
 import TimeSalesTape from "./components/TimeSalesTape";
 import TradingTerminalPage from "./pages/TradingTerminalPage";
 import MobileCoachHome from "./mobile/MobileCoachHome";
-import MobileOrderConfirm from "./mobile/MobileOrderConfirm";
 import MobilePortfolio from "./mobile/MobilePortfolio";
 import MobileStockDetails from "./mobile/MobileStockDetails";
 import MobileOrderTicket from "./mobile/MobileOrderTicket";
@@ -243,7 +242,8 @@ function AppRoutes() {
       <MobileStockDetails />
     </ProtectedRoute>
   }
-    </Routes>
+/>
+</Routes>
   );
 }
 
