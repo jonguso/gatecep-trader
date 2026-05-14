@@ -2,9 +2,17 @@ import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import OrderAuditTrail from "./OrderAuditTrail";
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
+const API_URL =
+  process.env.REACT_APP_API_URL ||
+  "http://localhost:4000";
 
-const steps = ["QUEUED", "ROUTED", "ACCEPTED", "PARTIAL_FILL", "FILLED"];
+const steps = [
+  "QUEUED",
+  "ROUTED",
+  "ACCEPTED",
+  "PARTIAL_FILL",
+  "FILLED"
+];
 
 function StatusBadge({ status }) {
   const className =
@@ -26,6 +34,7 @@ function StatusBadge({ status }) {
     </span>
   );
 }
+
 function ExecutionTimeline({ status }) {
   const currentIndex = steps.indexOf(status);
 
@@ -39,7 +48,9 @@ function ExecutionTimeline({ status }) {
             }`}
           />
           <span className="text-xs mx-1">{step}</span>
-          {index < steps.length - 1 && <div className="w-6 h-px bg-slate-600" />}
+          {index < steps.length - 1 && (
+            <div className="w-6 h-px bg-slate-600" />
+          )}
         </div>
       ))}
     </div>
@@ -93,32 +104,37 @@ export default function LiveOrderExecutionPanel() {
     const data = await res.json();
     setOrders(data.queue || []);
   }
-async function cancelOrder(orderId) {
-  const res = await fetch(`${API_URL}/execution/${orderId}/cancel`, {
-    method: "POST"
-  });
 
-  const data = await res.json();
+  async function cancelOrder(orderId) {
+    const res = await fetch(`${API_URL}/execution/${orderId}/cancel`, {
+      method: "POST"
+    });
 
-  if (!data.ok) {
-    alert(data.error || "Failed to cancel order");
-    return;
+    const data = await res.json();
+
+    if (!data.ok) {
+      alert(data.error || "Failed to cancel order");
+      return;
+    }
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId ? data.order : order
+      )
+    );
   }
-
-  setOrders((prev) =>
-    prev.map((o) => (o.id === orderId ? data.order : o))
-  );
-}
 
   useEffect(() => {
     loadOrders();
 
-   io(API_URL, {
-  transports: ["websocket"],
-  auth: {
-    token
-  }
-});
+    const token = localStorage.getItem("gatecep_token");
+
+    const socket = io(API_URL, {
+      transports: ["websocket"],
+      auth: {
+        token
+      }
+    });
 
     socket.on("connect", () => {
       console.log("Connected to order socket");
@@ -130,11 +146,15 @@ async function cancelOrder(orderId) {
 
     socket.on("order:update", (updatedOrder) => {
       setOrders((prev) => {
-        const exists = prev.some((o) => o.id === updatedOrder.id);
+        const exists = prev.some(
+          (order) => order.id === updatedOrder.id
+        );
 
         if (exists) {
-          return prev.map((o) =>
-            o.id === updatedOrder.id ? updatedOrder : o
+          return prev.map((order) =>
+            order.id === updatedOrder.id
+              ? updatedOrder
+              : order
           );
         }
 
@@ -142,18 +162,23 @@ async function cancelOrder(orderId) {
       });
 
       setSelectedOrder((current) =>
-        current?.id === updatedOrder.id ? updatedOrder : current
+        current?.id === updatedOrder.id
+          ? updatedOrder
+          : current
       );
     });
 
     return () => {
+      socket.off("order:update");
       socket.disconnect();
     };
   }, []);
 
   return (
     <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-xl">
-      <h2 className="text-xl font-bold mb-4">Live Broker Execution Queue</h2>
+      <h2 className="text-xl font-bold mb-4">
+        Live Broker Execution Queue
+      </h2>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -166,8 +191,7 @@ async function cancelOrder(orderId) {
               <th className="text-left py-2">Progress</th>
               <th className="text-left py-2">Fill</th>
               <th className="text-left py-2">Audit</th>
-	      <th className="text-left py-2">Action</th>
-
+              <th className="text-left py-2">Action</th>
             </tr>
           </thead>
 
@@ -194,11 +218,13 @@ async function cancelOrder(orderId) {
                       {order.brokerStatus || "PENDING"}
                     </span>
                   </div>
-{order.rejectionReason && (
-  <div className="text-xs text-red-400 mt-1">
-    Reason: {order.rejectionReason}
-  </div>
-)}
+
+                  {order.rejectionReason && (
+                    <div className="text-xs text-red-400 mt-1">
+                      Reason: {order.rejectionReason}
+                    </div>
+                  )}
+
                   <div className="text-xs text-slate-400">
                     Route: Gatecep → Broker → NSE
                   </div>
@@ -224,15 +250,16 @@ async function cancelOrder(orderId) {
                     View
                   </button>
                 </td>
-<td className="py-3">
-  <button
-    onClick={() => cancelOrder(order.id)}
-    disabled={!canCancel(order)}
-    className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-400 text-xs"
-  >
-    Cancel
-  </button>
-</td>
+
+                <td className="py-3">
+                  <button
+                    onClick={() => cancelOrder(order.id)}
+                    disabled={!canCancel(order)}
+                    className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-400 text-xs"
+                  >
+                    Cancel
+                  </button>
+                </td>
               </tr>
             ))}
 

@@ -22,7 +22,11 @@ import {
   savePersistentOrder
 } from "../../repositories/persistentOrders.repository.js";
 
+import { matchOrder } from "../matching/matchingEngine.service.js";
+import { recordTrade } from "../market/timeSales.service.js";
+
 import { publishEvent } from "../events/eventBus.service.js";
+
 import {
   updatePositionFromFill
 } from "../positions/position.service.js";
@@ -82,8 +86,11 @@ function addExecutionEvent(order, status, message) {
 export function queueOrder(order) {
   const quantity = Number(order.quantity || 0);
   const price = Number(order.price || 0);
+
   const selectedBroker =
-    order.broker || order.brokerId || getPreferredBroker();
+    order.broker ||
+    order.brokerId ||
+    getPreferredBroker();
 
   const estimatedTradeValue = quantity * price;
 
@@ -165,7 +172,10 @@ export function queueOrder(order) {
   persistOrder(queuedOrder);
 
   enqueueExecutionJob(queuedOrder).catch((error) => {
-    console.error("Failed to enqueue Redis execution job:", error.message);
+    console.error(
+      "Failed to enqueue Redis execution job:",
+      error.message
+    );
   });
 
   simulateExecution(queuedOrder.id);
@@ -193,7 +203,9 @@ export async function getExecutionQueue() {
 }
 
 export function getOrderById(orderId) {
-  return executionQueue.find((o) => o.id === orderId);
+  return executionQueue.find(
+    (order) => order.id === orderId
+  );
 }
 
 export function cancelOrder(orderId) {
@@ -206,8 +218,11 @@ export function cancelOrder(orderId) {
     };
   }
 
-  const previousStatus = order.status;
-  const blockedStatuses = ["FILLED", "REJECTED", "CANCELLED"];
+  const blockedStatuses = [
+    "FILLED",
+    "REJECTED",
+    "CANCELLED"
+  ];
 
   if (blockedStatuses.includes(order.status)) {
     return {
@@ -216,11 +231,18 @@ export function cancelOrder(orderId) {
     };
   }
 
-  if (order.side === "BUY" && order.remainingQuantity > 0) {
+  if (
+    order.side === "BUY" &&
+    order.remainingQuantity > 0
+  ) {
     const refundAmount =
-      Number(order.remainingQuantity || 0) * Number(order.price || 0);
+      Number(order.remainingQuantity || 0) *
+      Number(order.price || 0);
 
-    creditBrokerBuyingPower(order.broker, refundAmount);
+    creditBrokerBuyingPower(
+      order.broker,
+      refundAmount
+    );
   }
 
   order.status = "CANCELLED";
@@ -231,7 +253,7 @@ export function cancelOrder(orderId) {
   addExecutionEvent(
     order,
     "CANCELLED",
-    `Order cancelled successfully while previous status was ${previousStatus}.`
+    "Order cancelled successfully."
   );
 
   publishOrder(order);
@@ -246,13 +268,19 @@ export function cancelOrder(orderId) {
 function updateOrder(orderId, updates, eventMessage) {
   const order = getOrderById(orderId);
 
-  if (!order || order.status === "CANCELLED") return;
+  if (!order || order.status === "CANCELLED") {
+    return;
+  }
 
   Object.assign(order, updates);
   order.updatedAt = now();
 
   if (eventMessage) {
-    addExecutionEvent(order, updates.status || order.status, eventMessage);
+    addExecutionEvent(
+      order,
+      updates.status || order.status,
+      eventMessage
+    );
   }
 
   publishOrder(order);
@@ -268,9 +296,13 @@ function rejectOrder(orderId, reason) {
     order.remainingQuantity > 0
   ) {
     const refundAmount =
-      Number(order.remainingQuantity || 0) * Number(order.price || 0);
+      Number(order.remainingQuantity || 0) *
+      Number(order.price || 0);
 
-    creditBrokerBuyingPower(order.broker, refundAmount);
+    creditBrokerBuyingPower(
+      order.broker,
+      refundAmount
+    );
   }
 
   updateOrder(
@@ -287,14 +319,17 @@ function rejectOrder(orderId, reason) {
 function retryOrder(orderId, reason) {
   const order = getOrderById(orderId);
 
-  if (!order) return;
+  if (!order) {
+    return;
+  }
 
   if (order.retryCount >= order.maxRetries) {
     rejectOrder(orderId, reason);
     return;
   }
 
-  const nextBroker = brokerFailoverMap[order.broker] || "ABC";
+  const nextBroker =
+    brokerFailoverMap[order.broker] || "ABC";
 
   updateOrder(
     orderId,
@@ -317,29 +352,92 @@ function retryOrder(orderId, reason) {
 async function applyFill(orderId, fillQty, fillPrice) {
   const order = getOrderById(orderId);
 
-  if (!order || order.status === "CANCELLED") return;
+  if (!order || order.status === "CANCELLED") {
+    return;
+  }
 
-  const previousFilled = order.filledQuantity;
-  const newFilled = Math.min(order.quantity, previousFilled + fillQty);
+  const previousFilled =
+    Number(order.filledQuantity || 0);
 
-  const previousValue = previousFilled * order.averageFillPrice;
-  const newFillValue = (newFilled - previousFilled) * fillPrice;
+  const requestedFillQty = Math.min(
+    Number(order.quantity || 0) - previousFilled,
+    Number(fillQty || 0)
+  );
+
+
+  const matchResult = matchOrder({
+    symbol: order.symbol,
+    side: order.side,
+    quantity: requestedFillQty,
+    limitPrice: Number(fillPrice || 0)
+  });
+
+  const matchedQty =
+    Number(matchResult.filledQuantity || 0);
+
+  const matchedPrice =
+    Number(matchResult.averagePrice || fillPrice);
+
+  if (matchedQty <= 0) {
+    order.status = "REJECTED";
+    order.brokerStatus = "NO_LIQUIDITY";
+    order.rejectionReason = "NO_MATCHING_LIQUIDITY";
+    order.updatedAt = now();
+
+    addExecutionEvent(
+      order,
+      "REJECTED",
+      "Order rejected: no matching liquidity available."
+    );
+
+    publishOrder(order);
+    persistOrder(order);
+
+    return;
+  }
+
+  const newFilled = Math.min(
+    Number(order.quantity || 0),
+    previousFilled + matchedQty
+  );
+
+  const previousValue =
+    previousFilled *
+    Number(order.averageFillPrice || 0);
+
+  const newFillValue =
+    matchedQty * matchedPrice;
 
   order.filledQuantity = newFilled;
-  order.remainingQuantity = Math.max(order.quantity - newFilled, 0);
+
+  order.remainingQuantity = Math.max(
+    Number(order.quantity || 0) - newFilled,
+    0
+  );
 
   order.averageFillPrice =
     newFilled > 0
-      ? Number(((previousValue + newFillValue) / newFilled).toFixed(2))
+      ? Number(
+          (
+            (previousValue + newFillValue) /
+            newFilled
+          ).toFixed(2)
+        )
       : 0;
 
   order.fillPercent =
-    order.quantity > 0
-      ? Math.round((order.filledQuantity / order.quantity) * 100)
+    Number(order.quantity || 0) > 0
+      ? Math.round(
+          (order.filledQuantity /
+            Number(order.quantity || 0)) *
+            100
+        )
       : 0;
 
   order.status =
-    order.remainingQuantity === 0 ? "FILLED" : "PARTIAL_FILL";
+    order.remainingQuantity === 0
+      ? "FILLED"
+      : "PARTIAL_FILL";
 
   order.brokerStatus =
     order.status === "FILLED"
@@ -349,27 +447,71 @@ async function applyFill(orderId, fillQty, fillPrice) {
   order.updatedAt = now();
 
   const fill = {
-    orderId: order.id,
-    symbol: order.symbol,
-    quantity: newFilled - previousFilled,
-    price: fillPrice,
-    broker: order.broker,
-    timestamp: now()
-  };
+  orderId: order.id,
+  symbol: order.symbol,
+  quantity: matchedQty,
+  price: matchedPrice,
+  broker: order.broker,
+  timestamp: now()
+};
 
-  await updatePositionFromFill({
+const trade = recordTrade({
+  orderId: order.id,
   symbol: order.symbol,
   side: order.side,
-  quantity: newFilled - previousFilled,
-  price: fillPrice,
+  quantity: matchedQty,
+  price: matchedPrice,
   broker: order.broker
 });
+publishEvent("orderbook:update", {
+  symbol: order.symbol,
+  book: matchResult.book,
+  updatedAt: now()
+}).catch((error) => {
+  console.error("Order book publish failed:", error.message);
+});
 
-  publishEvent("execution:fill", fill).catch((error) => {
-    console.error("Fill publish failed:", error.message);
+publishEvent("time-sales:trade", trade).catch((error) => {
+  console.error("Time sales publish failed:", error.message);
+});
+
+  await updatePositionFromFill({
+    symbol: order.symbol,
+    side: order.side,
+    quantity: matchedQty,
+    price: matchedPrice,
+    broker: order.broker
   });
 
-  if (order.side === "SELL" && order.status === "FILLED") {
+  publishEvent("portfolio:update", {
+    orderId: order.id,
+    symbol: order.symbol,
+    side: order.side,
+    quantity: matchedQty,
+    price: matchedPrice,
+    broker: order.broker,
+    status: order.status,
+    updatedAt: now()
+  }).catch((error) => {
+    console.error(
+      "Portfolio update publish failed:",
+      error.message
+    );
+  });
+
+  publishEvent("execution:fill", fill).catch(
+    (error) => {
+      console.error(
+        "Fill publish failed:",
+        error.message
+      );
+    }
+  );
+
+  if (
+    order.side === "SELL" &&
+    order.status === "FILLED"
+  ) {
     recordRealizedTrade({
       symbol: order.symbol,
       quantity: order.filledQuantity,
@@ -382,20 +524,23 @@ async function applyFill(orderId, fillQty, fillPrice) {
   addExecutionEvent(
     order,
     order.status,
-    `${order.status === "FILLED" ? "Final" : "Partial"} fill: ${
-      newFilled - previousFilled
-    } shares @ KES ${fillPrice}.`
+    `${
+      order.status === "FILLED"
+        ? "Final"
+        : "Partial"
+    } fill: ${matchedQty} shares @ KES ${matchedPrice}.`
   );
 
   publishOrder(order);
   persistOrder(order);
 }
-
 function simulateExecution(orderId) {
   setTimeout(() => {
     const order = getOrderById(orderId);
 
-    if (!order) return;
+    if (!order) {
+      return;
+    }
 
     updateOrder(
       orderId,
@@ -411,14 +556,19 @@ function simulateExecution(orderId) {
   setTimeout(() => {
     const order = getOrderById(orderId);
 
-    if (!order) return;
+    if (!order) {
+      return;
+    }
 
-    if (order.quantity <= 0 || order.price <= 0) {
+    if (
+      Number(order.quantity || 0) <= 0 ||
+      Number(order.price || 0) <= 0
+    ) {
       rejectOrder(orderId, "INVALID_ORDER");
       return;
     }
 
-    if (order.quantity > 10000) {
+    if (Number(order.quantity || 0) > 10000) {
       rejectOrder(orderId, "ORDER_SIZE_TOO_LARGE");
       return;
     }
@@ -443,7 +593,11 @@ function simulateExecution(orderId) {
 
     if (
       !order ||
-      ["REJECTED", "RETRYING", "CANCELLED"].includes(order.status) ||
+      [
+        "REJECTED",
+        "RETRYING",
+        "CANCELLED"
+      ].includes(order.status) ||
       order.retryCount > 0
     ) {
       return;
@@ -451,10 +605,16 @@ function simulateExecution(orderId) {
 
     const firstFillQty = Math.max(
       1,
-      Math.floor(order.quantity * 0.45)
+      Math.floor(
+        Number(order.quantity || 0) * 0.45
+      )
     );
 
-    applyFill(orderId, firstFillQty, order.price);
+    applyFill(
+      orderId,
+      firstFillQty,
+      Number(order.price || 0)
+    );
   }, 5000);
 
   setTimeout(() => {
@@ -462,21 +622,31 @@ function simulateExecution(orderId) {
 
     if (
       !order ||
-      ["REJECTED", "RETRYING", "CANCELLED"].includes(order.status) ||
+      [
+        "REJECTED",
+        "RETRYING",
+        "CANCELLED"
+      ].includes(order.status) ||
       order.retryCount > 0 ||
-      order.remainingQuantity <= 0
+      Number(order.remainingQuantity || 0) <= 0
     ) {
       return;
     }
 
-    applyFill(orderId, order.remainingQuantity, order.price);
+    applyFill(
+      orderId,
+      Number(order.remainingQuantity || 0),
+      Number(order.price || 0)
+    );
   }, 8000);
 }
 
 function continueExecutionAfterRetry(orderId) {
   const order = getOrderById(orderId);
 
-  if (!order || order.status === "CANCELLED") return;
+  if (!order || order.status === "CANCELLED") {
+    return;
+  }
 
   updateOrder(
     orderId,
@@ -489,9 +659,15 @@ function continueExecutionAfterRetry(orderId) {
   );
 
   setTimeout(() => {
-    const refreshedOrder = getOrderById(orderId);
+    const refreshedOrder =
+      getOrderById(orderId);
 
-    if (!refreshedOrder || refreshedOrder.status === "CANCELLED") return;
+    if (
+      !refreshedOrder ||
+      refreshedOrder.status === "CANCELLED"
+    ) {
+      return;
+    }
 
     updateOrder(
       orderId,
@@ -504,7 +680,8 @@ function continueExecutionAfterRetry(orderId) {
   }, 1200);
 
   setTimeout(() => {
-    const refreshedOrder = getOrderById(orderId);
+    const refreshedOrder =
+      getOrderById(orderId);
 
     if (
       !refreshedOrder ||
@@ -517,28 +694,37 @@ function continueExecutionAfterRetry(orderId) {
 
     const firstFillQty = Math.max(
       1,
-      Math.floor(refreshedOrder.remainingQuantity * 0.5)
+      Math.floor(
+        Number(
+          refreshedOrder.remainingQuantity || 0
+        ) * 0.5
+      )
     );
 
-    applyFill(orderId, firstFillQty, refreshedOrder.price);
+    applyFill(
+      orderId,
+      firstFillQty,
+      Number(refreshedOrder.price || 0)
+    );
   }, 3500);
 
   setTimeout(() => {
-    const refreshedOrder = getOrderById(orderId);
+    const refreshedOrder =
+      getOrderById(orderId);
 
     if (
       !refreshedOrder ||
       refreshedOrder.status === "CANCELLED" ||
       refreshedOrder.status === "REJECTED" ||
-      refreshedOrder.remainingQuantity <= 0
+      Number(refreshedOrder.remainingQuantity || 0) <= 0
     ) {
       return;
     }
 
     applyFill(
       orderId,
-      refreshedOrder.remainingQuantity,
-      refreshedOrder.price
+      Number(refreshedOrder.remainingQuantity || 0),
+      Number(refreshedOrder.price || 0)
     );
   }, 5500);
 }

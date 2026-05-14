@@ -31,7 +31,7 @@ function BrokerBarChart({ brokerStats }) {
       </h2>
 
       <div style={{ width: "100%", height: 320 }}>
-        <ResponsiveContainer>
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
 
@@ -89,7 +89,7 @@ function StatusPieChart({ analytics }) {
       </h2>
 
       <div style={{ width: "100%", height: 320 }}>
-        <ResponsiveContainer>
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}

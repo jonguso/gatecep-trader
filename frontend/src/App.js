@@ -21,6 +21,16 @@ import ComplianceSurveillancePanel from "./components/ComplianceSurveillancePane
 import LiveOrderExecutionPanel from "./components/orders/LiveOrderExecutionPanel";
 import ExecutionAnalyticsPage from "./pages/ExecutionAnalyticsPage";
 import TradeBlotterPage from "./pages/TradeBlotterPage";
+import LivePortfolioPnLPanel from "./components/LivePortfolioPnLPanel";
+import NSEMarketOverviewPanel from "./components/NSEMarketOverviewPanel";
+import MarketMoversPanel from "./components/MarketMoversPanel";
+import TimeSalesTape from "./components/TimeSalesTape";
+import TradingTerminalPage from "./pages/TradingTerminalPage";
+import MobileCoachHome from "./mobile/MobileCoachHome";
+import MobileOrderConfirm from "./mobile/MobileOrderConfirm";
+import MobilePortfolio from "./mobile/MobilePortfolio";
+import MobileStockDetails from "./mobile/MobileStockDetails";
+import MobileOrderTicket from "./mobile/MobileOrderTicket";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -40,6 +50,8 @@ function HomePage() {
   return (
     <div className="p-6 bg-slate-950 min-h-screen text-white">
       <AdminControlCenter />
+
+      <LivePortfolioPnLPanel />
       
       <NotificationCenter />
       
@@ -50,6 +62,12 @@ function HomePage() {
       <CoachGSignalsPanel />
 
       <WatchlistPanel />
+
+      <NSEMarketOverviewPanel />
+
+      <MarketMoversPanel />
+
+      <TimeSalesTape />
 
       <BrokerAccountsPanel />
 
@@ -102,6 +120,14 @@ function Navigation() {
         >
           Trade Blotter
         </Link>
+
+<Link
+  to="/trading-terminal"
+  className="text-white hover:text-cyan-400 font-medium"
+>
+  Trading Terminal
+</Link>
+
       </div>
 
       <div className="flex items-center gap-4">
@@ -174,6 +200,59 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+<Route
+  path="/trading-terminal"
+  element={
+    <ProtectedRoute>
+      <>
+        <Navigation />
+        <TradingTerminalPage />
+      </>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile"
+  element={
+    <ProtectedRoute>
+      <MobileCoachHome />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/order/:symbol/:side"
+  element={
+    <ProtectedRoute>
+      <MobileOrderConfirm />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/portfolio"
+  element={
+    <ProtectedRoute>
+      <MobilePortfolio />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile/stock/:symbol"
+  element={
+    <ProtectedRoute>
+      <MobileStockDetails />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile/order/:symbol/:side"
+  element={
+    <ProtectedRoute>
+      <MobileOrderTicket />
+    </ProtectedRoute>
+  }
+/>
     </Routes>
   );
 }

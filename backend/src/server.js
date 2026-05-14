@@ -17,6 +17,7 @@ import { marketDataGateway } from "./services/marketData/MarketDataGateway.js";
 
 import { placeOrder, listOrders } from "./routes/orders.js";
 import { getTradeRecommendation } from "./routes/recommendations.js";
+import smartBrokerRouter from "./routes/smartBroker.routes.js";
 
 import {
   getLedger,
@@ -59,6 +60,12 @@ import sectorAllocationRouter from "./routes/sectorAllocation.routes.js";
 import riskAnalysisRouter from "./routes/riskAnalysis.routes.js";
 import coachGRouter from "./routes/coachG.routes.js";
 import coachGAlertsRouter from "./routes/coachGAlerts.routes.js";
+import portfolioHeatmapRouter from "./routes/portfolioHeatmap.routes.js";
+import { getCandles } from "./routes/candles.js";
+import matchingRouter from "./routes/matching.routes.js";
+import timeSalesRouter from "./routes/timeSales.routes.js";
+import executionQualityRouter from "./routes/executionQuality.routes.js";
+import { initCoachGSocket } from "./websocket/coachG.socket.js";
 
 import { initOrderSocket } from "./websocket/orders.socket.js";
 import { initMarketDataSocket } from "./websocket/marketData.socket.js";
@@ -114,7 +121,7 @@ app.use(morgan("combined"));
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300
+    max: process.env.NODE_ENV === "production" ? 300 : 5000
   })
 );
 
@@ -143,12 +150,18 @@ app.get("/prices", async (req, res) => {
 app.get("/account/:userId", (req, res) => {
   res.json(state.users[req.params.userId]);
 });
+app.get("/candles/:symbol", getCandles);
 app.use("/portfolio", unifiedPortfolioRouter);
 app.use("/portfolio", portfolioAnalyticsRoutes);
 app.use("/portfolio/sectors", sectorAllocationRouter);
 app.use("/portfolio/risk", riskAnalysisRouter);
 app.use("/coach-g", coachGRouter);
 app.use("/coach-g-alerts", coachGAlertsRouter);
+app.use("/portfolio/heatmap", portfolioHeatmapRouter);
+app.use("/smart-broker", smartBrokerRouter);
+app.use("/matching", matchingRouter);
+app.use("/time-sales", timeSalesRouter);
+app.use("/execution-quality", executionQualityRouter);
 
 app.get("/portfolio/:userId", (req, res) => {
   res.json(state.holdings[req.params.userId] || []);
@@ -240,6 +253,7 @@ initializeSocketGateway(io);
 
 initOrderSocket(io);
 initMarketDataSocket(io);
+initCoachGSocket(io);
 initPortfolioSocket(io);
 
 await initDb();

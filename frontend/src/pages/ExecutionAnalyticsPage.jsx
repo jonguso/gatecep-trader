@@ -3,11 +3,18 @@ import ExecutionAnalyticsCharts from "../components/ExecutionAnalyticsCharts";
 import SmartRoutingPanel from "../components/SmartRoutingPanel";
 import BrokerHealthPanel from "../components/BrokerHealthPanel";
 import OmsAlertsPanel from "../components/OmsAlertsPanel";
+import LiveOrderExecutionPanel from "../components/orders/LiveOrderExecutionPanel";
+import NSEChartPanel from "../components/NSEChartPanel";
 import PortfolioRiskPanel from "../components/PortfolioRiskPanel";
 import OrderBookPanel from "../components/OrderBookPanel";
 import ExecutionAdvisorPanel from "../components/ExecutionAdvisorPanel";
 import OrderSplitterPanel from "../components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "../components/ChildOrderExecutionPanel";
+import ExecutionTimelinePanel from "../components/ExecutionTimelinePanel";
+import SmartBrokerScorePanel from "../components/SmartBrokerScorePanel";
+import ExecutionQualityPanel from "../components/ExecutionQualityPanel";
+import BrokerLeaderboardPanel from "../components/BrokerLeaderboardPanel";
+import ExecutionQualityAdvisor from "../components/ExecutionQualityAdvisor";
 
 const API_URL =
   process.env.REACT_APP_API_URL || "http://localhost:4000";
@@ -151,15 +158,21 @@ export default function ExecutionAnalyticsPage() {
         />
       </div>
 
-      <BrokerTable brokerStats={analytics.brokerStats} />
+<NSEChartPanel />
+<BrokerTable brokerStats={analytics.brokerStats} />
 <ExecutionAnalyticsCharts analytics={analytics} />
+<ExecutionQualityPanel />
+<BrokerLeaderboardPanel />
+<ExecutionQualityAdvisor />
 <SmartRoutingPanel />
+<SmartBrokerScorePanel />
 <BrokerHealthPanel />
 <OmsAlertsPanel />
 <PortfolioRiskPanel />
 <OrderBookPanel />
 <ExecutionAdvisorPanel />
 <OrderSplitterPanel />
+<LiveOrderExecutionPanel />
 <ChildOrderExecutionPanel />
     </div>
   );

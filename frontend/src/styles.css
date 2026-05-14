@@ -1,1 +1,18 @@
-*{box-sizing:border-box}body{margin:0;background:#0b0e11;color:white;font-family:Arial,Helvetica,sans-serif}.app{display:flex;min-height:100vh}aside{width:260px;background:#151a21;border-right:1px solid #263241;padding:18px}.brand{font-size:28px;font-weight:900;color:#f0b90b;margin-bottom:20px}.brand span{display:block;color:#9ca3af;font-size:12px}aside button{width:100%;background:transparent;color:white;border:0;border-bottom:1px solid #263241;text-align:left;padding:12px;cursor:pointer}aside button.active,aside button:hover{color:#f0b90b;background:#1e293b}main{flex:1}header{display:flex;gap:14px;align-items:center;padding:14px;background:#0f141b;border-bottom:1px solid #263241;position:sticky;top:0}section{padding:18px}.gold{color:#f0b90b}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric,.panel{background:#151a21;border:1px solid #263241;border-radius:14px;padding:14px;margin-bottom:12px}.metric span{display:block;color:#9ca3af}.metric b{font-size:20px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.notice{background:#111827;border-left:4px solid #f0b90b;padding:14px;border-radius:10px;margin-top:14px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #263241;padding:8px;text-align:left}tr:hover{background:#111827}button{background:#f0b90b;color:#111827;border:0;padding:10px;border-radius:8px;font-weight:900;cursor:pointer}button.buy{background:#16a34a;color:white}button.sell{background:#dc2626;color:white}input,select{background:#0b0e11;color:white;border:1px solid #263241;border-radius:8px;padding:10px;margin:4px}label{display:block;color:#9ca3af;margin-top:10px}.ticket{max-width:420px}pre{background:#111827;border:1px solid #263241;border-radius:10px;padding:12px;color:#e5e7eb;overflow:auto}@media(max-width:900px){.app{display:block}aside{width:100%}.cards,.grid{grid-template-columns:1fr}}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@keyframes ticker {
+  0% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+body {
+  margin: 0;
+  font-family: Inter, sans-serif;
+  background: #020617;
+  color: white;
+}
