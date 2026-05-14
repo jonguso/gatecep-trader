@@ -1,6 +1,8 @@
+
 import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
 import { useEffect, useState } from "react";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
+import MobileBottomNav from "../components/mobile/MobileBottomNav";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -415,24 +417,3 @@ function FloatingCoachG() {
   );
 }
 
-function MobileBottomNav() {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-4 text-center text-xs text-white">
-      <a href="/mobile" className="py-3">
-        Coach
-      </a>
-
-      <a href="/trading-terminal" className="py-3">
-        Markets
-      </a>
-
-      <a href="/mobile/portfolio" className="py-3">
-        Portfolio
-      </a>
-
-      <a href="/execution-analytics" className="py-3">
-        Pro
-      </a>
-    </div>
-  );
-}

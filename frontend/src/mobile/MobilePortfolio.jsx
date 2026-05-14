@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
+import MobileBottomNav from "../components/mobile/MobileBottomNav";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -135,7 +136,10 @@ function Card({ title, value, color = "text-white" }) {
 
       <div className={`text-xl font-bold mt-2 ${color}`}>
         {value}
-      </div>
+
+           </div>
+
+      <MobileBottomNav />
     </div>
   );
 }

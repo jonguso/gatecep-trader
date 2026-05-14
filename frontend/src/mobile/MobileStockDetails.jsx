@@ -1,7 +1,11 @@
-import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
 import { useEffect, useState } from "react";
+import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
 import { useParams } from "react-router-dom";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
+import MobileMiniChart from "../components/mobile/MobileMiniChart";
+import LiveAISentimentBanner from "../components/mobile/LiveAISentimentBanner";
+import FloatingCoachG from "../components/mobile/FloatingCoachG";
+import MobileBottomNav from "../components/mobile/MobileBottomNav";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -12,6 +16,8 @@ export default function MobileStockDetails() {
 
   const [price, setPrice] = useState(null);
   const [book, setBook] = useState(null);
+  const [lastDisplayPrice, setLastDisplayPrice] = useState(null);
+  const [priceFlash, setPriceFlash] = useState("");
 
   async function loadData() {
     try {
@@ -28,6 +34,29 @@ export default function MobileStockDetails() {
       );
 
       setPrice(found || null);
+
+const newPrice = Number(
+  found?.price ||
+    found?.lastPrice ||
+    found?.currentPrice ||
+    0
+);
+
+if (newPrice > 0) {
+  if (lastDisplayPrice !== null) {
+    if (newPrice > lastDisplayPrice) {
+      setPriceFlash("text-green-400 scale-105");
+    } else if (newPrice < lastDisplayPrice) {
+      setPriceFlash("text-red-400 scale-105");
+    }
+
+    setTimeout(() => {
+      setPriceFlash("");
+    }, 800);
+  }
+
+  setLastDisplayPrice(newPrice);
+}
 
       if (bookData.ok) {
         setBook(bookData.book);
@@ -81,7 +110,11 @@ export default function MobileStockDetails() {
             </div>
 
             <div className="text-right">
-              <div className="text-3xl font-bold text-cyan-300">
+              <div
+  className={`text-3xl font-bold transition-all duration-300 ${
+    priceFlash || "text-cyan-300"
+  }`}
+>
                 KES{" "}
                 {Number(
                   price?.price ||
@@ -106,9 +139,10 @@ export default function MobileStockDetails() {
             </div>
           </div>
 
-          <div className="h-40 bg-slate-800 rounded-2xl mt-5 flex items-center justify-center text-cyan-400 text-sm border border-slate-700">
-            AI Momentum Chart Preview
-          </div>
+          <div className="mt-5">
+<LiveAISentimentBanner />
+  <MobileMiniChart symbol={symbol} height={180} />
+</div>
         </div>
 
         <div className="grid grid-cols-3 gap-3 mt-4">
@@ -177,7 +211,8 @@ export default function MobileStockDetails() {
         </div>
       </div>
 
-      <MobileBottomNav />
+     <FloatingCoachG />
+     <MobileBottomNav />
     </div>
   );
 }
@@ -216,13 +251,3 @@ function SafetyRow({ label, value, ok }) {
   );
 }
 
-function MobileBottomNav() {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-4 text-center text-xs text-white">
-      <a href="/mobile" className="py-3">Coach</a>
-      <a href="/trading-terminal" className="py-3">Markets</a>
-      <a href="/mobile/portfolio" className="py-3">Portfolio</a>
-      <a href="/execution-analytics" className="py-3">Pro</a>
-    </div>
-  );
-}

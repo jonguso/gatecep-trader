@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 import SwipeTradeButton from "../components/mobile/SwipeTradeButton";
+import MobileBottomNav from "../components/mobile/MobileBottomNav";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -9,6 +10,7 @@ const API_URL =
 
 export default function MobileOrderTicket() {
   const { symbol, side } = useParams();
+  const navigate = useNavigate();
 
   const [quantity, setQuantity] = useState(100);
   const [price, setPrice] = useState(18.45);
@@ -55,6 +57,11 @@ export default function MobileOrderTicket() {
       setOrderId(data.order.id);
       setExecution(data.order);
       setMessage(`Order submitted: ${data.order.id}`);
+
+setTimeout(() => {
+  navigate(`/mobile/stock/${symbol}`);
+}, 6000);
+
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -272,6 +279,7 @@ export default function MobileOrderTicket() {
                         {event.message}
                       </div>
                     </div>
+		<MobileBottomNav />
                   </div>
                 )
               )}
