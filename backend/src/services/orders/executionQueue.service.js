@@ -1,10 +1,18 @@
 import { emitOrderUpdate } from "../../websocket/orders.socket.js";
-
+import {
+  debitWallet,
+  getWalletBalance,
+  creditWallet
+} from "../wallet/cashWallet.service.js";
 import {
   saveOrder,
   saveOrderEvent,
   loadOrders
 } from "../../repositories/order.repository.js";
+import {
+  addOrderToBook,
+  matchOrderBook
+} from "../market/orderBook.service.js";
 
 import {
   getPreferredBroker,
@@ -94,6 +102,87 @@ export function queueOrder(order) {
 
   const estimatedTradeValue = quantity * price;
 
+
+if (order.side === "BUY") {
+  const wallet = getWalletBalance();
+
+  if (estimatedTradeValue > Number(wallet.balance || 0)) {
+    const rejectedOrder = {
+      id: `ORD-${Date.now()}`,
+      symbol: order.symbol,
+      side: order.side,
+      quantity,
+      price,
+      broker: selectedBroker,
+      status: "REJECTED",
+      brokerStatus: "REJECTED",
+      filledQuantity: 0,
+      remainingQuantity: quantity,
+      averageFillPrice: 0,
+      fillPercent: 0,
+      retryCount: 0,
+      maxRetries: 1,
+      rejectionReason: "INSUFFICIENT_WALLET_BALANCE",
+      lastBrokerAttempt: selectedBroker,
+      executionEvents: [],
+      createdAt: now(),
+      updatedAt: now()
+    };
+
+    executionQueue.push(rejectedOrder);
+
+    addExecutionEvent(
+      rejectedOrder,
+      "REJECTED",
+      "Order rejected: insufficient wallet balance."
+    );
+
+    publishOrder(rejectedOrder);
+    persistOrder(rejectedOrder);
+
+    return rejectedOrder;
+  }
+
+  const debit = debitWallet(estimatedTradeValue);
+
+  if (!debit.ok) {
+    const rejectedOrder = {
+      id: `ORD-${Date.now()}`,
+      symbol: order.symbol,
+      side: order.side,
+      quantity,
+      price,
+      broker: selectedBroker,
+      status: "REJECTED",
+      brokerStatus: "REJECTED",
+      filledQuantity: 0,
+      remainingQuantity: quantity,
+      averageFillPrice: 0,
+      fillPercent: 0,
+      retryCount: 0,
+      maxRetries: 1,
+      rejectionReason: debit.error,
+      lastBrokerAttempt: selectedBroker,
+      executionEvents: [],
+      createdAt: now(),
+      updatedAt: now()
+    };
+
+    executionQueue.push(rejectedOrder);
+
+    addExecutionEvent(
+      rejectedOrder,
+      "REJECTED",
+      `Order rejected: ${debit.error}.`
+    );
+
+    publishOrder(rejectedOrder);
+    persistOrder(rejectedOrder);
+
+    return rejectedOrder;
+  }
+}
+
   if (order.side === "BUY") {
     const debit = debitBrokerBuyingPower(
       selectedBroker,
@@ -161,6 +250,14 @@ export function queueOrder(order) {
   };
 
   executionQueue.push(queuedOrder);
+
+addOrderToBook({
+  symbol: queuedOrder.symbol,
+  side: queuedOrder.side,
+  quantity: queuedOrder.quantity,
+  price: queuedOrder.price,
+  orderId: queuedOrder.id
+});
 
   addExecutionEvent(
     queuedOrder,
@@ -483,6 +580,13 @@ publishEvent("time-sales:trade", trade).catch((error) => {
     broker: order.broker
   });
 
+if (order.side === "SELL") {
+  creditWallet(
+    matchedQty * matchedPrice,
+    `SELL ${order.symbol} wallet credit`
+  );
+}
+
   publishEvent("portfolio:update", {
     orderId: order.id,
     symbol: order.symbol,
@@ -586,6 +690,34 @@ function simulateExecution(orderId) {
       },
       `${order.broker} accepted the order.`
     );
+
+const matchedTrade = matchOrderBook(order.symbol);
+
+if (matchedTrade) {
+  console.log("Matched trade:", matchedTrade);
+
+  applyFill(
+    matchedTrade.buyOrderId,
+    matchedTrade.quantity,
+    matchedTrade.price
+  );
+
+  applyFill(
+    matchedTrade.sellOrderId,
+    matchedTrade.quantity,
+    matchedTrade.price
+  );
+
+  creditWallet(
+    matchedTrade.quantity * matchedTrade.price,
+    `SELL ${order.symbol} wallet credit`
+  );
+
+  publishEvent("orderbook:matched", matchedTrade).catch((error) => {
+    console.error("Order book match publish failed:", error.message);
+  });
+}
+
   }, 2800);
 
   setTimeout(() => {

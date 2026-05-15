@@ -9,26 +9,30 @@ export default function MobileBottomNav() {
   }
 
   const items = [
-    {
-      label: "Coach",
-      path: "/mobile"
-    },
-    {
-      label: "Markets",
-      path: "/trading-terminal"
-    },
-    {
-      label: "Portfolio",
-      path: "/mobile/portfolio"
-    },
-    {
-      label: "Pro",
-      path: "/execution-analytics"
-    }
-  ];
+  {
+    label: "Coach",
+    path: "/mobile"
+  },
+  {
+    label: "Markets",
+    path: "/mobile/markets"
+  },
+  {
+    label: "Portfolio",
+    path: "/mobile/portfolio"
+  },
+  {
+    label: "Wallet",
+    path: "/mobile/wallet"
+  },
+  {
+    label: "Pro",
+    path: "/mobile/pro"
+  }
+];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-4 text-center text-xs text-white z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 text-center text-xs text-white z-50">
       {items.map((item) => (
         <a
           key={item.path}

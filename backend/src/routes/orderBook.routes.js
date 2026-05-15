@@ -7,19 +7,15 @@ import {
 const router = express.Router();
 
 router.get("/:symbol", (req, res) => {
-  try {
-    const book = getOrderBook(req.params.symbol);
+  const book = getOrderBook(
+    req.params.symbol
+  );
 
-    res.json({
-      ok: true,
-      book
-    });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: error.message
-    });
-  }
+  res.json({
+    ok: true,
+    symbol: req.params.symbol,
+    book
+  });
 });
 
 export default router;

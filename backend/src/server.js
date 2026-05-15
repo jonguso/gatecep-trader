@@ -19,6 +19,7 @@ import { placeOrder, listOrders } from "./routes/orders.js";
 import { getTradeRecommendation } from "./routes/recommendations.js";
 import smartBrokerRouter from "./routes/smartBroker.routes.js";
 import walletRouter from "./routes/wallet.routes.js";
+import walletLedgerRouter from "./routes/walletLedger.routes.js";
 
 import {
   getLedger,
@@ -165,6 +166,7 @@ app.use("/matching", matchingRouter);
 app.use("/time-sales", timeSalesRouter);
 app.use("/execution-quality", executionQualityRouter);
 app.use("/coach", coachRouter);
+app.use("/wallet/ledger", walletLedgerRouter);
 
 app.get("/portfolio/:userId", (req, res) => {
   res.json(state.holdings[req.params.userId] || []);
@@ -217,6 +219,7 @@ app.use("/oms-alerts", omsAlertsRouter);
 app.use("/order-history", orderHistoryRouter);
 app.use("/risk", riskRouter);
 app.use("/order-book", orderBookRouter);
+app.use("/orderbook", orderBookRouter);
 app.use("/execution-advisor", executionAdvisorRouter);
 app.use("/order-splitter", orderSplitterRouter);
 app.use("/child-orders", childOrdersRouter);

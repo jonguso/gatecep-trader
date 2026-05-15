@@ -17,6 +17,7 @@ import PortfolioDashboard from "./components/PortfolioDashboard";
 import PortfolioPerformanceChart from "./components/PortfolioPerformanceChart";
 import SettlementLedgerPanel from "./components/SettlementLedgerPanel";
 import ComplianceSurveillancePanel from "./components/ComplianceSurveillancePanel";
+import MobileBottomNav from "./components/mobile/MobileBottomNav";
 
 import LiveOrderExecutionPanel from "./components/orders/LiveOrderExecutionPanel";
 import ExecutionAnalyticsPage from "./pages/ExecutionAnalyticsPage";
@@ -30,6 +31,8 @@ import MobileCoachHome from "./mobile/MobileCoachHome";
 import MobilePortfolio from "./mobile/MobilePortfolio";
 import MobileStockDetails from "./mobile/MobileStockDetails";
 import MobileOrderTicket from "./mobile/MobileOrderTicket";
+import MobileDepositFunds from "./mobile/MobileDepositFunds";
+import MobileWallet from "./mobile/MobileWallet";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -215,6 +218,45 @@ function AppRoutes() {
   element={
     <ProtectedRoute>
       <MobileCoachHome />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile/markets"
+  element={
+    <ProtectedRoute>
+      <>
+        <TradingTerminalPage />
+        <MobileBottomNav />
+      </>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/pro"
+  element={
+    <ProtectedRoute>
+      <>
+        <ExecutionAnalyticsPage />
+        <MobileBottomNav />
+      </>
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile/deposit"
+  element={
+    <ProtectedRoute>
+      <MobileDepositFunds />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile/wallet"
+  element={
+    <ProtectedRoute>
+      <MobileWallet />
     </ProtectedRoute>
   }
 />

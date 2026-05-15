@@ -1,77 +1,114 @@
-const basePrices = {
-  SCOM: 18.45,
-  EQTY: 47.2,
-  KCB: 31.8,
-  COOP: 15.6
-};
+const orderBooks = {};
 
-function randomQty() {
-  return Math.floor(Math.random() * 5000) + 100;
-}
-
-function generateLevels(basePrice, side) {
-  const levels = [];
-
-  for (let i = 0; i < 5; i++) {
-    const offset = (i + 1) * 0.01;
-
-    const price =
-      side === "BID"
-        ? Number((basePrice - offset).toFixed(2))
-        : Number((basePrice + offset).toFixed(2));
-
-    levels.push({
-      price,
-      quantity: randomQty()
-    });
+function ensureBook(symbol) {
+  if (!orderBooks[symbol]) {
+    orderBooks[symbol] = {
+      bids: [],
+      asks: []
+    };
   }
 
-  return levels;
+  return orderBooks[symbol];
 }
 
-export function getOrderBook(symbol = "SCOM") {
-  const basePrice =
-    basePrices[symbol] || 20;
+export function addOrderToBook({
+  symbol,
+  side,
+  quantity,
+  price,
+  orderId
+}) {
+  const book = ensureBook(symbol);
 
-  const bids = generateLevels(basePrice, "BID");
-  const asks = generateLevels(basePrice, "ASK");
+  const level = {
+    orderId,
+    quantity: Number(quantity),
+    price: Number(price),
+    createdAt: new Date().toISOString()
+  };
 
-  const bestBid = bids[0]?.price || 0;
-  const bestAsk = asks[0]?.price || 0;
+  if (side === "BUY") {
+    book.bids.push(level);
 
-  const spread = Number(
-    (bestAsk - bestBid).toFixed(2)
+    book.bids.sort(
+      (a, b) => b.price - a.price
+    );
+  } else {
+    book.asks.push(level);
+
+    book.asks.sort(
+      (a, b) => a.price - b.price
+    );
+  }
+
+  return book;
+}
+
+export function getOrderBook(symbol) {
+  return ensureBook(symbol);
+}
+
+export function removeOrderFromBook({
+  symbol,
+  side,
+  orderId
+}) {
+  const book = ensureBook(symbol);
+
+  if (side === "BUY") {
+    book.bids = book.bids.filter(
+      (x) => x.orderId !== orderId
+    );
+  } else {
+    book.asks = book.asks.filter(
+      (x) => x.orderId !== orderId
+    );
+  }
+
+  return book;
+}
+
+export function matchOrderBook(symbol) {
+  const book = ensureBook(symbol);
+
+  if (
+    !book.bids.length ||
+    !book.asks.length
+  ) {
+    return null;
+  }
+
+  const bestBid = book.bids[0];
+  const bestAsk = book.asks[0];
+
+  if (bestBid.price < bestAsk.price) {
+    return null;
+  }
+
+  const matchedQty = Math.min(
+    bestBid.quantity,
+    bestAsk.quantity
   );
 
-  const totalBidLiquidity = bids.reduce(
-    (sum, level) => sum + level.quantity,
-    0
-  );
+  const tradePrice = bestAsk.price;
 
-  const totalAskLiquidity = asks.reduce(
-    (sum, level) => sum + level.quantity,
-    0
-  );
+  bestBid.quantity -= matchedQty;
+  bestAsk.quantity -= matchedQty;
 
-  const liquidityScore = Math.min(
-    100,
-    Math.round(
-      (totalBidLiquidity + totalAskLiquidity) / 500
-    )
-  );
+  if (bestBid.quantity <= 0) {
+    book.bids.shift();
+  }
 
-  const marketImpactEstimate = Number(
-    ((spread / basePrice) * 100).toFixed(2)
-  );
+  if (bestAsk.quantity <= 0) {
+    book.asks.shift();
+  }
 
   return {
     symbol,
-    bestBid,
-    bestAsk,
-    spread,
-    liquidityScore,
-    marketImpactEstimate,
-    bids,
-    asks
+    quantity: matchedQty,
+    price: tradePrice,
+    buyOrderId: bestBid.orderId,
+    sellOrderId: bestAsk.orderId,
+    executedAt: new Date().toISOString()
   };
 }
