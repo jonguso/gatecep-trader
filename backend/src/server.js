@@ -18,6 +18,7 @@ import { marketDataGateway } from "./services/marketData/MarketDataGateway.js";
 import { placeOrder, listOrders } from "./routes/orders.js";
 import { getTradeRecommendation } from "./routes/recommendations.js";
 import smartBrokerRouter from "./routes/smartBroker.routes.js";
+import walletRouter from "./routes/wallet.routes.js";
 
 import {
   getLedger,
@@ -235,6 +236,7 @@ app.use("/exports", exportRouter);
 app.use("/notifications", notificationRouter);
 app.use("/rebalancer", rebalancerRouter);
 app.use("/positions", positionsRouter);
+app.use("/wallet", walletRouter);
 
 app.use(errorHandler);
 

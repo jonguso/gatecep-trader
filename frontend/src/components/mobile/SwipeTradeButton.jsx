@@ -3,7 +3,8 @@ import { useRef, useState } from "react";
 export default function SwipeTradeButton({
   text = "Swipe To Buy",
   onComplete,
-  color = "bg-green-500"
+  color = "bg-green-500",
+  disabled = false
 }) {
   const [dragX, setDragX] = useState(0);
   const [completed, setCompleted] = useState(false);
@@ -12,14 +13,14 @@ export default function SwipeTradeButton({
   const dragging = useRef(false);
 
   function handleStart(clientX) {
-    if (completed) return;
+  if (completed || disabled) return;
 
-    dragging.current = true;
-    startX.current = clientX;
-  }
+  dragging.current = true;
+  startX.current = clientX;
+}
 
-  function handleMove(clientX) {
-    if (!dragging.current || completed) return;
+ function handleMove(clientX) {
+  if (!dragging.current || completed || disabled) return;
 
     const diff = clientX - startX.current;
 
@@ -62,7 +63,9 @@ export default function SwipeTradeButton({
 
       {!completed && (
         <div
-          className={`absolute top-1 left-1 w-14 h-14 rounded-full ${color} flex items-center justify-center text-white font-bold shadow-xl cursor-pointer`}
+          className={`absolute top-1 left-1 w-14 h-14 rounded-full ${color} flex items-center justify-center text-white font-bold shadow-xl ${
+  disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+}`}
           style={{
             transform: `translateX(${dragX}px)`
           }}

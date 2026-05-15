@@ -21,11 +21,73 @@ export default function MobileOrderTicket() {
   const [orderId, setOrderId] = useState(null);
   const [execution, setExecution] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [wallet, setWallet] = useState(null);
 
   const estimatedValue =
     Number(quantity || 0) * Number(price || 0);
+  const availableFunds = Number(wallet?.balance || 0);
+
+const marketReferencePrice = Number(price || 0);
+const insufficientFunds =
+  estimatedValue > availableFunds;
+
+const priceDeviation =
+  Math.abs(
+    Number(price) - marketReferencePrice
+  ) / marketReferencePrice;
+
+const invalidPrice =
+  priceDeviation > 0.1;
+
+async function loadWallet() {
+  try {
+    const res = await fetch(`${API_URL}/wallet/balance`);
+    const data = await res.json();
+
+    if (data.ok) {
+      setWallet(data.wallet);
+    }
+  } catch (error) {
+    console.error("Failed to load wallet:", error);
+  }
+}
+
+async function loadMarketPrice() {
+  try {
+    const res = await fetch(`${API_URL}/prices`);
+    const data = await res.json();
+
+    const found = (data.data || []).find(
+      (item) => item.symbol === symbol
+    );
+
+    if (found) {
+      const currentPrice = Number(
+        found.price ||
+          found.lastPrice ||
+          found.currentPrice ||
+          price
+      );
+
+      if (currentPrice > 0) {
+        setPrice(currentPrice);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load market price:", error);
+  }
+}
 
   async function executeOrder() {
+if (insufficientFunds) {
+  setMessage("Order blocked: insufficient available funds.");
+  return;
+}
+
+if (invalidPrice) {
+  setMessage("Order blocked: price is too far from current market.");
+  return;
+}
     try {
       setLoading(true);
       setMessage("");
@@ -71,6 +133,9 @@ setTimeout(() => {
       setLoading(false);
     }
   }
+useEffect(() => {
+  loadWallet();
+}, []);
 
   useEffect(() => {
     if (!orderId) return;
@@ -210,22 +275,53 @@ setTimeout(() => {
               Smart routing will use the best available broker when AUTO is selected.
               Check quantity, liquidity, and buying power before confirming.
             </div>
+{insufficientFunds && (
+  <div className="bg-red-500/10 border border-red-500 rounded-2xl p-4 mt-4">
+    <div className="text-red-400 font-bold">
+      Insufficient Buying Power
+    </div>
+
+    <div className="text-sm text-slate-300 mt-2">
+      Available: KES {availableFunds.toLocaleString()} • Required: KES{" "}
+      {estimatedValue.toLocaleString()}
+    </div>
+  </div>
+)}
+
+{invalidPrice && (
+  <div className="bg-yellow-500/10 border border-yellow-500 rounded-2xl p-4 mt-4">
+    <div className="text-yellow-400 font-bold">
+      Price Deviation Warning
+    </div>
+
+    <div className="text-sm text-slate-300 mt-2">
+      Order price is more than 10% away from current market reference.
+    </div>
+  </div>
+)}
           </div>
 
           <div className="mt-5">
-            <SwipeTradeButton
-              text={
-                loading
-                  ? "Submitting..."
-                  : `Swipe To ${side}`
-              }
-              color={
-                side === "BUY"
-                  ? "bg-green-500"
-                  : "bg-red-500"
-              }
-              onComplete={executeOrder}
-            />
+        <SwipeTradeButton
+  disabled={insufficientFunds || invalidPrice}
+  text={
+    insufficientFunds
+      ? "Insufficient Funds"
+      : invalidPrice
+      ? "Invalid Price"
+      : loading
+      ? "Submitting..."
+      : `Swipe To ${side}`
+  }
+  color={
+    insufficientFunds || invalidPrice
+      ? "bg-slate-700"
+      : side === "BUY"
+      ? "bg-green-500"
+      : "bg-red-500"
+  }
+  onComplete={executeOrder}
+/>
           </div>
 
           {message && (

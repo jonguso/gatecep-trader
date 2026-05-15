@@ -13,8 +13,17 @@ export function buildTradeRecommendation({ symbol, side="BUY", price, qty, marke
   if (priceRisk < 20) riskFlags.push("Price outside allowed broker range");
   confidence = clamp(confidence, 0, 99);
   const signal = confidence >= 75 ? side : confidence >= 60 ? "REVIEW" : "HOLD";
-  return {
-    symbol, side, signal, action: signal, confidence,
+ return {
+  symbol,
+  side,
+  signal,
+  action: signal,
+  confidence,
+  price: Number(price || 0),
+  marketPrice: Number(market.price || market.lastPrice || price || 0),
+  lastPrice: Number(market.lastPrice || market.price || price || 0),
+  changePct,
+  volume: Number(market.volume || 0),
     recommendationText: `${confidence}% ${signal}: Coach G reviewed momentum, liquidity, price range, and exposure.`,
     scores: { momentum: Math.round(momentum), liquidity: Math.round(liquidity), priceRisk: Math.round(priceRisk), exposure: Math.round(exposure) },
     riskFlags,

@@ -6,24 +6,37 @@ const API_URL =
 
 export default function MobileBuyingPowerBar() {
   const [portfolio, setPortfolio] = useState(null);
+  const [wallet, setWallet] = useState(null);
 
-  async function loadPortfolio() {
+  async function loadData() {
     try {
-      const res = await fetch(`${API_URL}/portfolio/unified`);
-      const data = await res.json();
+      const [portfolioRes, walletRes] = await Promise.all([
+        fetch(`${API_URL}/portfolio/unified`),
+        fetch(`${API_URL}/wallet/balance`)
+      ]);
 
-      if (data.ok) {
-        setPortfolio(data.portfolio);
+      const portfolioData = await portfolioRes.json();
+      const walletData = await walletRes.json();
+
+      if (portfolioData.ok) {
+        setPortfolio(portfolioData.portfolio);
+      }
+
+      if (walletData.ok) {
+        setWallet(walletData.wallet);
       }
     } catch (error) {
-      console.error("Failed to load buying power:", error);
+      console.error(
+        "Failed to load buying power:",
+        error
+      );
     }
   }
 
   useEffect(() => {
-    loadPortfolio();
+    loadData();
 
-    const interval = setInterval(loadPortfolio, 5000);
+    const interval = setInterval(loadData, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -39,7 +52,8 @@ export default function MobileBuyingPowerBar() {
           <div className="text-xl font-bold text-green-400">
             KES{" "}
             {Number(
-              portfolio?.buyingPower ||
+              wallet?.balance ||
+                portfolio?.buyingPower ||
                 portfolio?.availableFunds ||
                 0
             ).toLocaleString()}

@@ -33,12 +33,15 @@ function confidenceColor(confidence) {
 }
 
 function marketPrice(item) {
-  return Number(
+  const value = Number(
+    item.marketPrice ||
     item.price ||
-      item.lastPrice ||
-      item.currentPrice ||
-      18.45
-  ).toFixed(2);
+    item.lastPrice ||
+    item.currentPrice ||
+    0
+  );
+
+  return value.toFixed(2);
 }
 
 function aiReason(signal) {
