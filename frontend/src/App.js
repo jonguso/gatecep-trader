@@ -28,6 +28,7 @@ import MarketMoversPanel from "./components/MarketMoversPanel";
 import TimeSalesTape from "./components/TimeSalesTape";
 import TradingTerminalPage from "./pages/TradingTerminalPage";
 import MobileCoachHome from "./mobile/MobileCoachHome";
+import MobileMarkets from "./mobile/MobileMarkets";
 import MobilePortfolio from "./mobile/MobilePortfolio";
 import MobileStockDetails from "./mobile/MobileStockDetails";
 import MobileOrderTicket from "./mobile/MobileOrderTicket";
@@ -225,14 +226,10 @@ function AppRoutes() {
   path="/mobile/markets"
   element={
     <ProtectedRoute>
-      <>
-        <TradingTerminalPage />
-        <MobileBottomNav />
-      </>
+      <MobileMarkets />
     </ProtectedRoute>
   }
 />
-
 <Route
   path="/mobile/pro"
   element={

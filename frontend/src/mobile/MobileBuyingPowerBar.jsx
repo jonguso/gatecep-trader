@@ -62,7 +62,7 @@ export default function MobileBuyingPowerBar() {
 
         <div className="text-right">
           <div className="text-xs text-slate-400">
-            Portfolio Value
+            Net Worth
           </div>
 
           <div className="text-lg font-bold text-cyan-400">

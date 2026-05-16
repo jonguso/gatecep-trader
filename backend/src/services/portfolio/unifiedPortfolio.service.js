@@ -1,5 +1,8 @@
 import { getPositions } from "../positions/position.service.js";
 import { marketDataGateway } from "../marketData/MarketDataGateway.js";
+import {
+  getMarketMetadata
+} from "../market/marketMetadata.service.js";
 
 export async function getUnifiedPortfolio() {
   const positions = await getPositions();
@@ -13,6 +16,7 @@ const priceMap = new Map();
   }
 
   const holdings = positions.map((position) => {
+  const metadata = getMarketMetadata(position.symbol);
     const marketPrice =
       priceMap.get(position.symbol) || position.averageCost || 0;
 
@@ -29,19 +33,22 @@ const priceMap = new Map();
       costValue > 0
         ? Number(((unrealizedPnL / costValue) * 100).toFixed(2))
         : 0;
+    
 
-    return {
-      broker: position.broker,
-      symbol: position.symbol,
-      quantity: position.quantity,
-      averageCost: position.averageCost,
-      marketPrice,
-      marketValue,
-      unrealizedPnL,
-      unrealizedPnLPercent,
-      realizedPnL: position.realizedPnL,
-      updatedAt: position.updatedAt
-    };
+   return {
+  broker: position.broker,
+  symbol: position.symbol,
+  name: metadata.name,
+  sector: metadata.sector,
+  quantity: position.quantity,
+  averageCost: position.averageCost,
+  marketPrice,
+  marketValue,
+  unrealizedPnL,
+  unrealizedPnLPercent,
+  realizedPnL: position.realizedPnL,
+  updatedAt: position.updatedAt
+};
   });
 
   const brokersMap = new Map();
