@@ -3,6 +3,7 @@ import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
 import { useEffect, useState } from "react";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
+import FloatingCoachG from "../components/mobile/FloatingCoachG";
 import { motion } from "framer-motion";
 
 const API_URL =
@@ -68,6 +69,7 @@ export default function MobileCoachHome() {
   const [question, setQuestion] = useState("");
   const [aiAnswer, setAiAnswer] = useState("");
   const [listening, setListening] = useState(false);
+  const [dailyBriefing, setDailyBriefing] = useState("");
 
   async function loadSignals() {
     try {
@@ -109,8 +111,32 @@ export default function MobileCoachHome() {
   }
 }
 
+async function loadDailyBriefing() {
+  try {
+    const res = await fetch(`${API_URL}/coach/ask`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        question:
+          "Give me today's NSE market briefing with risks, opportunities, and portfolio guidance."
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      setDailyBriefing(data.answer);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
   useEffect(() => {
     loadSignals();
+    loadDailyBriefing();
 
     const interval = setInterval(loadSignals, 10000);
 
@@ -166,6 +192,22 @@ export default function MobileCoachHome() {
             </div>
           </div>
         </div>
+
+<div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4 mt-5">
+  <div className="flex items-center justify-between">
+    <div className="text-cyan-400 font-bold">
+      Coach G Daily Briefing
+    </div>
+
+    <div className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300">
+      LIVE AI
+    </div>
+  </div>
+
+  <p className="text-sm text-slate-200 leading-6 mt-3">
+    {dailyBriefing || "Loading daily market intelligence..."}
+  </p>
+</div>
 
         <div className="bg-slate-900 rounded-2xl p-4 mt-5 border border-slate-800">
           <div className="text-sm text-slate-400 mb-2">
@@ -311,15 +353,15 @@ export default function MobileCoachHome() {
                   </a>
 
                   <button
-                    onClick={() => setListening(!listening)}
-                    className={`rounded-xl py-3 font-bold ${
-                      listening
-                        ? "bg-red-500 text-white animate-pulse"
-                        : "bg-slate-800 hover:bg-slate-700 text-cyan-300"
-                    }`}
-                  >
-                    {listening ? "Listening..." : "🎤 Voice"}
-                  </button>
+  onClick={() => setListening(!listening)}
+  className={`rounded-xl py-3 font-bold ${
+    listening
+      ? "bg-red-500 text-white animate-pulse"
+      : "bg-slate-800 hover:bg-slate-700 text-cyan-300"
+  }`}
+>
+  {listening ? "Listening..." : "🎤 Voice"}
+</button>
 
                   <a
                     href={`/mobile/order/${item.symbol}/BUY`}
@@ -337,97 +379,6 @@ export default function MobileCoachHome() {
       <FloatingCoachG />
       <MobileBottomNav />
   </motion.div>
-  );
-}
-
-function FloatingCoachG() {
-  const [open, setOpen] = useState(false);
-  const [listening, setListening] = useState(false);
-
-  return (
-    <>
-      {open && (
-        <div className="fixed bottom-24 right-4 w-80 bg-slate-900 border border-cyan-500 rounded-2xl shadow-2xl z-50 overflow-hidden">
-          <div className="bg-cyan-600 px-4 py-3 flex justify-between items-center">
-            <div>
-              <div className="font-bold">
-                Coach G AI
-              </div>
-
-              <div className="text-xs text-cyan-100">
-                NSE Trading Assistant
-              </div>
-            </div>
-
-            <button
-              onClick={() => setOpen(false)}
-              className="text-white text-sm"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="p-4 space-y-3">
-            {listening && (
-              <div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4">
-                <div className="font-bold text-cyan-300">
-                  Coach G Listening
-                </div>
-
-                <div className="text-xs text-slate-400 mt-1">
-                  Try saying: “Should I buy KCB?”
-                </div>
-              </div>
-            )}
-
-            <button className="w-full bg-slate-800 hover:bg-slate-700 rounded-xl p-3 text-left">
-              Should I buy SCOM today?
-            </button>
-
-            <button className="w-full bg-slate-800 hover:bg-slate-700 rounded-xl p-3 text-left">
-              Show safest NSE stocks
-            </button>
-
-            <button className="w-full bg-slate-800 hover:bg-slate-700 rounded-xl p-3 text-left">
-              Analyze my portfolio risk
-            </button>
-
-            <button className="w-full bg-slate-800 hover:bg-slate-700 rounded-xl p-3 text-left">
-              Best stock for tomorrow
-            </button>
-
-            <input
-              placeholder="Ask Coach G anything..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm"
-            />
-
-            <div className="grid grid-cols-2 gap-2">
-              <button className="bg-cyan-600 hover:bg-cyan-500 rounded-xl py-3 font-bold">
-                Ask Coach G
-              </button>
-
-              <button
-                onClick={() => setListening(!listening)}
-                className={`rounded-xl py-3 font-bold ${
-                  listening
-                    ? "bg-red-500 text-white animate-pulse"
-                    : "bg-slate-800 hover:bg-slate-700 text-cyan-300"
-                }`}
-              >
-                {listening ? "Listening..." : "🎤 Voice"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <button
-        onClick={() => setOpen(!open)}
-        className="fixed bottom-24 right-4 z-50 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-full shadow-2xl shadow-[0_0_30px_rgba(34,211,238,0.45)] w-16 h-16 flex items-center justify-center text-2xl font-bold border-4 border-cyan-300 animate-pulse"
-      >
-        G
-      </button>
-    </>
   );
 }
 

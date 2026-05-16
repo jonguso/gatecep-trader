@@ -90,18 +90,75 @@ router.post("/ask", async (req, res) => {
         `Use smaller order sizes, avoid chasing price spikes, and confirm liquidity before execution.`;
     }
 
-    res.json({
-      ok: true,
-      answer,
-      confidence,
-      recommendation,
-      portfolioContext: {
-        totalMarketValue,
-        totalPnL,
-        holdingCount: holdings.length
-      },
-      generatedAt: new Date().toISOString()
-    });
+const reasoning = [];
+const risks = [];
+
+if (recommendation === "BUY") {
+  reasoning.push("Healthy liquidity conditions");
+  reasoning.push("Manageable spread risk");
+  reasoning.push("Positive trade setup detected");
+}
+
+if (question.includes("SCOM")) {
+  reasoning.push("Telecommunications exposure may benefit from strong market activity");
+
+  if (scomHolding) {
+    risks.push(
+      `Existing SCOM exposure is already ${scomHolding.quantity} shares`
+    );
+  }
+}
+
+if (question.includes("KCB")) {
+  reasoning.push("Banking sector exposure detected");
+
+  if (kcbHolding?.unrealizedPnL < 0) {
+    risks.push("KCB position currently has unrealized losses");
+  }
+}
+
+if (question.includes("PORTFOLIO") || question.includes("RISK")) {
+  reasoning.push("Portfolio value and P&L reviewed");
+  reasoning.push(`${holdings.length} active positions analyzed`);
+
+  if (holdings.length < 4) {
+    risks.push("Portfolio diversification is still limited");
+  }
+
+  if (totalPnL < 0) {
+    risks.push("Portfolio total P&L is currently negative");
+  }
+}
+
+if (confidence < 80) {
+  risks.push("AI confidence is below strong conviction level");
+}
+
+const suggestedAllocation =
+  recommendation === "BUY"
+    ? confidence >= 90
+      ? "8% - 12%"
+      : confidence >= 75
+      ? "5% - 8%"
+      : "2% - 5%"
+    : "No new allocation suggested";
+
+return res.json({
+  ok: true,
+  answer,
+  confidence,
+  recommendation,
+  reasoning,
+  risks,
+  suggestedAllocation,
+  portfolioContext: {
+    totalMarketValue,
+    totalPnL,
+    holdingCount: holdings.length
+  },
+  generatedAt: new Date().toISOString()
+});
+
   } catch (error) {
     res.status(500).json({
       ok: false,
