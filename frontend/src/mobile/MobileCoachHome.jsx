@@ -1,10 +1,10 @@
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import AIConfidenceRing from "../components/mobile/AIConfidenceRing";
-import { useEffect, useState } from "react";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
 import FloatingCoachG from "../components/mobile/FloatingCoachG";
-import { motion } from "framer-motion";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -36,10 +36,10 @@ function confidenceColor(confidence) {
 function marketPrice(item) {
   const value = Number(
     item.marketPrice ||
-    item.price ||
-    item.lastPrice ||
-    item.currentPrice ||
-    0
+      item.price ||
+      item.lastPrice ||
+      item.currentPrice ||
+      0
   );
 
   return value.toFixed(2);
@@ -64,12 +64,59 @@ function aiReason(signal) {
   return "Hold for now. Coach G recommends waiting for a cleaner entry or stronger confirmation.";
 }
 
+function buildTradeSetup(item) {
+  const price = Number(
+    item.marketPrice ||
+      item.price ||
+      item.lastPrice ||
+      item.currentPrice ||
+      0
+  );
+
+  const confidence = Number(item.confidence || 0);
+  const isBuy = String(item.recommendation || "").includes("BUY");
+
+  const entry = price;
+  const target = isBuy
+    ? price * 1.08
+    : price * 1.03;
+
+  const stopLoss = isBuy
+    ? price * 0.96
+    : price * 0.98;
+
+  const reward = Math.abs(target - entry);
+  const risk = Math.abs(entry - stopLoss);
+
+  return {
+    entry,
+    target,
+    stopLoss,
+    riskReward:
+      risk > 0 ? (reward / risk).toFixed(2) : "0.00",
+    positionSize:
+      confidence >= 90
+        ? "8% - 12%"
+        : confidence >= 75
+        ? "5% - 8%"
+        : "2% - 5%"
+  };
+}
+
 export default function MobileCoachHome() {
   const [signals, setSignals] = useState([]);
-  const [question, setQuestion] = useState("");
-  const [aiAnswer, setAiAnswer] = useState("");
-  const [listening, setListening] = useState(false);
   const [dailyBriefing, setDailyBriefing] = useState("");
+  const [alerts, setAlerts] = useState([]);
+  const [watchlistSymbols, setWatchlistSymbols] = useState(() => {
+  const saved = localStorage.getItem(
+    "gatecep_ai_watchlist"
+  );
+
+
+  return saved
+    ? JSON.parse(saved)
+    : ["SCOM", "KCB", "EQTY", "COOP"];
+});
 
   async function loadSignals() {
     try {
@@ -84,57 +131,96 @@ export default function MobileCoachHome() {
     }
   }
 
-  async function askCoachG() {
-  try {
-    setAiAnswer("Coach G is analyzing...");
+  async function loadDailyBriefing() {
+    try {
+      const res = await fetch(`${API_URL}/coach/ask`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          question:
+            "Give me today's NSE market briefing with risks, opportunities, and portfolio guidance."
+        })
+      });
 
-    const res = await fetch(`${API_URL}/coach/ask`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        question
-      })
-    });
+      const data = await res.json();
 
-    const data = await res.json();
-
-    if (!data.ok) {
-      setAiAnswer("Coach G could not analyze this request.");
-      return;
+      if (data.ok) {
+        setDailyBriefing(data.answer);
+      }
+    } catch (error) {
+      console.error("Failed to load daily briefing:", error);
     }
-
-    setAiAnswer(data.answer);
-  } catch (error) {
-    setAiAnswer(error.message);
   }
+
+<div className="bg-slate-900 rounded-2xl p-4 mt-5 border border-slate-800">
+  <div className="flex items-center justify-between">
+    <div className="font-bold text-cyan-300">
+      AI Alerts
+    </div>
+
+    <div className="text-[10px] px-2 py-1 rounded-full bg-red-500/20 text-red-300">
+      LIVE
+    </div>
+  </div>
+
+  <div className="space-y-3 mt-4">
+    {alerts.map((alert, index) => (
+      <div
+        key={`${alert.symbol}-${index}`}
+        className="bg-slate-800 rounded-xl p-3 border border-slate-700"
+      >
+        <div className="flex items-center justify-between">
+          <div className="font-bold">
+            {alert.symbol}
+          </div>
+
+          <div
+            className={
+              alert.type === "HIGH_CONFIDENCE"
+                ? "text-cyan-300 text-xs"
+                : alert.type === "BREAKOUT"
+                ? "text-green-300 text-xs"
+                : "text-red-300 text-xs"
+            }
+          >
+            {alert.type.replace("_", " ")}
+          </div>
+        </div>
+
+        <div className="text-sm text-slate-300 mt-2">
+          {alert.message}
+        </div>
+      </div>
+    ))}
+
+    {alerts.length === 0 && (
+      <div className="text-sm text-slate-500">
+        No active AI alerts.
+      </div>
+    )}
+  </div>
+</div>
+
+ function toggleWatchlistSymbol(symbol) {
+  setWatchlistSymbols((current) => {
+    const exists = current.includes(symbol);
+
+    const next = exists
+      ? current.filter((item) => item !== symbol)
+      : [...current, symbol];
+
+    localStorage.setItem(
+      "gatecep_ai_watchlist",
+      JSON.stringify(next)
+    );
+
+    return next;
+  });
 }
 
-async function loadDailyBriefing() {
-  try {
-    const res = await fetch(`${API_URL}/coach/ask`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        question:
-          "Give me today's NSE market briefing with risks, opportunities, and portfolio guidance."
-      })
-    });
-
-    const data = await res.json();
-
-    if (data.ok) {
-      setDailyBriefing(data.answer);
-    }
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-  useEffect(() => {
+useEffect(() => {
     loadSignals();
     loadDailyBriefing();
 
@@ -143,13 +229,55 @@ async function loadDailyBriefing() {
     return () => clearInterval(interval);
   }, []);
 
+  const topSignal = signals[0];
+const customSignals = signals.filter((item) =>
+  watchlistSymbols.includes(item.symbol)
+);
+
+useEffect(() => {
+  const generatedAlerts = [];
+
+  customSignals.forEach((item) => {
+    const confidence = Number(item.confidence || 0);
+    const changePct = Number(item.changePct || 0);
+
+    if (confidence >= 90) {
+      generatedAlerts.push({
+        type: "HIGH_CONFIDENCE",
+        symbol: item.symbol,
+        message: `${item.symbol} AI confidence surged above 90%`
+      });
+    }
+
+    if (changePct >= 5) {
+      generatedAlerts.push({
+        type: "BREAKOUT",
+        symbol: item.symbol,
+        message: `${item.symbol} is gaining strong momentum`
+      });
+    }
+
+    if (
+      item.recommendation?.includes("SELL")
+    ) {
+      generatedAlerts.push({
+        type: "RISK",
+        symbol: item.symbol,
+        message: `${item.symbol} risk conditions worsening`
+      });
+    }
+  });
+
+  setAlerts(generatedAlerts.slice(0, 5));
+}, [customSignals]);
+
   return (
-   <motion.div
-  initial={{ opacity: 0, y: 12 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.25 }}
-  className="bg-slate-950 min-h-screen text-white pb-24"
->
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="bg-slate-950 min-h-screen text-white pb-24"
+    >
       <MobileBuyingPowerBar />
 
       <div className="p-4">
@@ -164,7 +292,7 @@ async function loadDailyBriefing() {
         <div className="grid grid-cols-3 gap-3 mt-5">
           <div className="bg-slate-900 rounded-2xl p-3 border border-slate-800">
             <div className="text-xs text-slate-400">
-              NSE Pulse
+              Market Sentiment
             </div>
 
             <div className="text-lg font-bold text-green-400">
@@ -174,79 +302,73 @@ async function loadDailyBriefing() {
 
           <div className="bg-slate-900 rounded-2xl p-3 border border-slate-800">
             <div className="text-xs text-slate-400">
-              Volume
+              Top Signal
             </div>
 
             <div className="text-lg font-bold text-cyan-400">
-              Rising
+              {topSignal?.symbol || "-"}
             </div>
           </div>
 
           <div className="bg-slate-900 rounded-2xl p-3 border border-slate-800">
             <div className="text-xs text-slate-400">
-              Risk
+              AI Confidence
             </div>
 
             <div className="text-lg font-bold text-yellow-400">
-              Medium
+              {topSignal?.confidence || 0}%
             </div>
           </div>
         </div>
 
-<div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4 mt-5">
-  <div className="flex items-center justify-between">
-    <div className="text-cyan-400 font-bold">
-      Coach G Daily Briefing
-    </div>
+        <div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4 mt-5">
+          <div className="flex items-center justify-between">
+            <div className="text-cyan-400 font-bold">
+              Coach G Daily Briefing
+            </div>
 
-    <div className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300">
-      LIVE AI
-    </div>
+            <div className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300">
+              LIVE AI
+            </div>
+          </div>
+
+          <p className="text-sm text-slate-200 leading-6 mt-3">
+            {dailyBriefing || "Loading daily market intelligence..."}
+          </p>
+        </div>
+
+<div className="bg-slate-900 rounded-2xl p-4 mt-5 border border-slate-800">
+  <div className="font-bold text-cyan-300">
+    Customize AI Watchlist
   </div>
 
-  <p className="text-sm text-slate-200 leading-6 mt-3">
-    {dailyBriefing || "Loading daily market intelligence..."}
-  </p>
+  <div className="flex flex-wrap gap-2 mt-3">
+    {signals.map((item) => {
+      const selected = watchlistSymbols.includes(item.symbol);
+
+      return (
+        <button
+          key={item.symbol}
+          onClick={() => toggleWatchlistSymbol(item.symbol)}
+          className={
+            selected
+              ? "px-3 py-2 rounded-xl bg-cyan-500 text-slate-950 text-xs font-bold"
+              : "px-3 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+          }
+        >
+          {item.symbol}
+        </button>
+      );
+    })}
+  </div>
 </div>
-
-        <div className="bg-slate-900 rounded-2xl p-4 mt-5 border border-slate-800">
-          <div className="text-sm text-slate-400 mb-2">
-            Ask Coach G
-          </div>
-
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Should I buy SCOM today?"
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-24"
-          />
-
-          <button
-            onClick={askCoachG}
-            className="w-full mt-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl py-3 font-bold"
-          >
-            Ask AI
-          </button>
-
-          {aiAnswer && (
-            <div className="mt-4 bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4">
-              <div className="text-cyan-400 font-bold mb-2">
-                Coach G Answer
-              </div>
-
-              <div className="text-sm text-slate-200 leading-6">
-                {aiAnswer}
-              </div>
-            </div>
-          )}
-        </div>
 
         <h2 className="text-xl font-bold mt-6 mb-3">
           AI Watchlist
         </h2>
 
         <div className="space-y-4">
-          {signals.slice(0, 5).map((item) => {
+          {customSignals.slice(0, 8).map((item) => {
             const confidence = Number(item.confidence || 0);
 
             return (
@@ -279,23 +401,22 @@ async function loadDailyBriefing() {
                 </div>
 
                 <div className="mt-4 flex justify-center">
-  <AIConfidenceRing
-    value={confidence}
-    size={100}
-  />
-</div>
+                  <AIConfidenceRing
+                    value={confidence}
+                    size={100}
+                  />
+                </div>
 
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-2 rounded-full ${confidenceColor(
-                        confidence
-                      )}`}
-                      style={{
-                        width: `${confidence}%`
-                      }}
-                    />
-                  </div>
-                
+                <div className="h-2 bg-slate-800 rounded-full overflow-hidden mt-3">
+                  <div
+                    className={`h-2 rounded-full ${confidenceColor(
+                      confidence
+                    )}`}
+                    style={{
+                      width: `${confidence}%`
+                    }}
+                  />
+                </div>
 
                 <div className="grid grid-cols-3 gap-2 mt-4">
                   <div className="bg-slate-800 rounded-xl p-2">
@@ -320,10 +441,8 @@ async function loadDailyBriefing() {
                           : "font-bold text-red-400"
                       }
                     >
-                      {Number(item.changePct || 2.4) >= 0
-                        ? "+"
-                        : ""}
-                      {Number(item.changePct || 2.4).toFixed(2)}%
+                      {Number(item.changePct || 0) >= 0 ? "+" : ""}
+                      {Number(item.changePct || 0).toFixed(2)}%
                     </div>
                   </div>
 
@@ -340,9 +459,74 @@ async function loadDailyBriefing() {
                   </div>
                 </div>
 
-                <div className="mt-4 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-cyan-400 text-xs border border-slate-700">
-                  Live AI Momentum Chart
-                </div>
+                <div className="mt-4 h-16 bg-slate-800 rounded-xl flex items-end gap-1 px-3 py-2 border border-slate-700">
+  {[35, 55, 42, 70, 58, 80, 66, 92].map((height, index) => (
+    <div
+      key={index}
+      className={
+        item.recommendation?.includes("SELL")
+          ? "flex-1 rounded-t bg-red-400/70"
+          : "flex-1 rounded-t bg-cyan-400/70"
+      }
+      style={{
+        height: `${height}%`
+      }}
+    />
+  ))}
+</div>
+
+{(() => {
+  const setup = buildTradeSetup(item);
+
+  return (
+    <div className="grid grid-cols-2 gap-2 mt-4">
+      <div className="bg-slate-800 rounded-xl p-2">
+        <div className="text-xs text-slate-400">
+          Entry
+        </div>
+        <div className="font-bold text-cyan-300">
+          KES {setup.entry.toFixed(2)}
+        </div>
+      </div>
+
+      <div className="bg-slate-800 rounded-xl p-2">
+        <div className="text-xs text-slate-400">
+          Target
+        </div>
+        <div className="font-bold text-green-400">
+          KES {setup.target.toFixed(2)}
+        </div>
+      </div>
+
+      <div className="bg-slate-800 rounded-xl p-2">
+        <div className="text-xs text-slate-400">
+          Stop Loss
+        </div>
+        <div className="font-bold text-red-400">
+          KES {setup.stopLoss.toFixed(2)}
+        </div>
+      </div>
+
+      <div className="bg-slate-800 rounded-xl p-2">
+        <div className="text-xs text-slate-400">
+          Risk/Reward
+        </div>
+        <div className="font-bold text-yellow-300">
+          {setup.riskReward}x
+        </div>
+      </div>
+
+      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-2 col-span-2">
+        <div className="text-xs text-cyan-300">
+          Suggested Allocation
+        </div>
+        <div className="font-bold text-white">
+          {setup.positionSize}
+        </div>
+      </div>
+    </div>
+  );
+})()}
 
                 <div className="grid grid-cols-3 gap-2 mt-4">
                   <a
@@ -353,15 +537,10 @@ async function loadDailyBriefing() {
                   </a>
 
                   <button
-  onClick={() => setListening(!listening)}
-  className={`rounded-xl py-3 font-bold ${
-    listening
-      ? "bg-red-500 text-white animate-pulse"
-      : "bg-slate-800 hover:bg-slate-700 text-cyan-300"
-  }`}
->
-  {listening ? "Listening..." : "🎤 Voice"}
-</button>
+                    className="rounded-xl py-3 font-bold bg-slate-800 text-cyan-300"
+                  >
+                    🎤 Voice
+                  </button>
 
                   <a
                     href={`/mobile/order/${item.symbol}/BUY`}
@@ -373,12 +552,17 @@ async function loadDailyBriefing() {
               </div>
             );
           })}
+
+          {signals.length === 0 && (
+            <div className="bg-slate-900 rounded-2xl p-6 text-center text-slate-400">
+              Loading AI watchlist...
+            </div>
+          )}
         </div>
       </div>
 
       <FloatingCoachG />
       <MobileBottomNav />
-  </motion.div>
+    </motion.div>
   );
 }
-
