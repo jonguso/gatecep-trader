@@ -34,6 +34,8 @@ import MobileStockDetails from "./mobile/MobileStockDetails";
 import MobileOrderTicket from "./mobile/MobileOrderTicket";
 import MobileDepositFunds from "./mobile/MobileDepositFunds";
 import MobileWallet from "./mobile/MobileWallet";
+import MobileNotifications from "./mobile/MobileNotifications";
+import MobileWatchlist from "./mobile/MobileWatchlist";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -274,6 +276,7 @@ function AppRoutes() {
     </ProtectedRoute>
   }
 />
+
 <Route
   path="/mobile/stock/:symbol"
   element={
@@ -282,6 +285,25 @@ function AppRoutes() {
     </ProtectedRoute>
   }
 />
+
+<Route
+  path="/mobile/notifications"
+  element={
+    <ProtectedRoute>
+      <MobileNotifications />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/watchlist"
+  element={
+    <ProtectedRoute>
+      <MobileWatchlist />
+    </ProtectedRoute>
+  }
+/>
+
 </Routes>
   );
 }
