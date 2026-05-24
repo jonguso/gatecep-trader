@@ -18,6 +18,8 @@ function changeColor(value) {
 
 export default function MobileMarkets() {
   const [prices, setPrices] = useState([]);
+  const [activeTab, setActiveTab] = useState("ALL");
+
 
   async function loadPrices() {
     try {
@@ -41,20 +43,44 @@ export default function MobileMarkets() {
   const gainers = useMemo(() => {
     return [...prices]
       .sort((a, b) => Number(b.changePct || 0) - Number(a.changePct || 0))
-      .slice(0, 8);
+      .slice(0, 5);
   }, [prices]);
 
   const losers = useMemo(() => {
     return [...prices]
       .sort((a, b) => Number(a.changePct || 0) - Number(b.changePct || 0))
-      .slice(0, 8);
+      .slice(0, 5);
   }, [prices]);
 
   const active = useMemo(() => {
     return [...prices]
       .sort((a, b) => Number(b.turnover || 0) - Number(a.turnover || 0))
-      .slice(0, 8);
+      .slice(0, 5);
   }, [prices]);
+
+const allSecurities = useMemo(() => {
+  return [...prices].sort((a, b) =>
+    String(a.symbol).localeCompare(String(b.symbol))
+  );
+}, [prices]);
+
+const visibleItems =
+  activeTab === "GAINERS"
+    ? gainers
+    : activeTab === "LOSERS"
+    ? losers
+    : activeTab === "ACTIVE"
+    ? active
+    : allSecurities;
+
+const sectionTitle =
+  activeTab === "GAINERS"
+    ? "Top Gainers"
+    : activeTab === "LOSERS"
+    ? "Top Losers"
+    : activeTab === "ACTIVE"
+    ? "Most Active"
+    : "NSE Securities";
 
   return (
     <motion.div
@@ -72,9 +98,40 @@ export default function MobileMarkets() {
           Live market movers, liquidity, and trading opportunities.
         </p>
 
-        <MarketSection title="Top Gainers" items={gainers} badge="GAINER" />
-        <MarketSection title="Top Losers" items={losers} badge="LOSER" />
-       <MarketSection title="Most Active" items={active} badge="ACTIVE" />
+        <div className="flex gap-2 mt-5 overflow-x-auto pb-2">
+  {[
+    ["ALL", "NSE Securities"],
+    ["GAINERS", "Top Gainers"],
+    ["LOSERS", "Top Losers"],
+    ["ACTIVE", "Most Active"]
+  ].map(([key, label]) => (
+    <button
+      key={key}
+      onClick={() => setActiveTab(key)}
+      className={
+        activeTab === key
+          ? "whitespace-nowrap bg-cyan-500 text-slate-950 px-4 py-2 rounded-xl text-sm font-bold"
+          : "whitespace-nowrap bg-slate-800 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold"
+      }
+    >
+      {label}
+    </button>
+  ))}
+</div>
+
+        <MarketSection
+          title={sectionTitle}
+          items={visibleItems}
+          badge={
+            activeTab === "GAINERS"
+              ? "GAINER"
+              : activeTab === "LOSERS"
+              ? "LOSER"
+              : activeTab === "ACTIVE"
+              ? "ACTIVE"
+              : "NSE"
+          }
+        />
       </div>
 
       <MobileBottomNav />

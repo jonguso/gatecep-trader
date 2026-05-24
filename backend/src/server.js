@@ -20,12 +20,19 @@ import { getTradeRecommendation } from "./routes/recommendations.js";
 import smartBrokerRouter from "./routes/smartBroker.routes.js";
 import walletRouter from "./routes/wallet.routes.js";
 import walletLedgerRouter from "./routes/walletLedger.routes.js";
+import notificationsRouter from "./routes/notifications.routes.js";
 
 import {
   getLedger,
   getBalances,
   clearPendingOrders
 } from "./routes/accounting.js";
+import {
+  generateAITradeAlert,
+  generateDividendAlert,
+  generatePortfolioRiskAlert,
+  generateExecutionAlert
+} from "./services/notifications/notificationEngine.service.js";
 
 import { brokerRouter } from "./routes/brokerRoutes.js";
 
@@ -53,7 +60,6 @@ import pnlRouter from "./routes/pnl.routes.js";
 import redisQueueRouter from "./routes/redisQueue.routes.js";
 import fixRouter from "./routes/fix.routes.js";
 import exportRouter from "./routes/export.routes.js";
-import notificationRouter from "./routes/notification.routes.js";
 import rebalancerRouter from "./routes/rebalancer.routes.js";
 import positionsRouter from "./routes/positions.routes.js";
 import unifiedPortfolioRouter from "./routes/unifiedPortfolio.routes.js";
@@ -167,6 +173,10 @@ app.use("/time-sales", timeSalesRouter);
 app.use("/execution-quality", executionQualityRouter);
 app.use("/coach", coachRouter);
 app.use("/wallet/ledger", walletLedgerRouter);
+app.use(
+  "/notifications",
+  notificationsRouter
+);
 
 app.get("/portfolio/:userId", (req, res) => {
   res.json(state.holdings[req.params.userId] || []);
@@ -236,7 +246,6 @@ app.use("/pnl", pnlRouter);
 app.use("/redis-queue", redisQueueRouter);
 app.use("/fix", fixRouter);
 app.use("/exports", exportRouter);
-app.use("/notifications", notificationRouter);
 app.use("/rebalancer", rebalancerRouter);
 app.use("/positions", positionsRouter);
 app.use("/wallet", walletRouter);
@@ -268,6 +277,49 @@ await initDb();
 await initializePositions();
 
 await seedDefaultAdmin();
+
+setInterval(() => {
+  const alerts = [
+    () =>
+      generateAITradeAlert({
+        symbol: "SCOM",
+        signal: "BUY_ZONE",
+        confidence: 91,
+        message:
+          "SCOM approaching accumulation support zone."
+      }),
+
+    () =>
+      generateDividendAlert({
+        symbol: "BAT",
+        dividend: 45,
+        booksClosureDate: "2026-06-10",
+        paymentDate: "2026-06-28"
+      }),
+
+    () =>
+      generatePortfolioRiskAlert({
+        symbol: "SCOM",
+        exposure: 48,
+        sector: "Telecommunications"
+      }),
+
+    () =>
+      generateExecutionAlert({
+        symbol: "KCB",
+        orderId: `ORD-${Date.now()}`,
+        status: "FILLED",
+        broker: "AIB"
+      })
+  ];
+
+  const randomAlert =
+    alerts[
+      Math.floor(Math.random() * alerts.length)
+    ];
+
+  randomAlert();
+}, 45000);
 
 server.listen(PORT, () => {
   logger.info(`Gatecep backend running on port ${PORT}`);

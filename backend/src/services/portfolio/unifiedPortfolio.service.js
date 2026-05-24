@@ -78,6 +78,7 @@ const priceMap = new Map();
     realizedPnL: Number(broker.realizedPnL.toFixed(2))
   }));
 
+
   const totalMarketValue = Number(
     holdings.reduce((sum, item) => sum + item.marketValue, 0).toFixed(2)
   );
