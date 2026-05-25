@@ -84,6 +84,7 @@ import executionQualityRouter from "./routes/executionQuality.routes.js";
 import coachRouter from "./routes/coach.routes.js";
 import aiRebalanceRouter from "./routes/aiRebalance.routes.js";
 import portfolioScoreRouter from "./routes/portfolioScore.routes.js";
+import brokerCashRouter from "./routes/brokerCash.routes.js";
 import { initCoachGSocket } from "./websocket/coachG.socket.js";
 
 import { initOrderSocket } from "./websocket/orders.socket.js";
@@ -185,6 +186,7 @@ app.use("/execution-quality", executionQualityRouter);
 app.use("/coach", coachRouter);
 app.use("/trade-journal", tradeJournalRouter);
 app.use("/wallet/ledger", walletLedgerRouter);
+app.use("/broker-cash", brokerCashRouter);
 app.use(
   "/portfolio-score",
   portfolioScoreRouter

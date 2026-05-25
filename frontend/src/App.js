@@ -45,6 +45,7 @@ import MobileSectorRotation from "./mobile/MobileSectorRotation";
 import MobilePortfolioScore from "./mobile/MobilePortfolioScore";
 import MobileTradeJournal from "./mobile/MobileTradeJournal";
 import MobileFunds from "./mobile/MobileFunds";
+import MobileBrokerTreasury from "./mobile/MobileBrokerTreasury";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -388,6 +389,15 @@ function AppRoutes() {
   element={
     <ProtectedRoute>
       <MobileFunds />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/broker-treasury"
+  element={
+    <ProtectedRoute>
+      <MobileBrokerTreasury />
     </ProtectedRoute>
   }
 />

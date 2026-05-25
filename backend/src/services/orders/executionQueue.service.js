@@ -43,6 +43,12 @@ import {
 import {
   createJournalEntry
 } from "../journal/tradeJournal.service.js";
+import {
+  reserveBrokerCash,
+  releaseBrokerCash,
+  settleBrokerBuy,
+  creditBrokerCash
+} from "../brokers/brokerCash.service.js";
 
 const executionQueue = [];
 
@@ -189,10 +195,47 @@ if (order.side === "BUY") {
 }
 
   if (order.side === "BUY") {
-    const debit = debitBrokerBuyingPower(
-      selectedBroker,
-      estimatedTradeValue
-    );
+    try {
+  reserveBrokerCash({
+    broker: selectedBroker,
+    amount: estimatedTradeValue
+  });
+} catch (error) {
+  const rejectedOrder = {
+    id: `ORD-${Date.now()}`,
+    symbol: order.symbol,
+    side: order.side,
+    quantity,
+    price,
+    broker: selectedBroker,
+    status: "REJECTED",
+    brokerStatus: "REJECTED",
+    filledQuantity: 0,
+    remainingQuantity: quantity,
+    averageFillPrice: 0,
+    fillPercent: 0,
+    retryCount: 0,
+    maxRetries: 1,
+    rejectionReason: error.message,
+    lastBrokerAttempt: selectedBroker,
+    executionEvents: [],
+    createdAt: now(),
+    updatedAt: now()
+  };
+
+  executionQueue.push(rejectedOrder);
+
+  addExecutionEvent(
+    rejectedOrder,
+    "REJECTED",
+    `Order rejected: ${error.message}.`
+  );
+
+  publishOrder(rejectedOrder);
+  persistOrder(rejectedOrder);
+
+  return rejectedOrder;
+}
 
     if (!debit.ok) {
       const rejectedOrder = {
@@ -356,6 +399,10 @@ if (order.side === "BUY") {
     reservedAmount,
     `Cancelled order release ${order.symbol}`
   );
+releaseBrokerCash({
+  broker: order.broker,
+  amount: reservedAmount
+});
 }
 
   order.status = "CANCELLED";
@@ -426,6 +473,10 @@ if (order && order.side === "BUY") {
     reservedAmount,
     `Rejected order release ${order.symbol}`
   );
+releaseBrokerCash({
+  broker: order.broker,
+  amount: reservedAmount
+});
 }
 
   updateOrder(
@@ -619,6 +670,10 @@ if (order.side === "BUY") {
     matchedQty * matchedPrice,
     `BUY settlement ${order.symbol}`
   );
+settleBrokerBuy({
+  broker: order.broker,
+  amount: matchedQty * matchedPrice
+});
 }
 
   if (order.side === "SELL") {
@@ -626,6 +681,10 @@ if (order.side === "BUY") {
       matchedQty * matchedPrice,
       `SELL ${order.symbol} wallet credit`
     );
+creditBrokerCash({
+  broker: order.broker,
+  amount: matchedQty * matchedPrice
+});
   }
 
   publishEvent("portfolio:update", {

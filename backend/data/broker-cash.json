@@ -1,0 +1,23 @@
+{
+  "AIB": {
+    "broker": "AIB",
+    "ledgerBalance": 400000,
+    "reserved": 0,
+    "pendingSettlement": 0,
+    "currency": "KES"
+  },
+  "ABC": {
+    "broker": "ABC",
+    "ledgerBalance": 350000,
+    "reserved": 0,
+    "pendingSettlement": 0,
+    "currency": "KES"
+  },
+  "NCBA": {
+    "broker": "NCBA",
+    "ledgerBalance": 300000,
+    "reserved": 0,
+    "pendingSettlement": 0,
+    "currency": "KES"
+  }
+}

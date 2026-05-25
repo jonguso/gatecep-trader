@@ -50,6 +50,19 @@ export default function MobileFunds() {
           Broker-style cash, buying power, and settlement balances.
         </p>
 
+<a
+  href="/mobile/broker-treasury"
+  className="block bg-purple-500/10 border border-purple-500/40 rounded-2xl p-4 mt-5"
+>
+  <div className="text-purple-300 font-bold">
+    Open Broker Treasury
+  </div>
+
+  <div className="text-sm text-slate-300 mt-1">
+    View broker buying power, reserved cash, and treasury utilization.
+  </div>
+</a>
+
         <div className="bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-5 mt-5">
           <div className="text-xs text-slate-400">
             Available Funds

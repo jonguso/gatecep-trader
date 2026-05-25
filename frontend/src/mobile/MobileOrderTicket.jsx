@@ -39,6 +39,7 @@ export default function MobileOrderTicket() {
   const [orderId, setOrderId] = useState(null);
   const [execution, setExecution] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [brokerCash, setBrokerCash] = useState([]);
 
   const effectivePrice =
     orderType === "MARKET"
@@ -78,6 +79,26 @@ const postTradeExposure =
           100
       )
     : currentExposure;
+
+const selectedBrokerCash =
+  brokerCash.find(
+    (item) => item.broker === broker
+  ) || null;
+
+const selectedBrokerBuyingPower =
+  broker === "AUTO"
+    ? brokerCash.reduce(
+        (sum, item) =>
+          sum + Number(item.buyingPower || 0),
+        0
+      )
+    : Number(
+        selectedBrokerCash?.buyingPower || 0
+      );
+
+const brokerFundsWarning =
+  side === "BUY" &&
+  estimatedValue > selectedBrokerBuyingPower;
 
 const exposureWarning =
   side === "BUY" && postTradeExposure >= 40;
@@ -123,7 +144,8 @@ const exposureWarning =
     !invalidLimitPrice &&
     !invalidPriceRange &&
     !invalidGtdDate &&
-    !insufficientFunds;
+    !insufficientFunds &&
+    !brokerFundsWarning;
 
   async function loadWallet() {
     try {
@@ -148,6 +170,19 @@ const exposureWarning =
     }
   } catch (error) {
     console.error("Failed to load portfolio:", error);
+  }
+}
+
+async function loadBrokerCash() {
+  try {
+    const res = await fetch(`${API_URL}/broker-cash`);
+    const data = await res.json();
+
+    if (data.ok) {
+      setBrokerCash(data.brokers || []);
+    }
+  } catch (error) {
+    console.error("Failed to load broker cash:", error);
   }
 }
 
@@ -180,9 +215,14 @@ const exposureWarning =
   useEffect(() => {
   loadWallet();
   loadPortfolio();
+  loadBrokerCash();
   loadMarketPrice();
 
-  const interval = setInterval(loadMarketPrice, 5000);
+  const interval = setInterval(() => {
+    loadMarketPrice();
+    loadBrokerCash();
+    loadWallet();
+  }, 5000);
 
   return () => clearInterval(interval);
 }, [symbol]);
@@ -590,6 +630,33 @@ useEffect(() => {
               </div>
             </div>
 
+<div className="bg-slate-800 rounded-2xl p-4 mt-4 border border-slate-700">
+  <div className="flex justify-between items-start">
+    <div>
+      <div className="text-xs text-slate-400">
+        Broker Buying Power
+      </div>
+
+      <div className="text-2xl font-bold text-cyan-300 mt-1">
+        {formatMoney(selectedBrokerBuyingPower)}
+      </div>
+    </div>
+
+    <a
+      href="/mobile/broker-treasury"
+      className="text-xs text-purple-300 font-bold"
+    >
+      Treasury →
+    </a>
+  </div>
+
+  <div className="text-xs text-slate-400 mt-3">
+    {broker === "AUTO"
+      ? "AUTO uses combined broker liquidity for smart routing."
+      : `${broker} available buying power after reserved orders.`}
+  </div>
+</div>
+
             <div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4 mt-5">
               <div className="text-cyan-400 font-bold">
                 Coach G Execution Check
@@ -601,6 +668,7 @@ useEffect(() => {
     type="warning"
   />
 )}
+
               </div>
 
               <div className="text-sm text-slate-300 mt-2 leading-6">
@@ -619,6 +687,18 @@ useEffect(() => {
                   type="error"
                 />
               )}
+
+{brokerFundsWarning && (
+  <WarningBox
+    title="Broker Buying Power Warning"
+    message={`Required ${formatMoney(
+      estimatedValue
+    )}, but available broker buying power is ${formatMoney(
+      selectedBrokerBuyingPower
+    )}.`}
+    type="error"
+  />
+)}
 
               {invalidPriceRange && (
                 <WarningBox
@@ -653,6 +733,8 @@ useEffect(() => {
                 text={
                   insufficientFunds
                     ? "Insufficient Funds"
+                    : brokerFundsWarning
+                    ? "Broker Funds Low"
                     : invalidPriceRange
                     ? "Invalid Price"
                     : invalidQuantity
