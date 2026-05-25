@@ -20,6 +20,18 @@ export default function MobileMarkets() {
   const [prices, setPrices] = useState([]);
   const [activeTab, setActiveTab] = useState("ALL");
 
+<a
+  href="/mobile/market-pulse"
+  className="block bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-4 mt-5"
+>
+  <div className="text-cyan-300 font-bold">
+    Open AI Market Pulse
+  </div>
+
+  <div className="text-sm text-slate-300 mt-1">
+    View NSE breadth, liquidity, gainers, losers, turnover leaders, and Coach G market sentiment.
+  </div>
+</a>
 
   async function loadPrices() {
     try {

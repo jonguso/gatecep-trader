@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import MobileBuyingPowerBar from "./MobileBuyingPowerBar";
 import SwipeTradeButton from "../components/mobile/SwipeTradeButton";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
+import useOrderSocket from "../hooks/useOrderSocket";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -17,6 +18,10 @@ function formatMoney(value) {
 export default function MobileOrderTicket() {
   const { symbol, side } = useParams();
   const navigate = useNavigate();
+  const {
+  latestOrder,
+  connected: orderSocketConnected
+} = useOrderSocket();
 
   const [quantity, setQuantity] = useState("");
   const [limitPrice, setLimitPrice] = useState("");
@@ -188,6 +193,15 @@ const exposureWarning =
     }
   }, [orderType]);
 
+useEffect(() => {
+  if (
+    latestOrder &&
+    latestOrder.id === orderId
+  ) {
+    setExecution(latestOrder);
+  }
+}, [latestOrder, orderId]);
+
   async function executeOrder() {
     if (!canSubmit) {
       if (invalidQuantity) {
@@ -275,7 +289,7 @@ const exposureWarning =
       } catch (error) {
         console.error("Execution polling failed:", error);
       }
-    }, 1500);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [orderId]);
@@ -687,6 +701,20 @@ const exposureWarning =
             </div>
           </motion.div>
         )}
+
+<div className="mt-4 text-xs">
+  <span
+    className={
+      orderSocketConnected
+        ? "text-green-400"
+        : "text-yellow-400"
+    }
+  >
+    {orderSocketConnected
+      ? "● Live execution stream connected"
+      : "● Using execution polling fallback"}
+  </span>
+</div>
 
         {execution && (
           <div className="bg-slate-900 rounded-2xl p-5 mt-5 border border-cyan-500/30">

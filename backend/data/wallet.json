@@ -1,0 +1,14 @@
+{
+  "balance": 1000000,
+  "ledgerBalance": 1050000,
+  "pendingOrders": 0,
+  "pendingSettlement": 0,
+  "currency": "KES",
+  "updatedAt": "2026-05-25T06:22:23.953Z",
+  "lastTransaction": {
+    "type": "CREDIT",
+    "amount": 50000,
+    "note": "Funds deposit",
+    "createdAt": "2026-05-25T06:22:23.953Z"
+  }
+}

@@ -1,109 +1,176 @@
 import {
-  addWalletLedgerEntry
-} from "./walletLedger.service.js";
-
-let wallet = {
-  balance: 0,
-  currency: "KES",
-  deposits: []
-};
+  loadWallet,
+  saveWallet
+} from "../../repositories/wallet.repository.js";
 
 export function getWalletBalance() {
-  return wallet;
-}
-
-export function depositFunds(amount) {
-  const value = Number(amount || 0);
-
-  if (value <= 0) {
-    return {
-      ok: false,
-      error: "INVALID_DEPOSIT_AMOUNT"
-    };
-  }
-
-  const deposit = {
-    id: `DEP-${Date.now()}`,
-    amount: value,
-    currency: "KES",
-    source: "DEMO_DEPOSIT",
-    createdAt: new Date().toISOString()
-  };
-
-  wallet.balance += value;
-
-addWalletLedgerEntry({
-  type: "DEPOSIT",
-  amount,
-  currency: wallet.currency,
-  balanceAfter: wallet.balance,
-  description: "Demo wallet deposit"
-});
-
-  wallet.deposits.unshift(deposit);
+  const wallet = loadWallet();
 
   return {
-    ok: true,
-    wallet,
-    deposit
+    ...wallet,
+    balance:
+      Number(wallet.ledgerBalance || 0) -
+      Number(wallet.pendingOrders || 0) -
+      Number(wallet.pendingSettlement || 0)
   };
 }
 
-export function debitWallet(amount) {
+export function debitWallet(amount, note = "Wallet debit") {
   const value = Number(amount || 0);
+  const wallet = getWalletBalance();
 
   if (value <= 0) {
     return {
       ok: false,
-      error: "INVALID_DEBIT_AMOUNT"
+      error: "INVALID_AMOUNT"
     };
   }
 
-  if (value > wallet.balance) {
+  if (value > Number(wallet.balance || 0)) {
     return {
       ok: false,
       error: "INSUFFICIENT_WALLET_BALANCE"
     };
   }
 
-  wallet.balance -= value;
-
-addWalletLedgerEntry({
-  type: "DEBIT",
-  amount,
-  currency: wallet.currency,
-  balanceAfter: wallet.balance,
-  description: "BUY order wallet debit"
-});
-
-
-  return {
-    ok: true,
-    wallet
-  };
-}
-export function creditWallet(amount, description = "SELL order wallet credit") {
-  const value = Number(amount || 0);
-
-  if (value <= 0) {
-    return {
-      ok: false,
-      error: "INVALID_CREDIT_AMOUNT"
-    };
-  }
-
-  wallet.balance += value;
-
-  addWalletLedgerEntry({
-    type: "CREDIT",
-    amount: value,
-    currency: wallet.currency,
-    balanceAfter: wallet.balance,
-    description
+  const updated = saveWallet({
+    ...wallet,
+    pendingOrders:
+      Number(wallet.pendingOrders || 0) + value,
+    lastTransaction: {
+      type: "DEBIT",
+      amount: value,
+      note,
+      createdAt: new Date().toISOString()
+    }
   });
 
   return {
     ok: true,
-    wallet
+    wallet: getWalletBalance(),
+    updated
   };
+}
+
+export function creditWallet(amount, note = "Wallet credit") {
+  const value = Number(amount || 0);
+  const wallet = loadWallet();
+
+  if (value <= 0) {
+    return {
+      ok: false,
+      error: "INVALID_AMOUNT"
+    };
+  }
+
+  const updated = saveWallet({
+    ...wallet,
+    ledgerBalance:
+      Number(wallet.ledgerBalance || 0) + value,
+    lastTransaction: {
+      type: "CREDIT",
+      amount: value,
+      note,
+      createdAt: new Date().toISOString()
+    }
+  });
+
+ return {
+  ok: true,
+  wallet: getWalletBalance(),
+  updated
+};
+}
+
+export function releasePendingOrder(amount, note = "Release pending order") {
+  const value = Number(amount || 0);
+  const wallet = loadWallet();
+
+  const updated = saveWallet({
+    ...wallet,
+    pendingOrders: Math.max(
+      0,
+      Number(wallet.pendingOrders || 0) - value
+    ),
+    lastTransaction: {
+      type: "RELEASE_PENDING",
+      amount: value,
+      note,
+      createdAt: new Date().toISOString()
+    }
+  });
+
+  return {
+    ok: true,
+    wallet: getWalletBalance(),
+    updated
+  };
+}
+
+export function settlePendingOrder(amount, note = "Order settlement") {
+  const value = Number(amount || 0);
+  const wallet = loadWallet();
+
+  const updated = saveWallet({
+    ...wallet,
+    ledgerBalance:
+      Number(wallet.ledgerBalance || 0) - value,
+    pendingOrders: Math.max(
+      0,
+      Number(wallet.pendingOrders || 0) - value
+    ),
+    lastTransaction: {
+      type: "SETTLEMENT",
+      amount: value,
+      note,
+      createdAt: new Date().toISOString()
+    }
+  });
+
+  return {
+    ok: true,
+    wallet: getWalletBalance(),
+    updated
+  };
+}
+
+export function depositFunds(amount, note = "Funds deposit") {
+  return creditWallet(amount, note);
+}
+
+export function withdrawFunds(amount, note = "Funds withdrawal") {
+  const value = Number(amount || 0);
+  const wallet = getWalletBalance();
+
+  if (value <= 0) {
+    return {
+      ok: false,
+      error: "INVALID_AMOUNT"
+    };
+  }
+
+  if (value > Number(wallet.balance || 0)) {
+    return {
+      ok: false,
+      error: "INSUFFICIENT_FUNDS"
+    };
+  }
+
+  const updated = saveWallet({
+    ...wallet,
+    ledgerBalance:
+      Number(wallet.ledgerBalance || 0) - value,
+    lastTransaction: {
+      type: "WITHDRAWAL",
+      amount: value,
+      note,
+      createdAt: new Date().toISOString()
+    }
+  });
+
+ return {
+  ok: true,
+  wallet: getWalletBalance(),
+  updated
+};
 }

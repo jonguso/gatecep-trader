@@ -36,6 +36,15 @@ import MobileDepositFunds from "./mobile/MobileDepositFunds";
 import MobileWallet from "./mobile/MobileWallet";
 import MobileNotifications from "./mobile/MobileNotifications";
 import MobileWatchlist from "./mobile/MobileWatchlist";
+import MobileDividends from "./mobile/MobileDividends";
+import MobileDividendAI from "./mobile/MobileDividendAI";
+import MobileAIRebalance from "./mobile/MobileAIRebalance";
+import MobilePortfolioHeatmap from "./mobile/MobilePortfolioHeatmap";
+import MobileMarketPulse from "./mobile/MobileMarketPulse";
+import MobileSectorRotation from "./mobile/MobileSectorRotation";
+import MobilePortfolioScore from "./mobile/MobilePortfolioScore";
+import MobileTradeJournal from "./mobile/MobileTradeJournal";
+import MobileFunds from "./mobile/MobileFunds";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -300,6 +309,85 @@ function AppRoutes() {
   element={
     <ProtectedRoute>
       <MobileWatchlist />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/dividends"
+  element={
+    <ProtectedRoute>
+      <MobileDividends />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/dividends-ai"
+  element={
+    <ProtectedRoute>
+      <MobileDividendAI />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/ai-rebalance"
+  element={
+    <ProtectedRoute>
+      <MobileAIRebalance />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/market-pulse"
+  element={
+    <ProtectedRoute>
+      <MobileMarketPulse />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/sector-rotation"
+  element={
+    <ProtectedRoute>
+      <MobileSectorRotation />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/heatmap"
+  element={
+    <ProtectedRoute>
+      <MobilePortfolioHeatmap />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/mobile/portfolio-score"
+  element={
+    <ProtectedRoute>
+      <MobilePortfolioScore />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile/trade-journal"
+  element={
+    <ProtectedRoute>
+      <MobileTradeJournal />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/mobile/funds"
+  element={
+    <ProtectedRoute>
+      <MobileFunds />
     </ProtectedRoute>
   }
 />

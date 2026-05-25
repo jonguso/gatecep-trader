@@ -21,6 +21,13 @@ import smartBrokerRouter from "./routes/smartBroker.routes.js";
 import walletRouter from "./routes/wallet.routes.js";
 import walletLedgerRouter from "./routes/walletLedger.routes.js";
 import notificationsRouter from "./routes/notifications.routes.js";
+import dividendsRouter from "./routes/dividends.routes.js";
+import aiMarketPulseRouter from "./routes/aiMarketPulse.routes.js";
+import sectorRotationAIRouter from "./routes/sectorRotationAI.routes.js";
+import tradeJournalRouter from "./routes/tradeJournal.routes.js";
+import {
+  getDividendAIScores
+} from "./services/dividends/dividendAI.service.js";
 
 import {
   getLedger,
@@ -31,7 +38,8 @@ import {
   generateAITradeAlert,
   generateDividendAlert,
   generatePortfolioRiskAlert,
-  generateExecutionAlert
+  generateExecutionAlert,
+  initNotificationSocket
 } from "./services/notifications/notificationEngine.service.js";
 
 import { brokerRouter } from "./routes/brokerRoutes.js";
@@ -74,6 +82,8 @@ import matchingRouter from "./routes/matching.routes.js";
 import timeSalesRouter from "./routes/timeSales.routes.js";
 import executionQualityRouter from "./routes/executionQuality.routes.js";
 import coachRouter from "./routes/coach.routes.js";
+import aiRebalanceRouter from "./routes/aiRebalance.routes.js";
+import portfolioScoreRouter from "./routes/portfolioScore.routes.js";
 import { initCoachGSocket } from "./websocket/coachG.socket.js";
 
 import { initOrderSocket } from "./websocket/orders.socket.js";
@@ -170,12 +180,24 @@ app.use("/portfolio/heatmap", portfolioHeatmapRouter);
 app.use("/smart-broker", smartBrokerRouter);
 app.use("/matching", matchingRouter);
 app.use("/time-sales", timeSalesRouter);
+app.use("/ai-rebalance", aiRebalanceRouter);
 app.use("/execution-quality", executionQualityRouter);
 app.use("/coach", coachRouter);
+app.use("/trade-journal", tradeJournalRouter);
 app.use("/wallet/ledger", walletLedgerRouter);
+app.use(
+  "/portfolio-score",
+  portfolioScoreRouter
+);
+app.use("/ai-market-pulse", aiMarketPulseRouter);
 app.use(
   "/notifications",
   notificationsRouter
+);
+app.use("/dividends", dividendsRouter);
+app.use(
+  "/sector-rotation-ai",
+  sectorRotationAIRouter
 );
 
 app.get("/portfolio/:userId", (req, res) => {
@@ -263,6 +285,8 @@ const io = new Server(server, {
   }
 });
 
+initNotificationSocket(io);
+
 io.use(socketAuth);
 
 initializeSocketGateway(io);
@@ -310,7 +334,26 @@ setInterval(() => {
         orderId: `ORD-${Date.now()}`,
         status: "FILLED",
         broker: "AIB"
-      })
+      }),
+
+    () => {
+      const dividendScores = getDividendAIScores();
+const bestDividend = dividendScores.sort(
+  (a, b) =>
+    b.captureOpportunityScore -
+    a.captureOpportunityScore
+)[0];
+
+generateAITradeAlert({
+  symbol: bestDividend.symbol,
+  signal: "DIVIDEND_AI",
+  confidence: bestDividend.captureOpportunityScore,
+  message:
+    `Coach G ranks ${bestDividend.symbol} as ${bestDividend.aiRecommendation}. ` +
+    `Estimated yield ${bestDividend.estimatedYieldPercent}%, ` +
+    `books close on ${bestDividend.booksClosureDate}.`
+});
+    }
   ];
 
   const randomAlert =

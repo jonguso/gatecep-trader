@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
+import useMarketSocket from "../hooks/useMarketSocket";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -14,12 +15,45 @@ function changeColor(value) {
 
 export default function MobileWatchlist() {
   const [prices, setPrices] = useState([]);
-  const [watchlist, setWatchlist] = useState([
-    "SCOM",
-    "KCB",
-    "EQTY",
-    "BAT"
-  ]);
+const [watchlist, setWatchlist] = useState([]);
+const [newSymbol, setNewSymbol] = useState("");
+const {
+  prices: socketPrices,
+  connected
+} = useMarketSocket();
+
+function aiSignal(changePct) {
+  if (changePct >= 5) {
+    return {
+      label: "Strong Bullish",
+      color: "text-green-400"
+    };
+  }
+
+  if (changePct >= 0) {
+    return {
+      label: "Accumulation",
+      color: "text-cyan-400"
+    };
+  }
+
+  return {
+    label: "Risk Watch",
+    color: "text-red-400"
+  };
+}
+
+function liquidityBadge(turnover) {
+  if (turnover >= 100000000) {
+    return "High Liquidity";
+  }
+
+  if (turnover >= 20000000) {
+    return "Moderate";
+  }
+
+  return "Low Liquidity";
+}
 
   async function loadPrices() {
     try {
@@ -32,24 +66,81 @@ export default function MobileWatchlist() {
     }
   }
 
-  useEffect(() => {
-    loadPrices();
+  async function loadWatchlist() {
+  try {
+    const res = await fetch(`${API_URL}/watchlist`);
+    const data = await res.json();
 
-    const interval = setInterval(loadPrices, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const items = prices.filter((item) =>
-    watchlist.includes(item.symbol)
-  );
-
-  function removeFromWatchlist(symbol) {
-    setWatchlist((prev) =>
-      prev.filter((item) => item !== symbol)
-    );
+    if (data.ok) {
+      setWatchlist(data.watchlist || []);
+    }
+  } catch (error) {
+    console.error("Failed to load watchlist:", error);
   }
+}
 
+async function addSymbol() {
+  const symbol = newSymbol.trim().toUpperCase();
+
+  if (!symbol) return;
+
+  try {
+    const res = await fetch(`${API_URL}/watchlist`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ symbol })
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      setWatchlist(data.watchlist || []);
+      setNewSymbol("");
+    }
+  } catch (error) {
+    console.error("Failed to add symbol:", error);
+  }
+}
+
+async function removeFromWatchlist(symbol) {
+  try {
+    const res = await fetch(`${API_URL}/watchlist/${symbol}`, {
+      method: "DELETE"
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      setWatchlist(data.watchlist || []);
+    }
+  } catch (error) {
+    console.error("Failed to remove symbol:", error);
+  }
+}
+
+  useEffect(() => {
+  loadWatchlist();
+  loadPrices();
+
+  const interval = setInterval(loadPrices, 15000);
+
+  return () => clearInterval(interval);
+}, []);
+
+  const livePrices =
+  socketPrices.length > 0
+    ? socketPrices
+    : prices;
+
+const items = livePrices.filter((item) =>
+  watchlist.includes(
+    String(item.symbol || "").trim()
+  )
+);
+
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -66,6 +157,42 @@ export default function MobileWatchlist() {
           AI-monitored securities and smart alerts.
         </p>
 
+<div className="mt-3 text-xs">
+  <span
+    className={
+      connected
+        ? "text-green-400"
+        : "text-yellow-400"
+    }
+  >
+    {connected
+      ? "● Live market stream connected"
+      : "● Using fallback polling"}
+  </span>
+</div>
+
+ <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mt-5">
+  <div className="text-sm text-slate-400 mb-2">
+    Add Security
+  </div>
+
+  <div className="flex gap-2">
+    <input
+      value={newSymbol}
+      onChange={(e) => setNewSymbol(e.target.value)}
+      placeholder="e.g. EABL"
+      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white uppercase"
+    />
+
+    <button
+      onClick={addSymbol}
+      className="bg-cyan-600 hover:bg-cyan-500 rounded-xl px-4 font-bold"
+    >
+      Add
+    </button>
+  </div>
+</div> 
+
         <div className="space-y-4 mt-5">
           {items.map((item) => {
             const positive =
@@ -74,11 +201,15 @@ export default function MobileWatchlist() {
             const aiConfidence =
               positive ? 88 : 64;
 
+            const signal = aiSignal(item.changePct || 0);
+
             return (
               <div
                 key={item.symbol}
                 className="bg-slate-900 border border-slate-800 rounded-2xl p-4"
               >
+               
+                         
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2">
@@ -95,6 +226,20 @@ export default function MobileWatchlist() {
                       {item.name}
                     </div>
                   </div>
+
+<div className="flex flex-wrap gap-2 mt-2">
+  <div className={`text-[10px] px-2 py-1 rounded-full bg-slate-800 ${signal.color}`}>
+    {signal.label}
+  </div>
+
+  <div className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-300">
+    {liquidityBadge(item.turnover || 0)}
+  </div>
+
+  <div className="text-[10px] px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-300">
+    AI {aiConfidence}%
+  </div>
+</div>
 
                   <button
                     onClick={() =>
@@ -124,7 +269,7 @@ export default function MobileWatchlist() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-800 rounded-xl p-3">
+                   <div className="bg-slate-800 rounded-xl p-3">
                     <div className="text-xs text-slate-400">
                       Change
                     </div>

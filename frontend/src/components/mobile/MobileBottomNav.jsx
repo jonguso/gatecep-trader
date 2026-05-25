@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import useNotificationSocket from "../../hooks/useNotificationSocket";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -9,6 +10,9 @@ export default function MobileBottomNav() {
   const location = useLocation();
   const [notificationCount, setNotificationCount] =
     useState(0);
+  const {
+  notifications: socketNotifications
+} = useNotificationSocket();
 
   function active(path) {
     return (
@@ -35,17 +39,26 @@ export default function MobileBottomNav() {
   }
 
   useEffect(() => {
-    loadNotifications();
+  loadNotifications();
 
-    const interval = setInterval(
-      loadNotifications,
-      10000
-    );
+  const interval = setInterval(
+    loadNotifications,
+    10000
+  );
 
-    return () => clearInterval(interval);
-  }, []);
+  return () => clearInterval(interval);
+}, []);
 
-  const items = [
+const unreadSocketCount = socketNotifications.filter(
+  (item) => !item.read
+).length;
+
+const displayNotificationCount =
+  unreadSocketCount > 0
+    ? unreadSocketCount
+    : notificationCount;
+
+const items = [
   {
     label: "Coach",
     path: "/mobile"
@@ -84,11 +97,12 @@ export default function MobileBottomNav() {
           <div className="relative inline-block">
             {item.label}
 
-            {item.badge && notificationCount > 0 && (
+           {item.badge &&
+  displayNotificationCount > 0 && (
               <span className="absolute -top-3 -right-5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-[0_0_12px_rgba(239,68,68,0.7)] animate-pulse">
-                {notificationCount > 99
-                  ? "99+"
-                  : notificationCount}
+                {displayNotificationCount > 99
+  ? "99+"
+  : displayNotificationCount}
               </span>
             )}
           </div>

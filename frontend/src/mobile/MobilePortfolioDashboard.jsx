@@ -154,7 +154,9 @@ function SectorPieChart({ holdings, total }) {
   );
 }
 
-export default function MobilePortfolioDashboard() {
+export default function MobilePortfolioDashboard({
+  livePortfolio
+}) {
   const [portfolio, setPortfolio] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [brokerFilter, setBrokerFilter] = useState("ALL");
@@ -172,9 +174,11 @@ export default function MobilePortfolioDashboard() {
       const portfolioData = await portfolioRes.json();
       const walletData = await walletRes.json();
 
-      if (portfolioData.ok) {
-        setPortfolio(portfolioData.portfolio);
-      }
+      if (livePortfolio) {
+  setPortfolio(livePortfolio);
+} else if (portfolioData.ok) {
+  setPortfolio(portfolioData.portfolio);
+}
 
       if (walletData.ok) {
         setWallet(walletData.wallet);
@@ -190,10 +194,16 @@ export default function MobilePortfolioDashboard() {
   useEffect(() => {
     loadData();
 
-    const interval = setInterval(loadData, 5000);
+    const interval = setInterval(loadData, 15000);
 
     return () => clearInterval(interval);
   }, []);
+
+useEffect(() => {
+  if (livePortfolio) {
+    setPortfolio(livePortfolio);
+  }
+}, [livePortfolio]);
 
   const brokers = useMemo(() => {
     const values = (portfolio?.holdings || []).map(
@@ -505,20 +515,27 @@ export default function MobilePortfolioDashboard() {
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => setShowSummary(true)}
-          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl py-4 font-bold text-cyan-300"
-        >
-          Portfolio Summary
-        </button>
+  <button
+    onClick={() => setShowSummary(true)}
+    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl py-4 font-bold text-cyan-300"
+  >
+    Portfolio Summary
+  </button>
 
-        <button
-          onClick={() => setShowDetails(true)}
-          className="bg-cyan-600 hover:bg-cyan-500 rounded-2xl py-4 font-bold text-white"
-        >
-          Portfolio Details
-        </button>
-      </div>
+  <button
+    onClick={() => setShowDetails(true)}
+    className="bg-cyan-600 hover:bg-cyan-500 rounded-2xl py-4 font-bold text-white"
+  >
+    Portfolio Details
+  </button>
+
+  <a
+    href="/mobile/heatmap"
+    className="col-span-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/40 rounded-2xl py-4 text-center font-bold text-purple-300"
+  >
+    Portfolio Heatmap
+  </a>
+</div>
 
       <div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4">
         <div className="text-cyan-400 font-bold">

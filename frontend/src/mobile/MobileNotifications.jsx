@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
+import useNotificationSocket from "../hooks/useNotificationSocket";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
   "http://localhost:4000";
+
 
 function severityStyle(severity) {
   if (severity === "positive") {
@@ -32,6 +34,12 @@ function categoryIcon(category) {
 
 export default function MobileNotifications() {
   const [notifications, setNotifications] = useState([]);
+  const [filter, setFilter] = useState("ALL");
+
+  const {
+    notifications: socketNotifications,
+    connected
+  } = useNotificationSocket();
 
   async function loadNotifications() {
     try {
@@ -61,14 +69,18 @@ export default function MobileNotifications() {
   useEffect(() => {
     loadNotifications();
 
-    const interval = setInterval(loadNotifications, 10000);
+    const interval = setInterval(loadNotifications, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
-  const unreadCount = notifications.filter(
-    (item) => !item.read
-  ).length;
+  const visibleNotifications =
+  socketNotifications.length > 0
+    ? socketNotifications
+    : notifications;
+  const unreadCount = visibleNotifications.filter(
+  (item) => !item.read
+).length;
 
   return (
     <motion.div
@@ -86,10 +98,61 @@ export default function MobileNotifications() {
           AI alerts, dividend updates, portfolio risks, and execution events.
         </p>
 
+<div className="flex gap-2 overflow-x-auto mt-4 pb-1">
+  {[
+    "ALL",
+    "AI_SIGNAL",
+    "DIVIDEND",
+    "PORTFOLIO",
+    "EXECUTION"
+  ].map((type) => (
+    <button
+      key={type}
+      onClick={() => setFilter(type)}
+      className={
+        filter === type
+          ? "px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs whitespace-nowrap"
+          : "px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs whitespace-nowrap"
+      }
+    >
+      {type === "ALL"
+        ? "All"
+        : type.replace("_", " ")}
+    </button>
+  ))}
+</div>
+
+<div className="mt-3 text-xs">
+  <span
+    className={
+      connected
+        ? "text-green-400"
+        : "text-yellow-400"
+    }
+  >
+    {connected
+      ? "● Live alert stream connected"
+      : "● Using alert polling fallback"}
+  </span>
+</div>
+
         <div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4 mt-5">
           <div className="text-xs text-slate-400">
             Unread Alerts
           </div>
+
+<a
+  href="/mobile/dividends"
+  className="block bg-yellow-500/10 border border-yellow-500/40 rounded-2xl p-4 mt-4"
+>
+  <div className="text-yellow-300 font-bold">
+    Dividend Calendar
+  </div>
+
+  <div className="text-sm text-slate-300 mt-1">
+    View upcoming books closure dates, payment dates, and Coach G dividend insights.
+  </div>
+</a>
 
           <div className="text-3xl font-bold text-cyan-300 mt-1">
             {unreadCount}
@@ -97,7 +160,15 @@ export default function MobileNotifications() {
         </div>
 
         <div className="space-y-4 mt-5">
-          {notifications.map((item) => (
+         {visibleNotifications
+  .filter((item) => {
+    if (filter === "ALL") {
+      return true;
+    }
+
+    return item.category === filter;
+  })
+  .map((item) => (
             <div
               key={item.id}
               className={`rounded-2xl border p-4 ${severityStyle(
@@ -145,7 +216,7 @@ export default function MobileNotifications() {
             </div>
           ))}
 
-          {notifications.length === 0 && (
+          {visibleNotifications.length === 0 && (
             <div className="bg-slate-900 rounded-2xl p-6 text-center text-slate-400 border border-slate-800">
               No notifications yet.
             </div>

@@ -1,3 +1,8 @@
+let ioInstance = null;
+
+export function initNotificationSocket(io) {
+  ioInstance = io;
+}
 const notifications = [];
 
 export function addNotification(notification) {
@@ -8,7 +13,19 @@ export function addNotification(notification) {
     ...notification
   });
 
-  return notifications[0];
+  const created = notifications[0];
+
+if (ioInstance) {
+  ioInstance.emit("notification:new", {
+    notification: created
+  });
+
+  ioInstance.emit("notifications:update", {
+    notifications
+  });
+}
+
+return created;
 }
 
 export function getNotifications() {

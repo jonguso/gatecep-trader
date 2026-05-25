@@ -1,48 +1,56 @@
-import { generateCoachGSignals } from "../ai/coachG.service.js";
+const userWatchlists = new Map();
 
-const watchlist = [
+const DEFAULT_WATCHLIST = [
   "SCOM",
-  "EQTY",
   "KCB",
-  "COOP"
+  "EQTY",
+  "BAT"
 ];
 
-const prices = {
-  SCOM: 18.45,
-  EQTY: 47.2,
-  KCB: 31.8,
-  COOP: 15.6
-};
+function normalizeSymbol(symbol) {
+  return String(symbol || "")
+    .trim()
+    .toUpperCase();
+}
 
-export function getWatchlist() {
-  const signals = generateCoachGSignals();
+export function getWatchlist(userId = "demo-user") {
+  if (!userWatchlists.has(userId)) {
+    userWatchlists.set(userId, [...DEFAULT_WATCHLIST]);
+  }
 
-  return watchlist.map((symbol) => {
-    const move =
-      Number((Math.random() * 0.6 - 0.3).toFixed(2));
+  return userWatchlists.get(userId);
+}
 
-    prices[symbol] = Number(
-      (prices[symbol] + move).toFixed(2)
-    );
+export function addToWatchlist({
+  userId = "demo-user",
+  symbol
+}) {
+  const normalized = normalizeSymbol(symbol);
 
-    const signal =
-      signals.find(
-        (s) => s.symbol === symbol
-      ) || {};
+  if (!normalized) {
+    throw new Error("Symbol is required");
+  }
 
-    return {
-      symbol,
-      price: prices[symbol],
-      change: move,
-      changePct: Number(
-        ((move / prices[symbol]) * 100).toFixed(2)
-      ),
-      recommendation:
-        signal.recommendation,
-      confidence:
-        signal.confidence,
-      hot:
-        signal.confidence >= 85
-    };
-  });
+  const watchlist = getWatchlist(userId);
+
+  if (!watchlist.includes(normalized)) {
+    watchlist.push(normalized);
+  }
+
+  return watchlist;
+}
+
+export function removeFromWatchlist({
+  userId = "demo-user",
+  symbol
+}) {
+  const normalized = normalizeSymbol(symbol);
+
+  const watchlist = getWatchlist(userId).filter(
+    (item) => item !== normalized
+  );
+
+  userWatchlists.set(userId, watchlist);
+
+  return watchlist;
 }

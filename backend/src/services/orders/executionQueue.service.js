@@ -2,7 +2,9 @@ import { emitOrderUpdate } from "../../websocket/orders.socket.js";
 import {
   debitWallet,
   getWalletBalance,
-  creditWallet
+  creditWallet,
+  releasePendingOrder,
+  settlePendingOrder
 } from "../wallet/cashWallet.service.js";
 import {
   saveOrder,
@@ -38,6 +40,9 @@ import { publishEvent } from "../events/eventBus.service.js";
 import {
   updatePositionFromFill
 } from "../positions/position.service.js";
+import {
+  createJournalEntry
+} from "../journal/tradeJournal.service.js";
 
 const executionQueue = [];
 
@@ -342,6 +347,17 @@ export function cancelOrder(orderId) {
     );
   }
 
+if (order.side === "BUY") {
+  const reservedAmount =
+    Number(order.remainingQuantity || 0) *
+    Number(order.price || 0);
+
+  releasePendingOrder(
+    reservedAmount,
+    `Cancelled order release ${order.symbol}`
+  );
+}
+
   order.status = "CANCELLED";
   order.brokerStatus = "CANCEL_REQUEST_ACCEPTED";
   order.rejectionReason = null;
@@ -401,6 +417,16 @@ function rejectOrder(orderId, reason) {
       refundAmount
     );
   }
+if (order && order.side === "BUY") {
+  const reservedAmount =
+    Number(order.remainingQuantity || 0) *
+    Number(order.price || 0);
+
+  releasePendingOrder(
+    reservedAmount,
+    `Rejected order release ${order.symbol}`
+  );
+}
 
   updateOrder(
     orderId,
@@ -460,7 +486,6 @@ async function applyFill(orderId, fillQty, fillPrice) {
     Number(order.quantity || 0) - previousFilled,
     Number(fillQty || 0)
   );
-
 
   const matchResult = matchOrder({
     symbol: order.symbol,
@@ -544,33 +569,42 @@ async function applyFill(orderId, fillQty, fillPrice) {
   order.updatedAt = now();
 
   const fill = {
-  orderId: order.id,
-  symbol: order.symbol,
-  quantity: matchedQty,
-  price: matchedPrice,
-  broker: order.broker,
-  timestamp: now()
-};
+    orderId: order.id,
+    symbol: order.symbol,
+    quantity: matchedQty,
+    price: matchedPrice,
+    broker: order.broker,
+    timestamp: now()
+  };
 
-const trade = recordTrade({
-  orderId: order.id,
-  symbol: order.symbol,
-  side: order.side,
-  quantity: matchedQty,
-  price: matchedPrice,
-  broker: order.broker
-});
-publishEvent("orderbook:update", {
-  symbol: order.symbol,
-  book: matchResult.book,
-  updatedAt: now()
-}).catch((error) => {
-  console.error("Order book publish failed:", error.message);
-});
+  const trade = recordTrade({
+    orderId: order.id,
+    symbol: order.symbol,
+    side: order.side,
+    quantity: matchedQty,
+    price: matchedPrice,
+    broker: order.broker
+  });
 
-publishEvent("time-sales:trade", trade).catch((error) => {
-  console.error("Time sales publish failed:", error.message);
-});
+  publishEvent("orderbook:update", {
+    symbol: order.symbol,
+    book: matchResult.book,
+    updatedAt: now()
+  }).catch((error) => {
+    console.error(
+      "Order book publish failed:",
+      error.message
+    );
+  });
+
+  publishEvent("time-sales:trade", trade).catch(
+    (error) => {
+      console.error(
+        "Time sales publish failed:",
+        error.message
+      );
+    }
+  );
 
   await updatePositionFromFill({
     symbol: order.symbol,
@@ -580,12 +614,19 @@ publishEvent("time-sales:trade", trade).catch((error) => {
     broker: order.broker
   });
 
-if (order.side === "SELL") {
-  creditWallet(
+if (order.side === "BUY") {
+  settlePendingOrder(
     matchedQty * matchedPrice,
-    `SELL ${order.symbol} wallet credit`
+    `BUY settlement ${order.symbol}`
   );
 }
+
+  if (order.side === "SELL") {
+    creditWallet(
+      matchedQty * matchedPrice,
+      `SELL ${order.symbol} wallet credit`
+    );
+  }
 
   publishEvent("portfolio:update", {
     orderId: order.id,
@@ -625,6 +666,36 @@ if (order.side === "SELL") {
     });
   }
 
+  if (order.status === "FILLED") {
+    createJournalEntry({
+      symbol: order.symbol,
+      side: order.side,
+      broker:
+        order.broker ||
+        order.lastBrokerAttempt ||
+        "AUTO",
+      quantity: Number(
+        order.filledQuantity ||
+          order.quantity ||
+          0
+      ),
+      entryPrice: Number(
+        order.averageFillPrice ||
+          order.price ||
+          0
+      ),
+      currentPrice: Number(
+        order.averageFillPrice ||
+          order.price ||
+          0
+      ),
+      aiConfidence: 85,
+      reason:
+        "Auto-journaled from filled order",
+      holdingDays: 0
+    });
+  }
+
   addExecutionEvent(
     order,
     order.status,
@@ -638,6 +709,7 @@ if (order.side === "SELL") {
   publishOrder(order);
   persistOrder(order);
 }
+
 function simulateExecution(orderId) {
   setTimeout(() => {
     const order = getOrderById(orderId);
