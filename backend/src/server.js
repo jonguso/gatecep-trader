@@ -82,6 +82,7 @@ import matchingRouter from "./routes/matching.routes.js";
 import timeSalesRouter from "./routes/timeSales.routes.js";
 import executionQualityRouter from "./routes/executionQuality.routes.js";
 import coachRouter from "./routes/coach.routes.js";
+import ordersRouter from "./routes/orders.routes.js";
 import aiRebalanceRouter from "./routes/aiRebalance.routes.js";
 import portfolioScoreRouter from "./routes/portfolioScore.routes.js";
 import brokerCashRouter from "./routes/brokerCash.routes.js";
@@ -187,6 +188,7 @@ app.use("/coach", coachRouter);
 app.use("/trade-journal", tradeJournalRouter);
 app.use("/wallet/ledger", walletLedgerRouter);
 app.use("/broker-cash", brokerCashRouter);
+app.use("/orders", ordersRouter);
 app.use(
   "/portfolio-score",
   portfolioScoreRouter

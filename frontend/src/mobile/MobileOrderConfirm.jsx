@@ -9,8 +9,8 @@ const API_URL =
 export default function MobileOrderConfirm() {
   const { symbol, side } = useParams();
 
-  const [quantity, setQuantity] = useState(100);
-  const [price, setPrice] = useState(18.45);
+  const [quantity, setQuantity] = useState(300);
+  const [price, setPrice] = useState(35);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 

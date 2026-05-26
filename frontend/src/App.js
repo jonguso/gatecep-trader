@@ -46,6 +46,8 @@ import MobilePortfolioScore from "./mobile/MobilePortfolioScore";
 import MobileTradeJournal from "./mobile/MobileTradeJournal";
 import MobileFunds from "./mobile/MobileFunds";
 import MobileBrokerTreasury from "./mobile/MobileBrokerTreasury";
+import MobileOrders from "./mobile/MobileOrders";
+import MobileModifyOrder from "./mobile/MobileModifyOrder";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -400,6 +402,16 @@ function AppRoutes() {
       <MobileBrokerTreasury />
     </ProtectedRoute>
   }
+/>
+
+<Route
+  path="/mobile/orders"
+  element={<MobileOrders />}
+/>
+
+<Route
+  path="/mobile/orders/:id/modify"
+  element={<MobileModifyOrder />}
 />
 
 </Routes>

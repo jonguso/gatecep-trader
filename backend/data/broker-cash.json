@@ -2,7 +2,7 @@
   "AIB": {
     "broker": "AIB",
     "ledgerBalance": 400000,
-    "reserved": 42630,
+    "reserved": 127429.5,
     "pendingSettlement": 0,
     "currency": "KES"
   },

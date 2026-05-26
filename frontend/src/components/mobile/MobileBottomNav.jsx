@@ -68,8 +68,8 @@ const items = [
     path: "/mobile/markets"
   },
   {
-    label: "Watchlist",
-    path: "/mobile/watchlist"
+    label: "Orders",
+    path: "/mobile/orders"
   },
   {
     label: "Portfolio",
@@ -81,7 +81,6 @@ const items = [
     badge: true
   }
 ];
-
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 text-center text-xs text-white z-50">
       {items.map((item) => (

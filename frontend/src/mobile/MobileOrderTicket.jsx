@@ -40,6 +40,8 @@ export default function MobileOrderTicket() {
   const [execution, setExecution] = useState(null);
   const [success, setSuccess] = useState(false);
   const [brokerCash, setBrokerCash] = useState([]);
+  const [showConfirm, setShowConfirm] =
+  useState(false);
 
   const effectivePrice =
     orderType === "MARKET"
@@ -48,6 +50,20 @@ export default function MobileOrderTicket() {
 
   const estimatedValue =
     Number(quantity || 0) * Number(effectivePrice || 0);
+ const fees = {
+  brokerage: estimatedValue * 0.013,
+  levy: estimatedValue * 0.002,
+  statutory: 50,
+  totalFees:
+    estimatedValue * 0.013 +
+    estimatedValue * 0.002 +
+    50,
+  netCost:
+    estimatedValue +
+    estimatedValue * 0.013 +
+    estimatedValue * 0.002 +
+    50
+};
 
   const availableFunds = Number(wallet?.balance || 0);
 
@@ -754,7 +770,7 @@ useEffect(() => {
                     ? "bg-green-500"
                     : "bg-red-500"
                 }
-                onComplete={executeOrder}
+                onComplete={() => setShowConfirm(true)}
               />
             </div>
 
@@ -857,6 +873,74 @@ useEffect(() => {
           </div>
         )}
       </div>
+{showConfirm && (
+  <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
+    <div className="bg-slate-900 w-full rounded-t-3xl p-5">
+      <div className="flex justify-between items-center">
+        <div className="text-2xl font-bold">
+          Verify Order
+        </div>
+
+        <button
+          onClick={() => setShowConfirm(false)}
+          className="text-slate-400 text-xl"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="mt-5 bg-slate-800 rounded-2xl p-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold">
+            {side} {symbol}
+          </div>
+
+          <div className="text-slate-400 mt-2">
+            Qty {quantity} @ KES {effectivePrice}
+          </div>
+        </div>
+
+        <div className="space-y-3 mt-5 text-sm">
+          <FeeRow
+            label="Order Value"
+            value={estimatedValue}
+          />
+
+          <FeeRow
+            label="Brokerage Fee"
+            value={fees.brokerage}
+          />
+
+          <FeeRow
+            label="NSE Levy"
+            value={fees.levy}
+          />
+
+          <FeeRow
+            label="Statutory Fees"
+            value={fees.statutory}
+          />
+
+          <FeeRow
+            label="Net Consideration"
+            value={fees.netCost}
+            bold
+          />
+        </div>
+
+        <button
+          onClick={() => {
+            setShowConfirm(false);
+            executeOrder();
+          }}
+          className="w-full bg-cyan-500 text-slate-950 font-bold rounded-2xl py-4 mt-6"
+        >
+          CONFIRM {side}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       <MobileBottomNav />
     </motion.div>
@@ -884,6 +968,32 @@ function WarningBox({ title, message, type }) {
 
       <div className="text-sm text-slate-300 mt-2">
         {message}
+      </div>
+    </div>
+  );
+}
+
+function FeeRow({ label, value, bold }) {
+  return (
+    <div className="flex justify-between">
+      <div
+        className={
+          bold
+            ? "font-bold text-white"
+            : "text-slate-400"
+        }
+      >
+        {label}
+      </div>
+
+      <div
+        className={
+          bold
+            ? "font-bold text-cyan-300"
+            : "text-white"
+        }
+      >
+        KES {Number(value || 0).toFixed(2)}
       </div>
     </div>
   );
