@@ -42,13 +42,25 @@ export default function MobileFunds() {
       className="bg-slate-950 min-h-screen text-white pb-24"
     >
       <div className="p-4">
-        <h1 className="text-3xl font-bold">
-          Funds
-        </h1>
+        <div className="flex justify-between items-start mb-4">
+  <div>
+    <h1 className="text-3xl font-bold">
+      Funds & Buying Power
+    </h1>
 
-        <p className="text-slate-400 text-sm mt-1">
-          Broker-style cash, buying power, and settlement balances.
-        </p>
+    <p className="text-slate-400 text-sm mt-2">
+      Broker-style cash, buying power, and settlement balances.
+
+    </p>
+  </div>
+
+  <a
+    href="/mobile/portfolio"
+    className="bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-cyan-300"
+  >
+    ✕ Close
+  </a>
+</div>
 
 <a
   href="/mobile/broker-treasury"
@@ -62,6 +74,7 @@ export default function MobileFunds() {
     View broker buying power, reserved cash, and treasury utilization.
   </div>
 </a>
+
 
         <div className="bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-5 mt-5">
           <div className="text-xs text-slate-400">

@@ -18,7 +18,6 @@ import {
 
 import {
   getPreferredBroker,
-  debitBrokerBuyingPower,
   creditBrokerBuyingPower
 } from "../brokers/brokerAccounts.service.js";
 
@@ -154,9 +153,21 @@ if (order.side === "BUY") {
     return rejectedOrder;
   }
 
-  const debit = debitWallet(estimatedTradeValue);
+  const debit = debitWallet(
+  estimatedTradeValue,
+  `BUY reserve ${order.symbol}`
+);
 
-  if (!debit.ok) {
+  
+}
+
+  if (order.side === "BUY") {
+  try {
+    reserveBrokerCash({
+      broker: selectedBroker,
+      amount: estimatedTradeValue
+    });
+  } catch (error) {
     const rejectedOrder = {
       id: `ORD-${Date.now()}`,
       symbol: order.symbol,
@@ -172,7 +183,7 @@ if (order.side === "BUY") {
       fillPercent: 0,
       retryCount: 0,
       maxRetries: 1,
-      rejectionReason: debit.error,
+      rejectionReason: error.message,
       lastBrokerAttempt: selectedBroker,
       executionEvents: [],
       createdAt: now(),
@@ -184,7 +195,7 @@ if (order.side === "BUY") {
     addExecutionEvent(
       rejectedOrder,
       "REJECTED",
-      `Order rejected: ${debit.error}.`
+      `Order rejected: ${error.message}.`
     );
 
     publishOrder(rejectedOrder);
@@ -193,87 +204,6 @@ if (order.side === "BUY") {
     return rejectedOrder;
   }
 }
-
-  if (order.side === "BUY") {
-    try {
-  reserveBrokerCash({
-    broker: selectedBroker,
-    amount: estimatedTradeValue
-  });
-} catch (error) {
-  const rejectedOrder = {
-    id: `ORD-${Date.now()}`,
-    symbol: order.symbol,
-    side: order.side,
-    quantity,
-    price,
-    broker: selectedBroker,
-    status: "REJECTED",
-    brokerStatus: "REJECTED",
-    filledQuantity: 0,
-    remainingQuantity: quantity,
-    averageFillPrice: 0,
-    fillPercent: 0,
-    retryCount: 0,
-    maxRetries: 1,
-    rejectionReason: error.message,
-    lastBrokerAttempt: selectedBroker,
-    executionEvents: [],
-    createdAt: now(),
-    updatedAt: now()
-  };
-
-  executionQueue.push(rejectedOrder);
-
-  addExecutionEvent(
-    rejectedOrder,
-    "REJECTED",
-    `Order rejected: ${error.message}.`
-  );
-
-  publishOrder(rejectedOrder);
-  persistOrder(rejectedOrder);
-
-  return rejectedOrder;
-}
-
-    if (!debit.ok) {
-      const rejectedOrder = {
-        id: `ORD-${Date.now()}`,
-        symbol: order.symbol,
-        side: order.side,
-        quantity,
-        price,
-        broker: selectedBroker,
-        status: "REJECTED",
-        brokerStatus: "REJECTED",
-        filledQuantity: 0,
-        remainingQuantity: quantity,
-        averageFillPrice: 0,
-        fillPercent: 0,
-        retryCount: 0,
-        maxRetries: 1,
-        rejectionReason: debit.error,
-        lastBrokerAttempt: selectedBroker,
-        executionEvents: [],
-        createdAt: now(),
-        updatedAt: now()
-      };
-
-      executionQueue.push(rejectedOrder);
-
-      addExecutionEvent(
-        rejectedOrder,
-        "REJECTED",
-        `Order rejected: ${debit.error}.`
-      );
-
-      publishOrder(rejectedOrder);
-      persistOrder(rejectedOrder);
-
-      return rejectedOrder;
-    }
-  }
 
   const queuedOrder = {
     id: `ORD-${Date.now()}`,

@@ -83,15 +83,25 @@ export default function MobilePortfolioHeatmap() {
       className="bg-slate-950 min-h-screen text-white pb-24"
     >
       <div className="p-4">
-        <h1 className="text-3xl font-bold">
-          Portfolio Heatmap
-        </h1>
+        <div className="flex justify-between items-start mb-4">
+  <div>
+    <h1 className="text-3xl font-bold">
+      Portfolio Heatmap
+    </h1>
 
-        <p className="text-slate-400 text-sm mt-1">
-          Live exposure, profit/loss, and concentration view.
-        </p>
+    <p className="text-slate-400 text-sm mt-2">
+      Live exposure, profit/loss, and concentration view.
+    </p>
+  </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-5">
+  <a
+    href="/mobile/portfolio"
+    className="bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-cyan-300"
+  >
+    ✕ Close
+  </a>
+</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-5">
           {groupedSectors.map((sectorGroup) => {
             const pnl = Number(sectorGroup.unrealizedPnL || 0);
             const value = Number(sectorGroup.marketValue || 0);
@@ -108,7 +118,7 @@ export default function MobilePortfolioHeatmap() {
                   pnl
                 )}`}
               >
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
   <div>
     <div className="text-xl font-bold">
       {sectorGroup.sector}
@@ -119,7 +129,7 @@ export default function MobilePortfolioHeatmap() {
     </div>
   </div>
 
-  <div className="flex items-center gap-4 text-right">
+  <div className="grid grid-cols-3 gap-3 text-left md:text-right">
     <div>
       <div className="text-[10px] text-slate-400">
         Exposure

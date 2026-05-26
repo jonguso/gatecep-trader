@@ -98,6 +98,7 @@ export default function MobileNotifications() {
           AI alerts, dividend updates, portfolio risks, and execution events.
         </p>
 
+
 <div className="flex gap-2 overflow-x-auto mt-4 pb-1">
   {[
     "ALL",

@@ -82,13 +82,24 @@ export default function MobileAIRebalance() {
       className="bg-slate-950 min-h-screen text-white pb-24"
     >
       <div className="p-4">
-        <h1 className="text-3xl font-bold">
-          AI Rebalance
-        </h1>
+       <div className="flex justify-between items-start mb-4">
+  <div>
+    <h1 className="text-3xl font-bold">
+      AI Rebalance
+    </h1>
 
-        <p className="text-slate-400 text-sm mt-1">
-          Coach G portfolio diversification and exposure analysis.
-        </p>
+    <div className="text-slate-400 text-sm mt-2">
+      Coach G portfolio diversification and exposure analysis.
+    </div>
+  </div>
+
+  <a
+    href="/mobile/portfolio"
+    className="bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-cyan-300"
+  >
+    ✕ Close
+  </a>
+</div>
 
         <div className="bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-4 mt-5">
           <div className="text-xs text-slate-400">

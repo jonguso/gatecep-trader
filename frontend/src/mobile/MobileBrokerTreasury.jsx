@@ -63,14 +63,24 @@ export default function MobileBrokerTreasury() {
       className="bg-slate-950 min-h-screen text-white pb-24"
     >
       <div className="p-4">
-        <h1 className="text-3xl font-bold">
-          Broker Treasury
-        </h1>
+        <div className="flex justify-between items-start mb-4">
+  <div>
+    <h1 className="text-3xl font-bold">
+      Broker Trading Space
+    </h1>
 
-        <p className="text-slate-400 text-sm mt-1">
-          Broker-level buying power, reserved cash, and settlement balances.
-        </p>
+    <p className="text-slate-400 text-sm mt-2">
+      Broker-level buying power, reserved cash, and settlement balances.
+    </p>
+  </div>
 
+  <a
+    href="/mobile/portfolio"
+    className="bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-cyan-300"
+  >
+    ✕ Close
+  </a>
+</div>
         <div className="grid grid-cols-3 gap-3 mt-5">
           <SummaryCard
             title="Ledger"

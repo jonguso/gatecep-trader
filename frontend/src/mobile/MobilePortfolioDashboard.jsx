@@ -514,6 +514,16 @@ useEffect(() => {
         total={currentValue}
       />
 
+ <div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4">
+        <div className="text-cyan-400 font-bold">
+          Coach G Portfolio Advice
+        </div>
+
+        <p className="text-sm text-slate-300 mt-2">
+          {portfolioAdvice}
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
   <button
     onClick={() => setShowSummary(true)}
@@ -529,23 +539,10 @@ useEffect(() => {
     Portfolio Details
   </button>
 
-  <a
-    href="/mobile/heatmap"
-    className="col-span-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/40 rounded-2xl py-4 text-center font-bold text-purple-300"
-  >
-    Portfolio Heatmap
-  </a>
+  
 </div>
 
-      <div className="bg-cyan-500/10 border border-cyan-500 rounded-2xl p-4">
-        <div className="text-cyan-400 font-bold">
-          Coach G Portfolio Advice
-        </div>
-
-        <p className="text-sm text-slate-300 mt-2">
-          {portfolioAdvice}
-        </p>
-      </div>
+     
 
       {showDetails && (
         <PortfolioDetailsModal

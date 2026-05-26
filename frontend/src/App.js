@@ -360,7 +360,7 @@ function AppRoutes() {
 />
 
 <Route
-  path="/mobile/heatmap"
+  path="/mobile/portfolio-heatmap"
   element={
     <ProtectedRoute>
       <MobilePortfolioHeatmap />

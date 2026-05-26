@@ -83,14 +83,24 @@ export default function MobileTradeJournal() {
       className="bg-slate-950 min-h-screen text-white pb-24"
     >
       <div className="p-4">
-        <h1 className="text-3xl font-bold">
-          AI Trade Journal
-        </h1>
+<div className="flex justify-between items-start mb-4">
+  <div>
+    <h1 className="text-3xl font-bold">
+      AI Trade Journal
+    </h1>
 
-        <p className="text-slate-400 text-sm mt-1">
-          Coach G execution review, trade behavior, and performance analytics.
-        </p>
+    <p className="text-slate-400 text-sm mt-2">
+      Coach G execution review, trade behavior, and performance analytics.
+    </p>
+  </div>
 
+  <a
+    href="/mobile/portfolio"
+    className="bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-2 text-sm font-bold text-cyan-300"
+  >
+    ✕ Close
+  </a>
+</div>
         <div className="space-y-4 mt-5">
           {journal.map((item) => (
             <div

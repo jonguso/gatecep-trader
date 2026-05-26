@@ -35,77 +35,70 @@ export default function MobilePortfolio() {
           </span>
         </div>
 
-<a
-  href="/mobile/heatmap"
-  className="block bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-4 mb-5"
->
-  <div className="text-cyan-300 font-bold">
-    Open Portfolio Heatmap
-  </div>
-
-  <div className="text-sm text-slate-300 mt-1">
-    View live exposure, sector concentration, and portfolio risk visualization.
-  </div>
-</a>
-
-<a
-  href="/mobile/ai-rebalance"
-  className="block bg-purple-500/10 border border-purple-500/40 rounded-2xl p-4 mb-5"
->
-  <div className="text-purple-300 font-bold">
-    Open AI Rebalance
-  </div>
-
-  <div className="text-sm text-slate-300 mt-1">
-    View Coach G portfolio exposure, concentration risk, and rebalance suggestions.
-  </div>
-</a>
-
-<a
-  href="/mobile/portfolio-score"
-  className="block bg-green-500/10 border border-green-500/40 rounded-2xl p-4 mb-5"
->
-  <div className="text-green-300 font-bold">
-    Open Portfolio Score
-  </div>
-
-  <div className="text-sm text-slate-300 mt-1">
-    View Coach G portfolio grade, concentration risk, and score breakdown.
-  </div>
-</a>
-
-<a
-  href="/mobile/trade-journal"
-  className="block bg-cyan-500/10 border border-cyan-500/40 rounded-2xl p-4 mb-5"
->
-  <div className="text-cyan-300 font-bold">
-    Open AI Trade Journal
-  </div>
-
-  <div className="text-sm text-slate-300 mt-1">
-    Review trade grades, behavior patterns, and Coach G execution feedback.
-  </div>
-</a>
-
-<a
-  href="/mobile/funds"
-  className="block bg-yellow-500/10 border border-yellow-500/40 rounded-2xl p-4 mb-5"
->
-  <div className="text-yellow-300 font-bold">
-    Open Funds & Buying Power
-  </div>
-
-  <div className="text-sm text-slate-300 mt-1">
-    View available funds, ledger balance, pending orders, and settlement balances.
-  </div>
-</a>
 
         <MobilePortfolioDashboard
           livePortfolio={livePortfolio}
         />
-      </div>
+<div className="grid grid-cols-2 gap-3 mt-5">
+  <ActionTile
+    href="/mobile/portfolio-heatmap"
+    title="Portfolio Heatmap"
+    color="cyan"
+  />
 
+  <ActionTile
+    href="/mobile/ai-rebalance"
+    title="AI Rebalance"
+    color="purple"
+  />
+
+  <ActionTile
+    href="/mobile/portfolio-score"
+    title="Portfolio Score"
+    color="green"
+  />
+
+  <ActionTile
+    href="/mobile/trade-journal"
+    title="AI Trade Journal"
+    color="blue"
+  />
+
+  <ActionTile
+    href="/mobile/funds"
+    title="Fund & Buying Power"
+    color="yellow"
+  />
+
+  <ActionTile
+    href="/mobile/broker-treasury"
+    title="Broker Buying Power"
+    color="pink"
+  />
+</div>
+
+</div>    
       <MobileBottomNav />
     </motion.div>
+  );
+}
+
+function ActionTile({ href, title, color = "cyan" }) {
+  const styles = {
+    cyan: "bg-cyan-500/10 border-cyan-500/40 text-cyan-300",
+    purple: "bg-purple-500/10 border-purple-500/40 text-purple-300",
+    green: "bg-green-500/10 border-green-500/40 text-green-300",
+    blue: "bg-blue-500/10 border-blue-500/40 text-blue-300",
+    yellow: "bg-yellow-500/10 border-yellow-500/40 text-yellow-300",
+    pink: "bg-pink-500/10 border-pink-500/40 text-pink-300"
+  };
+
+  return (
+    <a
+      href={href}
+      className={`rounded-2xl border p-4 text-center font-bold ${styles[color]}`}
+    >
+      {title}
+    </a>
   );
 }
