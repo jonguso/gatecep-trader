@@ -15,6 +15,9 @@ import {
   addOrderToBook,
   matchOrderBook
 } from "../market/orderBook.service.js";
+import {
+  executeTWAP
+} from "../execution/twapExecution.service.js";
 
 import {
   getPreferredBroker,
@@ -26,6 +29,9 @@ import {
 } from "../pnl/realizedPnl.service.js";
 
 import { enqueueExecutionJob } from "../queue/redisExecutionQueue.service.js";
+import {
+  simulateDepthFill
+} from "../market/liquidityDepth.service.js";
 
 import {
   savePersistentOrder
@@ -468,12 +474,12 @@ async function applyFill(orderId, fillQty, fillPrice) {
     Number(fillQty || 0)
   );
 
-  const matchResult = matchOrder({
-    symbol: order.symbol,
-    side: order.side,
-    quantity: requestedFillQty,
-    limitPrice: Number(fillPrice || 0)
-  });
+ const matchResult = simulateDepthFill({
+  symbol: order.symbol,
+  side: order.side,
+  quantity: requestedFillQty,
+  limitPrice: Number(fillPrice || 0)
+});
 
   const matchedQty =
     Number(matchResult.filledQuantity || 0);
@@ -685,15 +691,17 @@ creditBrokerCash({
     });
   }
 
-  addExecutionEvent(
-    order,
-    order.status,
-    `${
-      order.status === "FILLED"
-        ? "Final"
-        : "Partial"
-    } fill: ${matchedQty} shares @ KES ${matchedPrice}.`
-  );
+addExecutionEvent(
+  order,
+  order.status,
+  `${
+    order.status === "FILLED"
+      ? "Final"
+      : "Partial"
+  } fill: ${matchedQty} shares @ VWAP KES ${matchedPrice}. Slippage: ${
+    matchResult.slippagePct || 0
+  }%.`
+);
 
   publishOrder(order);
   persistOrder(order);
@@ -920,4 +928,20 @@ function continueExecutionAfterRetry(orderId) {
       Number(refreshedOrder.price || 0)
     );
   }, 5500);
+}
+
+export function clearExecutionQueue() {
+  executionQueue.length = 0;
+}
+
+export function resetExecutionQueue() {
+  executionQueue.length = 0;
+
+  console.log(
+    "Execution queue memory cleared."
+  );
+
+  return {
+    ok: true
+  };
 }

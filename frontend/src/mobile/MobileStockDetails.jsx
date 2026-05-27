@@ -7,6 +7,7 @@ import LiveAISentimentBanner from "../components/mobile/LiveAISentimentBanner";
 import FloatingCoachG from "../components/mobile/FloatingCoachG";
 import MobileBottomNav from "../components/mobile/MobileBottomNav";
 import { motion } from "framer-motion";
+import OrderBookDepthPanel from "../components/trading/OrderBookDepthPanel";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -60,8 +61,8 @@ if (newPrice > 0) {
 }
 
       if (bookData.ok) {
-        setBook(bookData.book);
-      }
+  setBook(bookData.depth);
+}
     } catch (error) {
       console.error("Failed to load stock details:", error);
     }
@@ -159,7 +160,7 @@ const spread =
 <LiveAISentimentBanner />
   <MobileMiniChart symbol={symbol} height={180} />
 
-  <OrderBookDepth book={book} symbol={symbol} />
+  <OrderBookDepthPanel symbol={symbol} />
 
  <LiquidityPressure book={book} />
 

@@ -25,6 +25,8 @@ import dividendsRouter from "./routes/dividends.routes.js";
 import aiMarketPulseRouter from "./routes/aiMarketPulse.routes.js";
 import sectorRotationAIRouter from "./routes/sectorRotationAI.routes.js";
 import tradeJournalRouter from "./routes/tradeJournal.routes.js";
+import orderBookDepthRoutes from "./routes/orderBookDepth.routes.js";
+import systemResetRoutes from "./routes/systemReset.routes.js";
 import {
   getDividendAIScores
 } from "./services/dividends/dividendAI.service.js";
@@ -189,6 +191,8 @@ app.use("/trade-journal", tradeJournalRouter);
 app.use("/wallet/ledger", walletLedgerRouter);
 app.use("/broker-cash", brokerCashRouter);
 app.use("/orders", ordersRouter);
+app.use("/system/reset", systemResetRoutes);
+app.use("/orderbook-depth", orderBookDepthRoutes);
 app.use(
   "/portfolio-score",
   portfolioScoreRouter
