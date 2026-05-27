@@ -32,6 +32,9 @@ import { enqueueExecutionJob } from "../queue/redisExecutionQueue.service.js";
 import {
   simulateDepthFill
 } from "../market/liquidityDepth.service.js";
+import {
+  selectBestBroker
+} from "../execution/smartOrderRouter.service.js";
 
 import {
   savePersistentOrder
@@ -111,10 +114,19 @@ export function queueOrder(order) {
   const quantity = Number(order.quantity || 0);
   const price = Number(order.price || 0);
 
-  const selectedBroker =
+  const brokerDecision = selectBestBroker({
+  symbol: order.symbol,
+  side: order.side,
+  quantity,
+  price,
+  preferredBroker:
     order.broker ||
     order.brokerId ||
-    getPreferredBroker();
+    getPreferredBroker()
+});
+
+const selectedBroker =
+  brokerDecision.selectedBroker;
 
   const estimatedTradeValue = quantity * price;
 
@@ -212,26 +224,29 @@ if (order.side === "BUY") {
 }
 
   const queuedOrder = {
-    id: `ORD-${Date.now()}`,
-    symbol: order.symbol,
-    side: order.side,
-    quantity,
-    price,
-    broker: selectedBroker,
-    status: "QUEUED",
-    brokerStatus: "PENDING",
-    filledQuantity: 0,
-    remainingQuantity: quantity,
-    averageFillPrice: 0,
-    fillPercent: 0,
-    retryCount: 0,
-    maxRetries: 1,
-    rejectionReason: null,
-    lastBrokerAttempt: selectedBroker,
-    executionEvents: [],
-    createdAt: now(),
-    updatedAt: now()
-  };
+  id: `ORD-${Date.now()}`,
+  symbol: order.symbol,
+  side: order.side,
+  quantity,
+  price,
+  broker: selectedBroker,
+
+  routingDecision: brokerDecision,
+
+  status: "QUEUED",
+  brokerStatus: "PENDING",
+  filledQuantity: 0,
+  remainingQuantity: quantity,
+  averageFillPrice: 0,
+  fillPercent: 0,
+  retryCount: 0,
+  maxRetries: 1,
+  rejectionReason: null,
+  lastBrokerAttempt: selectedBroker,
+  executionEvents: [],
+  createdAt: now(),
+  updatedAt: now()
+};
 
   executionQueue.push(queuedOrder);
 
@@ -241,6 +256,7 @@ addOrderToBook({
   quantity: queuedOrder.quantity,
   price: queuedOrder.price,
   orderId: queuedOrder.id
+
 });
 
   addExecutionEvent(
