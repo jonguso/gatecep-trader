@@ -25,6 +25,86 @@ const books = {
     ]
   },
 
+ABSA: {
+    bids: [
+      { price: 28.0, quantity: 4000 },
+      { price: 27.75, quantity: 10000 },
+      { price: 27.5, quantity: 16000 }
+    ],
+    asks: [
+      { price: 28.2, quantity: 3500 },
+      { price: 28.5, quantity: 9000 },
+      { price: 29.0, quantity: 14000 }
+    ]
+  },
+
+BAT: {
+    bids: [
+      { price: 573.0, quantity: 4000 },
+      { price: 572.75, quantity: 10000 },
+      { price: 572.5, quantity: 16000 }
+    ],
+    asks: [
+      { price: 573.2, quantity: 3500 },
+      { price: 573.5, quantity: 9000 },
+      { price: 574.0, quantity: 14000 }
+    ]
+  },
+
+CIC: {
+    bids: [
+      { price: 3.0, quantity: 4000 },
+      { price: 2.75, quantity: 10000 },
+      { price: 2.5, quantity: 16000 }
+    ],
+    asks: [
+      { price: 3.2, quantity: 3500 },
+      { price: 3.5, quantity: 9000 },
+      { price: 4.0, quantity: 14000 }
+    ]
+  },
+
+COOP: {
+    bids: [
+      { price: 29.0, quantity: 4000 },
+      { price: 28.75, quantity: 10000 },
+      { price: 28.5, quantity: 16000 }
+    ],
+    asks: [
+      { price: 29.2, quantity: 3500 },
+      { price: 29.5, quantity: 9000 },
+      { price: 30.0, quantity: 14000 }
+    ]
+  },
+
+EABL: {
+    bids: [
+      { price: 243.0, quantity: 4000 },
+      { price: 242.75, quantity: 10000 },
+      { price: 242.5, quantity: 16000 }
+    ],
+    asks: [
+      { price: 243.2, quantity: 3500 },
+      { price: 243.5, quantity: 9000 },
+      { price: 244.0, quantity: 14000 }
+    ]
+  },
+
+IMH: {
+    bids: [
+      { price: 43.0, quantity: 4000 },
+      { price: 42.75, quantity: 10000 },
+      { price: 42.5, quantity: 16000 }
+    ],
+    asks: [
+      { price: 43.2, quantity: 3500 },
+      { price: 43.5, quantity: 9000 },
+      { price: 44.0, quantity: 14000 }
+    ]
+  },
+
+
+
   KCB: {
     bids: [
       { price: 66.5, quantity: 3000 },
