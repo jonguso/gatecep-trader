@@ -2,21 +2,21 @@
   "AIB": {
     "broker": "AIB",
     "ledgerBalance": 400000,
-    "reserved": 321869.5,
+    "reserved": 392420.75,
     "pendingSettlement": 0,
     "currency": "KES"
   },
   "ABC": {
     "broker": "ABC",
     "ledgerBalance": 350000,
-    "reserved": 0,
+    "reserved": 70824,
     "pendingSettlement": 0,
     "currency": "KES"
   },
   "NCBA": {
     "broker": "NCBA",
     "ledgerBalance": 300000,
-    "reserved": 0,
+    "reserved": 72935,
     "pendingSettlement": 0,
     "currency": "KES"
   }

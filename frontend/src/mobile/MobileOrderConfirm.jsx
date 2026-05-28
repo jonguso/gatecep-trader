@@ -13,6 +13,8 @@ export default function MobileOrderConfirm() {
   const [price, setPrice] = useState(35);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [executionStrategy, setExecutionStrategy] =
+  useState("MARKET");
 
   async function executeOrder() {
     try {
@@ -25,11 +27,12 @@ export default function MobileOrderConfirm() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          symbol,
-          side,
-          quantity: Number(quantity),
-          price: Number(price)
-        })
+  symbol,
+  side,
+  quantity: Number(quantity),
+  price: Number(price),
+  executionStrategy
+})
       });
 
       const data = await res.json();
@@ -112,6 +115,34 @@ export default function MobileOrderConfirm() {
             </div>
           </div>
 
+<div className="mt-4">
+  <div className="text-sm text-slate-400 mb-2">
+    Execution Strategy
+  </div>
+
+  <div className="grid grid-cols-2 gap-2">
+    {[
+      "MARKET",
+      "LIMIT",
+      "TWAP",
+      "VWAP"
+    ].map((strategy) => (
+      <button
+        key={strategy}
+        onClick={() =>
+          setExecutionStrategy(strategy)
+        }
+        className={`rounded-xl py-3 text-sm font-bold border ${
+          executionStrategy === strategy
+            ? "bg-cyan-500 text-slate-950 border-cyan-400"
+            : "bg-slate-800 text-slate-300 border-slate-700"
+        }`}
+      >
+        {strategy}
+      </button>
+    ))}
+  </div>
+</div>
           <button
             onClick={executeOrder}
             disabled={loading}

@@ -25,7 +25,7 @@ export default function MobileStockDetails() {
     try {
       const [priceRes, bookRes] = await Promise.all([
         fetch(`${API_URL}/prices`),
-        fetch(`${API_URL}/matching/book/${symbol}`)
+        fetch(`${API_URL}/orderbook-depth/${symbol}`)
       ]);
 
       const priceData = await priceRes.json();
@@ -276,99 +276,6 @@ function SafetyRow({ label, value, ok }) {
         }
       >
         {value}
-      </div>
-    </div>
-  );
-}
-
-function OrderBookDepth({ book, symbol }) {
-  const bids = book?.bids || [];
-  const asks = book?.asks || [];
-
-  return (
-    <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 mt-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-white">
-          Market Depth
-        </h2>
-
-        <div className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300">
-          TAP TO TRADE
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-green-400 font-bold mb-2">
-            BIDS
-          </div>
-
-          <div className="space-y-2">
-            {bids.slice(0, 5).map((bid, index) => (
-              <a
-                key={`bid-${index}`}
-                href={`/mobile/order/${symbol}/BUY`}
-                className="block bg-green-500/10 border border-green-500/20 rounded-xl p-3 hover:bg-green-500/20 transition-colors"
-              >
-                <div className="flex justify-between">
-                  <span className="font-bold text-green-400">
-                    {Number(bid.price || 0).toFixed(2)}
-                  </span>
-
-                  <span className="text-slate-300">
-                    {Number(bid.quantity || 0).toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="text-[10px] text-green-300 mt-1">
-                  Tap to Buy
-                </div>
-              </a>
-            ))}
-
-            {bids.length === 0 && (
-              <div className="text-xs text-slate-500">
-                No bid orders.
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-red-400 font-bold mb-2">
-            ASKS
-          </div>
-
-          <div className="space-y-2">
-            {asks.slice(0, 5).map((ask, index) => (
-              <a
-                key={`ask-${index}`}
-                href={`/mobile/order/${symbol}/SELL`}
-                className="block bg-red-500/10 border border-red-500/20 rounded-xl p-3 hover:bg-red-500/20 transition-colors"
-              >
-                <div className="flex justify-between">
-                  <span className="font-bold text-red-400">
-                    {Number(ask.price || 0).toFixed(2)}
-                  </span>
-
-                  <span className="text-slate-300">
-                    {Number(ask.quantity || 0).toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="text-[10px] text-red-300 mt-1">
-                  Tap to Sell
-                </div>
-              </a>
-            ))}
-
-            {asks.length === 0 && (
-              <div className="text-xs text-slate-500">
-                No ask orders.
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );

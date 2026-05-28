@@ -1,4 +1,5 @@
 import express from "express";
+
 import {
   getExecutionQueue,
   cancelOrder
@@ -15,12 +16,25 @@ import {
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
-  const orders = await getExecutionQueue();
+router.get("/:id", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+
+  const queue = await getExecutionQueue();
+
+  const order = queue.find(
+    (item) => item.id === req.params.id
+  );
+
+  if (!order) {
+    return res.status(404).json({
+      ok: false,
+      error: "ORDER_NOT_FOUND"
+    });
+  }
 
   res.json({
     ok: true,
-    orders
+    order
   });
 });
 

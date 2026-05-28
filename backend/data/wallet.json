@@ -1,4 +1,14 @@
 {
-  "balance": 1000000,
-  "pendingOrders": 0
+  "balance": 1713113.75,
+  "ledgerBalance": 2000000,
+  "pendingOrders": 290060.25,
+  "pendingSettlement": 0,
+  "currency": "KES",
+  "updatedAt": "2026-05-28T23:31:46.862Z",
+  "lastTransaction": {
+    "type": "DEBIT",
+    "amount": 3174,
+    "note": "BUY reserve ABSA",
+    "createdAt": "2026-05-28T23:31:46.862Z"
+  }
 }
