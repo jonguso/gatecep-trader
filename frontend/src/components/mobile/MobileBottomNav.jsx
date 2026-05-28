@@ -76,8 +76,8 @@ const items = [
     path: "/mobile/portfolio"
   },
   {
-    label: "Alerts",
-    path: "/mobile/notifications",
+    label: "Wallet",
+    path: "/mobile/Wallet",
     badge: true
   }
 ];
