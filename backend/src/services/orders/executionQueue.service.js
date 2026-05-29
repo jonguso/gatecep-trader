@@ -32,9 +32,6 @@ import { enqueueExecutionJob } from "../queue/redisExecutionQueue.service.js";
 import {
   simulateDepthFill
 } from "../market/liquidityDepth.service.js";
-import {
-  selectBestBroker
-} from "../execution/smartOrderRouter.service.js";
 
 import {
   savePersistentOrder
@@ -114,19 +111,10 @@ export function queueOrder(order) {
   const quantity = Number(order.quantity || 0);
   const price = Number(order.price || 0);
 
-  const brokerDecision = selectBestBroker({
-  symbol: order.symbol,
-  side: order.side,
-  quantity,
-  price,
-  preferredBroker:
-    order.broker ||
-    order.brokerId ||
-    getPreferredBroker()
-});
-
 const selectedBroker =
-  brokerDecision.selectedBroker;
+  order.broker ||
+  order.brokerId ||
+  getPreferredBroker();
 
   const estimatedTradeValue = quantity * price;
 
@@ -230,8 +218,6 @@ if (order.side === "BUY") {
   quantity,
   price,
   broker: selectedBroker,
-
-  routingDecision: brokerDecision,
 
   status: "QUEUED",
   brokerStatus: "PENDING",
@@ -402,6 +388,14 @@ function updateOrder(orderId, updates, eventMessage) {
 function rejectOrder(orderId, reason) {
   const order = getOrderById(orderId);
 
+if (
+  !order ||
+  ["FILLED", "CANCELLED"].includes(order.status) ||
+  Number(order.remainingQuantity || 0) <= 0
+) {
+  return;
+}
+
   if (
     order &&
     order.side === "BUY" &&
@@ -478,9 +472,13 @@ function retryOrder(orderId, reason) {
 async function applyFill(orderId, fillQty, fillPrice) {
   const order = getOrderById(orderId);
 
-  if (!order || order.status === "CANCELLED") {
-    return;
-  }
+  if (
+  !order ||
+  ["CANCELLED", "REJECTED", "FILLED"].includes(order.status) ||
+  Number(order.remainingQuantity || 0) <= 0
+) {
+  return;
+}
 
   const previousFilled =
     Number(order.filledQuantity || 0);

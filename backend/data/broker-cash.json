@@ -9,7 +9,7 @@
   "ABC": {
     "broker": "ABC",
     "ledgerBalance": 350000,
-    "reserved": 70824,
+    "reserved": 77437.2,
     "pendingSettlement": 0,
     "currency": "KES"
   },
