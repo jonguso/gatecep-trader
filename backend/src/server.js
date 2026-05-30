@@ -45,6 +45,21 @@ import {
 } from "./services/notifications/notificationEngine.service.js";
 
 import { brokerRouter } from "./routes/brokerRoutes.js";
+import brokerReportImportRouter
+from "./routes/brokerReportImport.routes.js";
+import coachGBrokerMirrorRouter from "./routes/coachGBrokerMirror.routes.js";
+import brokerPortfolioRouter
+from "./routes/brokerPortfolio.routes.js";
+import brokerMirrorRebalanceRouter from "./routes/brokerMirrorRebalance.routes.js";
+import brokerMirrorHeatmapRouter
+from "./routes/brokerMirrorHeatmap.routes.js";
+import brokerExplainRouter
+from "./routes/brokerExplain.routes.js";
+import brokerMirrorActionsRouter from "./routes/brokerMirrorActions.routes.js";
+import brokerMirrorScoreRouter
+from "./routes/brokerMirrorScore.routes.js";
+import investmentPlannerRouter
+from "./routes/investmentPlanner.routes.js";
 
 import executionRouter from "./routes/execution.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
@@ -191,6 +206,36 @@ app.use("/trade-journal", tradeJournalRouter);
 app.use("/wallet/ledger", walletLedgerRouter);
 app.use("/broker-cash", brokerCashRouter);
 app.use("/orders", ordersRouter);
+app.use(
+   "/broker-reports",
+   brokerReportImportRouter
+);
+app.use("/coach-g/broker-mirror", coachGBrokerMirrorRouter);
+app.use(
+ "/broker-portfolio",
+ brokerPortfolioRouter
+);
+app.use("/broker-mirror-rebalance", brokerMirrorRebalanceRouter);
+app.use(
+ "/broker-heatmap",
+ brokerMirrorHeatmapRouter
+);
+app.use(
+ "/broker-explain",
+ brokerExplainRouter
+);
+app.use(errorHandler);
+app.use("/broker-mirror/action", brokerMirrorActionsRouter);
+app.use(
+ "/broker-mirror-score",
+ brokerMirrorScoreRouter
+);
+app.use(
+ "/investment-planner",
+ investmentPlannerRouter
+);
+
+
 app.use("/system/reset", systemResetRoutes);
 app.use("/orderbook-depth", orderBookDepthRoutes);
 app.use(

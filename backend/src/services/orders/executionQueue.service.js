@@ -32,6 +32,9 @@ import { enqueueExecutionJob } from "../queue/redisExecutionQueue.service.js";
 import {
   simulateDepthFill
 } from "../market/liquidityDepth.service.js";
+import {
+  selectBestBroker
+} from "../execution/smartOrderRouter.service.js";
 
 import {
   savePersistentOrder
@@ -111,10 +114,19 @@ export function queueOrder(order) {
   const quantity = Number(order.quantity || 0);
   const price = Number(order.price || 0);
 
+const brokerDecision = selectBestBroker({
+  symbol: order.symbol,
+  side: order.side,
+  quantity,
+  price,
+  preferredBroker:
+    order.broker ||
+    order.brokerId ||
+    getPreferredBroker()
+});
+
 const selectedBroker =
-  order.broker ||
-  order.brokerId ||
-  getPreferredBroker();
+  brokerDecision.selectedBroker;
 
   const estimatedTradeValue = quantity * price;
 
@@ -218,6 +230,8 @@ if (order.side === "BUY") {
   quantity,
   price,
   broker: selectedBroker,
+  
+   routingDecision: brokerDecision,
 
   status: "QUEUED",
   brokerStatus: "PENDING",

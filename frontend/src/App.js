@@ -48,6 +48,9 @@ import MobileFunds from "./mobile/MobileFunds";
 import MobileBrokerTreasury from "./mobile/MobileBrokerTreasury";
 import MobileOrders from "./mobile/MobileOrders";
 import MobileModifyOrder from "./mobile/MobileModifyOrder";
+import MobileBrokerMirrorRebalance from "./mobile/MobileBrokerMirrorRebalance";
+import MobileBrokerMirrorHome from "./mobile/MobileBrokerMirrorHome";
+import MobileBrokerUpload from "./mobile/MobileBrokerUpload";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -412,6 +415,21 @@ function AppRoutes() {
 <Route
   path="/mobile/orders/:id/modify"
   element={<MobileModifyOrder />}
+/>
+
+<Route
+  path="/mobile/broker-rebalance"
+  element={<MobileBrokerMirrorRebalance />}
+/>
+
+<Route 
+path="/mobile/broker-home" 
+element={<MobileBrokerMirrorHome />}
+/>
+
+<Route 
+path="/mobile/broker-upload" 
+element={<MobileBrokerUpload />} 
 />
 
 </Routes>
