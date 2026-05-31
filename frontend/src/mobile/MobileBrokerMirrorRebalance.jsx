@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   PieChart,
   Pie,
@@ -23,10 +24,10 @@ const COLORS = [
 ];
 
 export default function MobileBrokerMirrorRebalance() {
+  const navigate = useNavigate();
+
   const [plan, setPlan] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
-  const [expandedSector, setExpandedSector] = useState(null);
-
   const [showSimulator, setShowSimulator] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
@@ -72,6 +73,28 @@ export default function MobileBrokerMirrorRebalance() {
     loadPlan();
   }, [risk]);
 
+  useEffect(() => {
+    document.body.style.overflow = showSimulator ? "hidden" : "auto";
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showSimulator]);
+
+  useEffect(() => {
+    function handleEsc(event) {
+      if (event.key === "Escape") {
+        setShowSimulator(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleEsc);
+
+    return () => {
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
   const sectorRows = useMemo(() => {
     const grouped = heatmap.reduce((acc, item) => {
       const sector = item.sector || "Unknown";
@@ -93,7 +116,9 @@ export default function MobileBrokerMirrorRebalance() {
     }, {});
 
     return Object.values(grouped).sort(
-      (a, b) => Number(b.totalValue || 0) - Number(a.totalValue || 0)
+      (a, b) =>
+        Number(b.totalValue || 0) -
+        Number(a.totalValue || 0)
     );
   }, [heatmap]);
 
@@ -110,20 +135,22 @@ export default function MobileBrokerMirrorRebalance() {
     availableCash: plan.score?.cashSummary?.ledgerBalance || 0,
     netWorth: plan.score?.netWorth || 0,
     profitLoss: heatmap.reduce(
-      (sum, x) => sum + Number(x.profitLoss || 0),
+      (sum, item) => sum + Number(item.profitLoss || 0),
       0
     ),
     profitLossPct:
       heatmap.length > 0
         ? heatmap.reduce(
-            (sum, x) => sum + Number(x.changePct || 0),
+            (sum, item) => sum + Number(item.changePct || 0),
             0
           ) / heatmap.length
         : 0
   };
 
+  const largestSector = sectorRows[0];
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 pb-32">
+    <div className="min-h-screen bg-slate-950 text-white p-4 pb-16">
       <h1 className="text-2xl font-bold">
         Coach G Portfolio Analysis
       </h1>
@@ -191,9 +218,9 @@ export default function MobileBrokerMirrorRebalance() {
         <SmallCard
           label="Largest Sector"
           value={
-            sectorRows[0]
-              ? `${sectorRows[0].sector} (${percent(
-                  sectorRows[0].totalValue,
+            largestSector
+              ? `${largestSector.sector} (${percent(
+                  largestSector.totalValue,
                   summary.portfolioValue
                 )}%)`
               : "N/A"
@@ -224,6 +251,19 @@ export default function MobileBrokerMirrorRebalance() {
           <div style={{ width: "100%", height: 340 }}>
             <ResponsiveContainer>
               <PieChart>
+                <defs>
+                  <filter id="glow">
+                    <feGaussianBlur
+                      stdDeviation="3"
+                      result="coloredBlur"
+                    />
+                    <feMerge>
+                      <feMergeNode in="coloredBlur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+
                 <Pie
                   data={sectorRows.map((sector) => ({
                     name: sector.sector,
@@ -235,12 +275,31 @@ export default function MobileBrokerMirrorRebalance() {
                   }))}
                   dataKey="value"
                   nameKey="name"
-                  innerRadius={70}
-                  outerRadius={120}
+                  innerRadius={80}
+                  outerRadius={135}
                   paddingAngle={2}
-                  label={({ weight }) =>
-                    `${Number(weight || 0).toFixed(2)}%`
-                  }
+                  label={({ cx, cy, midAngle, outerRadius, weight }) => {
+                    const RADIAN = Math.PI / 180;
+                    const radius = outerRadius + 24;
+                    const x =
+                      cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y =
+                      cy + radius * Math.sin(-midAngle * RADIAN);
+
+                    return (
+                      <text
+                        x={x}
+                        y={y}
+                        fill="white"
+                        textAnchor={x > cx ? "start" : "end"}
+                        dominantBaseline="central"
+                        fontSize={12}
+                        fontWeight={700}
+                      >
+                        {Number(weight || 0).toFixed(2)}%
+                      </text>
+                    );
+                  }}
                 >
                   {sectorRows.map((_, index) => (
                     <Cell
@@ -258,17 +317,38 @@ export default function MobileBrokerMirrorRebalance() {
                 />
 
                 <text
+                  filter="url(#glow)"
                   x="50%"
                   y="50%"
                   textAnchor="middle"
                   dominantBaseline="middle"
                   fill="white"
                 >
-                  <tspan x="50%" dy="-0.8em" fontSize="14">
+                  <tspan
+                    x="50%"
+                    dy="-0.5em"
+                    fontSize="12"
+                    fill="#94a3b8"
+                  >
                     Total Value
                   </tspan>
-                  <tspan x="50%" dy="1.5em" fontSize="22" fontWeight="bold">
-                    KES {money(summary.portfolioValue)}
+
+                  <tspan
+                    x="50%"
+                    dy="1.4em"
+                    fontSize="10"
+                    fill="#94a3b8"
+                  >
+                    KES
+                  </tspan>
+
+                  <tspan
+                    x="50%"
+                    dy="1.3em"
+                    fontSize="18"
+                    fontWeight="bold"
+                  >
+                    {money(summary.portfolioValue)}
                   </tspan>
                 </text>
               </PieChart>
@@ -302,7 +382,10 @@ export default function MobileBrokerMirrorRebalance() {
                 </div>
 
                 <div className="text-right">
-                  {percent(sector.totalValue, summary.portfolioValue)}%
+                  {percent(
+                    sector.totalValue,
+                    summary.portfolioValue
+                  )}%
                 </div>
               </div>
             ))}
@@ -310,16 +393,14 @@ export default function MobileBrokerMirrorRebalance() {
         </div>
       </div>
 
-     <button
-  onClick={() => {
-    window.location.href = "/mobile/holding-details";
-  }}
-  className="w-full bg-slate-900 border border-cyan-500/30 rounded-2xl p-4 mt-6 font-bold text-cyan-300"
->
-  Holding Details
-</button>
+      <button
+        onClick={() => navigate("/mobile/holding-details")}
+        className="w-full bg-slate-900 border border-cyan-500/30 rounded-2xl p-4 mt-6 font-bold text-cyan-300"
+      >
+        Holding Details
+      </button>
 
-       <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mt-5">
+      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mt-5">
         <div className="font-bold text-yellow-300">
           Coach G Risk Alert
         </div>
@@ -335,30 +416,26 @@ export default function MobileBrokerMirrorRebalance() {
           setShowSimulator(true);
           setShowResults(false);
         }}
-        className="
-fixed
-bottom-24
-left-4
-right-4
-z-20
-bg-purple-600
-rounded-2xl
-p-4
-font-bold
-shadow-lg
-"
+        className="w-full mt-6 bg-purple-600 rounded-2xl p-4 font-bold shadow-lg"
       >
         Simulate Coach G Recommendations
       </button>
 
       {showSimulator && (
-        <div className="fixed inset-0 bg-black/70 flex items-end z-50">
-          <div className="bg-slate-950 border-t border-purple-500/40 rounded-t-3xl p-5 w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 overflow-y-auto pt-8 pb-8"
+          onClick={() => setShowSimulator(false)}
+        >
+          <div
+            className="bg-slate-950 border border-purple-500/40 rounded-3xl p-5 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="text-xl font-bold text-purple-300">
                   Coach G Investment Simulator
                 </h2>
+
                 <p className="text-sm text-slate-400 mt-1">
                   Test how new money could improve your portfolio.
                 </p>
@@ -372,38 +449,28 @@ shadow-lg
               </button>
             </div>
 
-            <div className="mt-5">
-              <label className="text-sm text-slate-400">
-                Investment Goal
-              </label>
+            <FormSelect
+              label="Investment Goal"
+              value={goal}
+              onChange={setGoal}
+              options={[
+                ["wealth_growth", "Wealth Growth"],
+                ["dividend", "Dividend Income"],
+                ["balanced_growth", "Balanced Growth"],
+                ["preservation", "Capital Preservation"]
+              ]}
+            />
 
-              <select
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
-              >
-                <option value="wealth_growth">Wealth Growth</option>
-                <option value="dividend">Dividend Income</option>
-                <option value="balanced_growth">Balanced Growth</option>
-                <option value="preservation">Capital Preservation</option>
-              </select>
-            </div>
-
-            <div className="mt-5">
-              <label className="text-sm text-slate-400">
-                Scenario
-              </label>
-
-              <select
-                value={risk}
-                onChange={(e) => setRisk(e.target.value)}
-                className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
-              >
-                <option value="conservative">Conservative</option>
-                <option value="balanced">Balanced</option>
-                <option value="aggressive">Aggressive</option>
-              </select>
-            </div>
+            <FormSelect
+              label="Scenario"
+              value={risk}
+              onChange={setRisk}
+              options={[
+                ["conservative", "Conservative"],
+                ["balanced", "Balanced"],
+                ["aggressive", "Aggressive"]
+              ]}
+            />
 
             <div className="mt-5">
               <label className="text-sm text-slate-400">
@@ -413,8 +480,29 @@ shadow-lg
               <input
                 type="number"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(event) => setAmount(event.target.value)}
                 className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
+              />
+            </div>
+
+            <div className="mt-5">
+              <div className="flex justify-between">
+                <label className="text-sm text-slate-400">
+                  Rebalance Intensity
+                </label>
+
+                <span className="text-purple-300 font-bold">
+                  {intensity}%
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={intensity}
+                onChange={(event) => setIntensity(event.target.value)}
+                className="w-full mt-3"
               />
             </div>
 
@@ -436,7 +524,10 @@ shadow-lg
                   </div>
 
                   <div className="text-xl font-bold mt-2">
-                    KES {money(plan.investmentPlan.projectedPortfolioValue)}
+                    KES{" "}
+                    {money(
+                      plan.investmentPlan.projectedPortfolioValue
+                    )}
                   </div>
 
                   <div className="text-sm text-slate-400 mt-2">
@@ -486,6 +577,7 @@ function Metric({ label, value, color }) {
       <div className="text-xs text-slate-400">
         {label}
       </div>
+
       <div className={`${color} text-xl font-bold`}>
         {value}
       </div>
@@ -504,9 +596,32 @@ function SmallCard({
       <div className="text-xs text-slate-400">
         {label}
       </div>
+
       <div className={`${color} font-bold`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function FormSelect({ label, value, onChange, options }) {
+  return (
+    <div className="mt-5">
+      <label className="text-sm text-slate-400">
+        {label}
+      </label>
+
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -521,5 +636,7 @@ function money(value) {
 function percent(value, total) {
   if (!total) return "0.00";
 
-  return Number((Number(value || 0) / Number(total || 1)) * 100).toFixed(2);
+  return Number(
+    (Number(value || 0) / Number(total || 1)) * 100
+  ).toFixed(2);
 }
