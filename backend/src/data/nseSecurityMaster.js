@@ -1,6 +1,7 @@
 export const nseSecurityMaster = {
   EQT: {
     symbol: "EQT",
+    aliases: ["EQTY"],
     name: "Equity Group Holdings PLC",
     sector: "Banking",
     price: 75.25
@@ -16,7 +17,7 @@ export const nseSecurityMaster = {
  ],
  name:"I&M Group PLC",
  sector:"Banking",
- price:50.50
+ price: 50.50
 },
 
   DTK: {
@@ -26,6 +27,14 @@ export const nseSecurityMaster = {
     sector: "Banking",
     price: 149.00
   },
+
+NCBA: {
+    symbol: "NCBA",
+    name: "NCBA Group PLC",
+    sector: "Banking",
+    price: 88.00
+  },
+
 
   KCB: {
     symbol: "KCB",
@@ -58,7 +67,7 @@ export const nseSecurityMaster = {
 KQ: {
     symbol: "KQ",
     name: "Kenya Airways",
-    sector: "Commercial and Services",
+    sector: "Comm. and Services",
     price: 5.88
   },
 
@@ -66,21 +75,21 @@ KQ: {
   SCOM: {
     symbol: "SCOM",
     name: "Safaricom PLC",
-    sector: "Telecommunication",
+    sector: "Telecom",
     price: 30.60
   },
 
   BAT: {
     symbol: "BAT",
     name: "British American Tobacco Kenya PLC",
-    sector: "Manufacturing and Allied",
+    sector: "Mfg. and Allied",
     price: 520.00
   },
 
   EABL: {
     symbol: "EABL",
     name: "East African Breweries PLC",
-    sector: "Manufacturing and Allied",
+    sector: "Mfg. and Allied",
     price: 248.00
   },
 
@@ -89,7 +98,7 @@ GLD:{
  aliases:["NEWGOLD"],
  name:"ABSA NewGold ETF",
  sector:"ETF",
- price:5650.00
+ price: 5650.00
 },
 
 KEGN:{
@@ -97,7 +106,7 @@ KEGN:{
  aliases:["KENGEN"],
  name:"KenGen PLC",
  sector:"Energy and Petroleum",
- price:9.12
+ price: 9.12
 },
 
 KNRE:{
@@ -105,7 +114,7 @@ KNRE:{
  aliases:["KENYA RE"],
  name:"Kenya Re",
  sector:"Insurance",
- price:3.34
+ price: 3.34
 },
 
 KPC: {
@@ -119,7 +128,7 @@ KPLC:{
  symbol:"KPLC",
  name:"Kenya Power",
  sector:"Energy and Petroleum",
- price:16.10
+ price: 16.10
 },
 
 
@@ -128,7 +137,7 @@ SBIC:{
  aliases:["STANBIC"],
  name:"Stanbic Holdings PLC",
  sector:"Banking",
- price:270
+ price: 270.00
 },
 
 SMWF:{
@@ -136,13 +145,13 @@ SMWF:{
  aliases:["SANLAM WORLD ETF"],
  name:"Sanlam MSCI World ETF",
  sector:"ETF",
- price:940.00
+ price: 940.00
 },
   SCBK:{
     symbol:"SCBK",
     name:"Standard Chartered Bank Kenya Ltd",
     sector:"Banking",
-    price:336.00
+    price: 336.00
   }
 
 };

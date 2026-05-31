@@ -30,6 +30,7 @@ export default function MobileBrokerMirrorRebalance() {
   const [heatmap, setHeatmap] = useState([]);
   const [showSimulator, setShowSimulator] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [selectedSector, setSelectedSector] = useState(null);
 
   const [risk, setRisk] = useState("balanced");
   const [goal, setGoal] = useState("balanced_growth");
@@ -149,6 +150,47 @@ export default function MobileBrokerMirrorRebalance() {
 
   const largestSector = sectorRows[0];
 
+const diversificationScore =
+Math.min(
+sectorRows.length * 4,
+30
+);
+
+const cashScore =
+summary.availableCash > 5000
+? 20
+: summary.availableCash > 1000
+? 12
+: 5;
+
+const riskPenalty =
+plan.score?.rating === "HIGH_RISK"
+? 20
+: 8;
+
+const profitScore =
+summary.profitLoss > 0
+? 20
+: -10;
+
+const healthScore =
+Math.max(
+0,
+
+Math.min(
+
+100,
+
+diversificationScore +
+cashScore +
+profitScore -
+riskPenalty +
+40
+
+)
+
+);
+
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 pb-16">
       <h1 className="text-2xl font-bold">
@@ -265,20 +307,38 @@ export default function MobileBrokerMirrorRebalance() {
                 </defs>
 
                 <Pie
-                  data={sectorRows.map((sector) => ({
-                    name: sector.sector,
-                    value: sector.totalValue,
-                    weight:
-                      summary.portfolioValue > 0
-                        ? (sector.totalValue / summary.portfolioValue) * 100
-                        : 0
-                  }))}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={80}
-                  outerRadius={135}
-                  paddingAngle={2}
-                  label={({ cx, cy, midAngle, outerRadius, weight }) => {
+ data={sectorRows.map((sector)=>({
+
+name: sector.sector,
+
+value: sector.totalValue,
+
+weight:
+summary.portfolioValue>0
+? (sector.totalValue/summary.portfolioValue)*100
+:0
+
+}))}
+
+onClick={(data) => {
+  const sector = sectorRows.find(
+    (item) => item.sector === data.name
+  );
+
+  setSelectedSector(sector || null);
+}}
+
+ style={{
+cursor:"pointer"
+}}
+
+ dataKey="value"
+ nameKey="name"
+ innerRadius={80}
+ outerRadius={135}
+ paddingAngle={2}
+
+                    label={({ cx, cy, midAngle, outerRadius, weight }) => {
                     const RADIAN = Math.PI / 180;
                     const radius = outerRadius + 24;
                     const x =
@@ -364,9 +424,12 @@ export default function MobileBrokerMirrorRebalance() {
 
             {sectorRows.map((sector, index) => (
               <div
-                key={sector.sector}
-                className="grid grid-cols-3 items-center py-3 border-b border-slate-800 text-sm"
-              >
+  key={sector.sector}
+
+  onClick={() => setSelectedSector(sector)}
+
+  className="grid grid-cols-3 items-center py-3 border-b border-slate-800 text-sm cursor-pointer active:scale-[0.98] transition"
+>
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full"
@@ -374,7 +437,16 @@ export default function MobileBrokerMirrorRebalance() {
                       background: COLORS[index % COLORS.length]
                     }}
                   />
-                  <span>{sector.sector}</span>
+
+                  <span
+  className={
+    sector.totalProfitLoss >= 0
+      ? "text-green-300"
+      : "text-red-300"
+  }
+>
+  {sector.totalProfitLoss >= 0 ? "▲" : "▼"} {sector.sector}
+</span>
                 </div>
 
                 <div className="text-right">
@@ -391,7 +463,171 @@ export default function MobileBrokerMirrorRebalance() {
             ))}
           </div>
         </div>
+
       </div>
+
+
+
+<div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4 mt-5">
+  <div className="font-bold text-cyan-300">
+    Coach G Recommendations
+  </div>
+
+  <div className="mt-3 space-y-2 text-sm text-slate-300">
+    <div>
+      • Largest exposure is{" "}
+      <span className="font-bold text-purple-300">
+        {largestSector?.sector || "N/A"}
+      </span>
+      . Avoid adding more unless it supports your goal.
+    </div>
+
+    <div>
+      • Use new money to strengthen underrepresented sectors.
+    </div>
+
+    <div>
+      • Since available cash is{" "}
+      <span className="font-bold text-green-300">
+        KES {money(summary.availableCash)}
+      </span>
+      , Coach G will prioritize future deposits or new investment amounts.
+    </div>
+
+    <div>
+      • Open simulator to test how new capital changes allocation.
+    </div>
+  </div>
+</div>
+
+<div className="
+bg-slate-900
+border
+border-slate-800
+rounded-2xl
+p-5
+mt-5
+">
+
+<div className="
+flex
+justify-between
+items-center
+">
+
+<div>
+
+<div className="
+text-slate-400
+text-sm
+">
+
+Portfolio Health
+
+</div>
+
+<div className="
+text-3xl
+font-bold
+text-cyan-300
+">
+
+{healthScore}/100
+
+</div>
+
+</div>
+
+<div className="
+text-right
+text-xs
+text-slate-400
+">
+
+Coach G Score
+
+</div>
+
+</div>
+
+<div className="
+mt-4
+space-y-2
+text-sm
+">
+
+<div className="
+flex
+justify-between
+">
+
+<span>Diversification</span>
+
+<span className="text-cyan-300">
+
++{diversificationScore}
+
+</span>
+
+</div>
+
+<div className="
+flex
+justify-between
+">
+
+<span>Cash Position</span>
+
+<span className="text-green-300">
+
++{cashScore}
+
+</span>
+
+</div>
+
+<div className="
+flex
+justify-between
+">
+
+<span>Risk Exposure</span>
+
+<span className="text-red-300">
+
+-{riskPenalty}
+
+</span>
+
+</div>
+
+<div className="
+flex
+justify-between
+">
+
+<span>Profitability</span>
+
+<span className={
+summary.profitLoss>=0
+?
+"text-green-300"
+:
+"text-red-300"
+}
+>
+
+{profitScore>=0?"+":""}
+
+{profitScore}
+
+</span>
+
+</div>
+
+</div>
+
+</div>
 
       <button
         onClick={() => navigate("/mobile/holding-details")}
@@ -420,6 +656,52 @@ export default function MobileBrokerMirrorRebalance() {
       >
         Simulate Coach G Recommendations
       </button>
+
+     {selectedSector && (
+  <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center overflow-y-auto pt-8 pb-8">
+    <div className="bg-slate-950 border border-cyan-500/40 rounded-3xl p-5 w-full max-w-3xl mx-4">
+      <div className="flex justify-between">
+        <h2 className="text-xl font-bold text-cyan-300">
+          {selectedSector.sector}
+        </h2>
+
+        <button
+          onClick={() => setSelectedSector(null)}
+          className="text-slate-400"
+        >
+          Close
+        </button>
+      </div>
+
+      <p className="text-sm text-slate-400 mt-2">
+        {selectedSector.securities.length} securities • KES {money(selectedSector.totalValue)}
+      </p>
+
+      <div className="mt-5 space-y-3">
+        {selectedSector.securities.map((sec) => (
+          <div
+            key={sec.symbol}
+            className="bg-slate-900 rounded-2xl p-4 border border-slate-800"
+          >
+            <div className="flex justify-between">
+              <div className="font-bold">{sec.symbol}</div>
+              <div className={sec.profitLoss >= 0 ? "text-green-300" : "text-red-300"}>
+                KES {money(sec.profitLoss)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-3 text-xs text-slate-400">
+              <div>Qty: {Number(sec.quantity || 0).toLocaleString()}</div>
+              <div>Price: KES {money(sec.price)}</div>
+              <div>Value: KES {money(sec.value)}</div>
+              <div>Return: {Number(sec.changePct || 0).toFixed(2)}%</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
 
       {showSimulator && (
         <div
