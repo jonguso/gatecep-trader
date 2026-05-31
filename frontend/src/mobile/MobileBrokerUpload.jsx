@@ -7,13 +7,12 @@ const API_URL =
 
 const documentTypes = [
   {
-    type: "holdings",
-    title: "Holdings Report",
-    required: true,
-    description:
-      "Shows shares you currently own. Required for portfolio analysis.",
-    examples: "Security Code, Security Name, Quantity"
-  },
+  type: "valuation",
+  title: "Portfolio Valuation",
+  required: true,
+  description: "Primary report for Coach G analysis. Includes quantity, average price, market value, and profit/loss.",
+  examples: "Security, Quantity, Avg.Price, Market Price, Market Value, Profit / Loss"
+},
   {
     type: "transactions",
     title: "Transaction History",
@@ -23,13 +22,12 @@ const documentTypes = [
     examples: "Date, Symbol, Buy/Sell, Quantity, Price"
   },
   {
-    type: "valuation",
-    title: "Portfolio Valuation",
-    required: false,
-    description:
-      "Shows broker-calculated market value. Useful for reconciliation.",
-    examples: "Symbol, Quantity, Market Price, Market Value"
-  },
+  type: "holdings",
+  title: "Holdings Report",
+  required: false,
+  description: "Shows shares you currently own. Optional fallback if valuation is unavailable.",
+  examples: "Security Code, Security Name, Quantity"
+},
   {
     type: "cash",
     title: "Cash / Ledger Statement",
@@ -44,7 +42,7 @@ export default function MobileBrokerUpload() {
   const navigate = useNavigate();
 
   const [broker, setBroker] = useState("AIB");
-  const [selectedType, setSelectedType] = useState("holdings");
+  const [selectedType, setSelectedType] = useState("valuation");
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("");
 
@@ -82,8 +80,14 @@ export default function MobileBrokerUpload() {
 
       if (data.ok) {
         setStatus(
-          `Upload completed. Imported ${data.count} records.`
-        );
+  `Upload completed. Imported ${
+    data.imported ?? data.count ?? 0
+  } records. Stored ${
+    data.storedCount ?? data.count ?? 0
+  } records. Duplicates skipped ${
+    data.duplicatesSkipped ?? 0
+  }.`
+);
       } else {
         setStatus(data.error || "Upload failed.");
       }

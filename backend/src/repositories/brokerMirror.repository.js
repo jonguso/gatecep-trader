@@ -130,7 +130,8 @@ function mergeUniqueRows(
 export function saveBrokerMirror(
   broker,
   reportType,
-  data
+  data,
+  options = {}
 ) {
   const mirror = readMirror();
 
@@ -145,11 +146,13 @@ export function saveBrokerMirror(
     mirror[reportType][normalizedBroker] || [];
 
   const merged =
-    mergeUniqueRows(
-      existing,
-      data,
-      reportType
-    );
+    options.replace
+      ? data
+      : mergeUniqueRows(
+          existing,
+          data,
+          reportType
+        );
 
   mirror[reportType][normalizedBroker] = merged;
 

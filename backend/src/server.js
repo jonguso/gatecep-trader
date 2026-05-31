@@ -60,6 +60,9 @@ import brokerMirrorScoreRouter
 from "./routes/brokerMirrorScore.routes.js";
 import investmentPlannerRouter
 from "./routes/investmentPlanner.routes.js";
+import brokerAccountSummaryRouter from "./routes/brokerAccountSummary.routes.js";
+import brokerSettlementRouter from "./routes/brokerSettlement.routes.js";
+import brokerCashSummaryRouter from "./routes/brokerCashSummary.routes.js";
 
 import executionRouter from "./routes/execution.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
@@ -215,11 +218,13 @@ app.use(
  "/broker-portfolio",
  brokerPortfolioRouter
 );
+app.use("/broker-settlement", brokerSettlementRouter);
 app.use("/broker-mirror-rebalance", brokerMirrorRebalanceRouter);
 app.use(
  "/broker-heatmap",
  brokerMirrorHeatmapRouter
 );
+app.use("/broker-cash-summary", brokerCashSummaryRouter);
 app.use(
  "/broker-explain",
  brokerExplainRouter
@@ -234,6 +239,7 @@ app.use(
  "/investment-planner",
  investmentPlannerRouter
 );
+app.use("/broker-account-summary", brokerAccountSummaryRouter);
 
 
 app.use("/system/reset", systemResetRoutes);

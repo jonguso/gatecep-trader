@@ -1,37 +1,57 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip
+} from "recharts";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
   "http://localhost:4000";
 
+const COLORS = [
+  "#06b6d4",
+  "#8b5cf6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#3b82f6",
+  "#ec4899",
+  "#14b8a6"
+];
+
 export default function MobileBrokerMirrorRebalance() {
   const [plan, setPlan] = useState(null);
-  const [risk, setRisk] = useState("balanced");
   const [heatmap, setHeatmap] = useState([]);
   const [expandedSector, setExpandedSector] = useState(null);
 
-  const [selectedExplanation, setSelectedExplanation] = useState(null);
-  const [loadingExplanation, setLoadingExplanation] = useState(false);
-
   const [showSimulator, setShowSimulator] = useState(false);
   const [showResults, setShowResults] = useState(false);
+
+  const [risk, setRisk] = useState("balanced");
+  const [goal, setGoal] = useState("balanced_growth");
   const [amount, setAmount] = useState(10000);
   const [intensity, setIntensity] = useState(50);
-  const [goal, setGoal] = useState("balanced_growth");
 
   async function loadPlan() {
+    const scoreRes = await fetch(`${API_URL}/broker-mirror-score/AIB`);
+    const score = await scoreRes.json();
+
     const rebalanceRes = await fetch(
       `${API_URL}/broker-mirror-rebalance/AIB?risk=${risk}`
     );
-
     const rebalance = await rebalanceRes.json();
-    setPlan(rebalance);
 
-    const heatmapRes = await fetch(
-      `${API_URL}/broker-heatmap/AIB`
-    );
-
+    const heatmapRes = await fetch(`${API_URL}/broker-heatmap/AIB`);
     const heatmapData = await heatmapRes.json();
+
+    setPlan({
+      ...rebalance,
+      score
+    });
+
     setHeatmap(heatmapData.heatmap || []);
   }
 
@@ -48,32 +68,12 @@ export default function MobileBrokerMirrorRebalance() {
     }));
   }
 
-  async function openExplanation(symbol) {
-    try {
-      setLoadingExplanation(true);
-
-      const res = await fetch(
-        `${API_URL}/broker-explain/AIB/${symbol}`
-      );
-
-      const data = await res.json();
-      setSelectedExplanation(data);
-    } catch (error) {
-      setSelectedExplanation({
-        ok: false,
-        error: error.message
-      });
-    } finally {
-      setLoadingExplanation(false);
-    }
-  }
-
   useEffect(() => {
     loadPlan();
   }, [risk]);
 
-  const groupedSectors = useMemo(() => {
-    return heatmap.reduce((acc, item) => {
+  const sectorRows = useMemo(() => {
+    const grouped = heatmap.reduce((acc, item) => {
       const sector = item.sector || "Unknown";
 
       if (!acc[sector]) {
@@ -81,36 +81,49 @@ export default function MobileBrokerMirrorRebalance() {
           sector,
           securities: [],
           totalValue: 0,
-          totalTrend: 0
+          totalProfitLoss: 0
         };
       }
 
       acc[sector].securities.push(item);
       acc[sector].totalValue += Number(item.value || 0);
-      acc[sector].totalTrend += Number(item.changePct || 0);
+      acc[sector].totalProfitLoss += Number(item.profitLoss || 0);
 
       return acc;
     }, {});
-  }, [heatmap]);
 
-  const sectorRows = useMemo(() => {
-    return Object.values(groupedSectors).sort(
+    return Object.values(grouped).sort(
       (a, b) => Number(b.totalValue || 0) - Number(a.totalValue || 0)
     );
-  }, [groupedSectors]);
-
-  const largestSector = sectorRows[0];
+  }, [heatmap]);
 
   if (!plan) {
     return (
-      <div className="min-h-screen bg-slate-950 p-4 text-white">
-        Loading Coach G advisory plan...
+      <div className="min-h-screen bg-slate-950 text-white p-5">
+        Loading Coach G...
       </div>
     );
   }
 
+  const summary = {
+    portfolioValue: plan.score?.totalValue || 0,
+    availableCash: plan.score?.cashSummary?.ledgerBalance || 0,
+    netWorth: plan.score?.netWorth || 0,
+    profitLoss: heatmap.reduce(
+      (sum, x) => sum + Number(x.profitLoss || 0),
+      0
+    ),
+    profitLossPct:
+      heatmap.length > 0
+        ? heatmap.reduce(
+            (sum, x) => sum + Number(x.changePct || 0),
+            0
+          ) / heatmap.length
+        : 0
+  };
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 pb-40">
+    <div className="min-h-screen bg-slate-950 text-white p-4 pb-32">
       <h1 className="text-2xl font-bold">
         Coach G Portfolio Analysis
       </h1>
@@ -120,180 +133,200 @@ export default function MobileBrokerMirrorRebalance() {
       </p>
 
       <div className="bg-slate-900 rounded-2xl p-4 mt-4 border border-slate-800">
-        <div className="text-slate-400 text-sm">
-          Portfolio Value
-        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Metric
+            label="Portfolio Value"
+            value={`KES ${money(summary.portfolioValue)}`}
+            color="text-cyan-300"
+          />
 
-        <div className="text-2xl font-bold text-cyan-300">
-          KES {Number(plan.totalValue || 0).toLocaleString()}
+          <Metric
+            label="Available Cash"
+            value={`KES ${money(summary.availableCash)}`}
+            color="text-green-300"
+          />
+
+          <Metric
+            label="Net Worth"
+            value={`KES ${money(summary.netWorth)}`}
+            color="text-white"
+          />
+
+          <Metric
+            label="Net Gain/Loss"
+            value={`KES ${money(summary.profitLoss)} (${Number(
+              summary.profitLossPct || 0
+            ).toFixed(2)}%)`}
+            color={
+              summary.profitLoss >= 0
+                ? "text-green-300"
+                : "text-red-300"
+            }
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-4">
-          <div className="bg-slate-950 rounded-xl p-3">
-            <div className="text-xs text-slate-400">
-              Risk
-            </div>
-            <div className="font-bold text-red-300">
-              {plan.riskBefore}
-            </div>
-          </div>
+          <SmallCard
+            label="Risk"
+            value={plan.score?.rating || "N/A"}
+            color="text-red-300"
+          />
 
-          <div className="bg-slate-950 rounded-xl p-3">
-            <div className="text-xs text-slate-400">
-              Sectors
-            </div>
-            <div className="font-bold text-cyan-300">
-              {sectorRows.length}
-            </div>
-          </div>
+          <SmallCard
+            label="Sectors"
+            value={sectorRows.length}
+            color="text-cyan-300"
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mt-4">
-        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4">
-          <div className="text-xs text-slate-400">
-            Diversification
-          </div>
-          <div className="font-bold text-cyan-300">
-            {sectorRows.length >= 5
-              ? "GOOD"
-              : sectorRows.length >= 3
-              ? "MODERATE"
-              : "LOW"}
-          </div>
-        </div>
+        <SmallCard
+          label="Diversification"
+          value={sectorRows.length >= 5 ? "GOOD" : "MODERATE"}
+          color="text-cyan-300"
+          className="bg-cyan-500/10 border-cyan-500/30"
+        />
 
-        <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-4">
-          <div className="text-xs text-slate-400">
-            Largest Sector
-          </div>
-          <div className="font-bold text-purple-300">
-            {largestSector?.sector || "N/A"}
-          </div>
-        </div>
+        <SmallCard
+          label="Largest Sector"
+          value={
+            sectorRows[0]
+              ? `${sectorRows[0].sector} (${percent(
+                  sectorRows[0].totalValue,
+                  summary.portfolioValue
+                )}%)`
+              : "N/A"
+          }
+          color="text-purple-300"
+          className="bg-purple-500/10 border-purple-500/30"
+        />
       </div>
 
-      <h2 className="text-xl font-bold mt-6 mb-4">
-        Sector Heatmap
+      <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-4 mt-4">
+        <div className="font-bold text-purple-300">
+          Coach G Summary
+        </div>
+
+        <p className="text-sm mt-2 text-slate-300">
+          {plan.score?.rating === "HIGH_RISK"
+            ? "Portfolio concentration risk detected. Future investments should improve diversification."
+            : "Portfolio appears reasonably diversified."}
+        </p>
+      </div>
+
+      <h2 className="text-3xl font-bold mt-8 mb-4">
+        Sector Allocation
       </h2>
 
-      <div className="
-flex
-gap-3
-overflow-x-auto
-pb-2
-snap-x
-">
-        {sectorRows.map((sector) => {
-          const exposurePct =
-            Number(plan.totalValue || 0) > 0
-              ? Number(
-                  (
-                    (Number(sector.totalValue || 0) /
-                      Number(plan.totalValue || 1)) *
-                    100
-                  ).toFixed(2)
-                )
-              : 0;
+      <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
+          <div style={{ width: "100%", height: 340 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie
+                  data={sectorRows.map((sector) => ({
+                    name: sector.sector,
+                    value: sector.totalValue,
+                    weight:
+                      summary.portfolioValue > 0
+                        ? (sector.totalValue / summary.portfolioValue) * 100
+                        : 0
+                  }))}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={70}
+                  outerRadius={120}
+                  paddingAngle={2}
+                  label={({ weight }) =>
+                    `${Number(weight || 0).toFixed(2)}%`
+                  }
+                >
+                  {sectorRows.map((_, index) => (
+                    <Cell
+                      key={index}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
 
-          const sectorColor =
-            exposurePct > 40
-              ? "border-red-500/60 bg-red-500/10"
-              : exposurePct > 20
-              ? "border-yellow-500/60 bg-yellow-500/10"
-              : "border-green-500/60 bg-green-500/10";
+                <Tooltip
+                  formatter={(value) => [
+                    `KES ${money(value)}`,
+                    "Value"
+                  ]}
+                />
 
-          const expanded =
-            expandedSector === sector.sector;
+                <text
+                  x="50%"
+                  y="50%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="white"
+                >
+                  <tspan x="50%" dy="-0.8em" fontSize="14">
+                    Total Value
+                  </tspan>
+                  <tspan x="50%" dy="1.5em" fontSize="22" fontWeight="bold">
+                    KES {money(summary.portfolioValue)}
+                  </tspan>
+                </text>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
 
-          const avgTrend =
-            sector.securities.length > 0
-              ? Number(
-                  (
-                    Number(sector.totalTrend || 0) /
-                    sector.securities.length
-                  ).toFixed(2)
-                )
-              : 0;
+          <div>
+            <div className="grid grid-cols-3 text-sm text-slate-400 border-b border-slate-800 pb-2 mb-3">
+              <div>Sector</div>
+              <div className="text-right">Value</div>
+              <div className="text-right">Weight</div>
+            </div>
 
-          return (
-            <div
-              key={sector.sector}
-              className={`min-w-[280px] snap-center rounded-2xl border overflow-hidden ${sectorColor}`}
-            >
-              <button
-                onClick={() =>
-                  setExpandedSector(
-                    expanded ? null : sector.sector
-                  )
-                }
-                className="w-full p-4 flex justify-between items-center text-left"
+            {sectorRows.map((sector, index) => (
+              <div
+                key={sector.sector}
+                className="grid grid-cols-3 items-center py-3 border-b border-slate-800 text-sm"
               >
-                <div>
-                  <div className="font-bold">
-                    {sector.sector}
-                  </div>
-
-                  <div className="text-xs text-slate-400">
-                    {sector.securities.length} securities • Trend{" "}
-                    {avgTrend.toFixed(2)}%
-                  </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{
+                      background: COLORS[index % COLORS.length]
+                    }}
+                  />
+                  <span>{sector.sector}</span>
                 </div>
 
                 <div className="text-right">
-                  <div className="font-bold">
-                    {exposurePct}%
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    KES{" "}
-                    {Number(sector.totalValue || 0).toLocaleString()}
-                  </div>
+                  KES {money(sector.totalValue)}
                 </div>
-              </button>
 
-              {expanded && (
-                <div className="px-4 pb-4">
-                  {sector.securities.map((security) => (
-                    <div
-                      key={security.symbol}
-                      onClick={() =>
-                        openExplanation(security.symbol)
-                      }
-                      className="bg-slate-950 rounded-xl p-3 mb-2 cursor-pointer active:scale-95 transition"
-                    >
-                      <div className="font-bold">
-                        {security.symbol}
-                      </div>
-
-                      <div className="text-xs text-slate-400">
-                        Value: KES{" "}
-                        {Number(
-                          security.value || 0
-                        ).toLocaleString()}
-                      </div>
-
-                      <div className="text-xs text-slate-400">
-                        Trend:{" "}
-                        {Number(
-                          security.changePct || 0
-                        ).toFixed(2)}
-                        %
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-right">
+                  {percent(sector.totalValue, summary.portfolioValue)}%
                 </div>
-              )}
-            </div>
-          );
-        })}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mt-5">
+     <button
+  onClick={() => {
+    window.location.href = "/mobile/holding-details";
+  }}
+  className="w-full bg-slate-900 border border-cyan-500/30 rounded-2xl p-4 mt-6 font-bold text-cyan-300"
+>
+  Holding Details
+</button>
+
+       <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 mt-5">
         <div className="font-bold text-yellow-300">
           Coach G Risk Alert
         </div>
+
         <p className="text-sm mt-2">
-          Your portfolio may have concentration risk. Use simulation to test how new money can improve diversification without forcing a sale.
+          {plan.score?.cashSummary?.cashAdvice ||
+            "Cash level is acceptable."}
         </p>
       </div>
 
@@ -318,71 +351,6 @@ shadow-lg
         Simulate Coach G Recommendations
       </button>
 
-      {selectedExplanation && (
-        <div className="fixed inset-0 bg-black/70 flex items-end z-50">
-          <div className="bg-slate-950 border-t border-cyan-500/40 rounded-t-3xl p-5 w-full">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-cyan-300">
-                Coach G Explanation
-              </h2>
-
-              <button
-                onClick={() => setSelectedExplanation(null)}
-                className="text-slate-400"
-              >
-                Close
-              </button>
-            </div>
-
-            {loadingExplanation ? (
-              <div className="text-slate-400 mt-4">
-                Loading explanation...
-              </div>
-            ) : (
-              <>
-                <div className="mt-4 text-2xl font-bold">
-                  {selectedExplanation.symbol}
-                </div>
-
-                <div className="text-sm text-slate-400">
-                  {selectedExplanation.sector}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  <div className="bg-slate-900 rounded-xl p-3">
-                    <div className="text-xs text-slate-400">
-                      Value
-                    </div>
-                    <div className="font-bold text-cyan-300">
-                      KES{" "}
-                      {Number(
-                        selectedExplanation.marketValue || 0
-                      ).toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900 rounded-xl p-3">
-                    <div className="text-xs text-slate-400">
-                      Trend
-                    </div>
-                    <div className="font-bold text-green-300">
-                      {Number(
-                        selectedExplanation.changePct || 0
-                      ).toFixed(2)}
-                      %
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-sm text-slate-200 leading-6 mt-4">
-                  {selectedExplanation.explanation}
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {showSimulator && (
         <div className="fixed inset-0 bg-black/70 flex items-end z-50">
           <div className="bg-slate-950 border-t border-purple-500/40 rounded-t-3xl p-5 w-full max-h-[90vh] overflow-y-auto">
@@ -406,40 +374,30 @@ shadow-lg
 
             <div className="mt-5">
               <label className="text-sm text-slate-400">
-<div className="mt-5">
-  <label className="text-sm text-slate-400">
-    Investment Goal
-  </label>
+                Investment Goal
+              </label>
 
-  <select
-    value={goal}
-    onChange={(e) => {
-      setGoal(e.target.value);
-      setShowResults(false);
-    }}
-    className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
-  >
-    <option value="wealth_growth">Wealth Growth</option>
-    <option value="dividend">Dividend Income</option>
-    <option value="balanced_growth">Balanced Growth</option>
-    <option value="preservation">Capital Preservation</option>
-    <option value="custom">Custom Goal</option>
-  </select>
-</div>
+              <select
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
+              >
+                <option value="wealth_growth">Wealth Growth</option>
+                <option value="dividend">Dividend Income</option>
+                <option value="balanced_growth">Balanced Growth</option>
+                <option value="preservation">Capital Preservation</option>
+              </select>
+            </div>
 
+            <div className="mt-5">
+              <label className="text-sm text-slate-400">
                 Scenario
               </label>
 
               <select
-                className="mt-2 bg-slate-900 border border-purple-500 rounded-xl p-3 w-full"
                 value={risk}
-                onChange={(e)=>{
-
- setRisk(e.target.value);
-
- setShowResults(false);
-
-}}
+                onChange={(e) => setRisk(e.target.value)}
+                className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
               >
                 <option value="conservative">Conservative</option>
                 <option value="balanced">Balanced</option>
@@ -455,41 +413,8 @@ shadow-lg
               <input
                 type="number"
                 value={amount}
-                onChange={(e) => {
-
- setAmount(e.target.value);
-
- setShowResults(false);
-
-}}
-                className="mt-2 bg-slate-900 border border-purple-500 rounded-xl p-3 w-full"
-              />
-            </div>
-
-            <div className="mt-5">
-              <div className="flex justify-between">
-                <label className="text-sm text-slate-400">
-                  Rebalance Intensity
-                </label>
-
-                <span className="text-purple-300 font-bold">
-                  {intensity}%
-                </span>
-              </div>
-
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={intensity}
-                onChange={(e)=>{
-
- setIntensity(e.target.value);
-
- setShowResults(false);
-
-}}
-                className="w-full mt-3"
+                onChange={(e) => setAmount(e.target.value)}
+                className="mt-2 w-full bg-slate-900 border border-purple-500 rounded-xl p-3"
               />
             </div>
 
@@ -505,174 +430,47 @@ shadow-lg
 
             {showResults && plan.investmentPlan && (
               <div className="mt-6">
-                <h3 className="font-bold text-cyan-300">
-                  Simulation Results
-                </h3>
-
-                <div className="
-bg-purple-500/10
-border
-border-purple-500/20
-rounded-xl
-p-4
-mt-4
-">
-
-<div className="text-xs text-slate-400">
-
-Scenario Summary
-
-</div>
-
-<div className="mt-2">
-
-Risk:
-
-<span className="font-bold ml-2">
-
-{risk}
-
-</span>
-
-</div>
-
-<div>
-
-Investment:
-
-<span className="font-bold ml-2">
-
-KES {Number(amount).toLocaleString()}
-
-</span>
-
-</div>
-
-<div>
-
-Intensity:
-
-<span className="font-bold ml-2">
-
-{intensity}%
-
-</span>
-
-</div>
-
-</div>
-
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="bg-slate-900 rounded-xl p-3">
-                    <div className="text-xs text-slate-400">
-                 <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 mt-4">
-  <div className="text-xs text-slate-400">
-    Goal Strategy
-  </div>
-
-  <div className="font-bold text-purple-300 mt-1">
-    {plan.investmentPlan.goalProfile?.label}
-  </div>
-
-  <p className="text-sm text-slate-300 mt-2">
-    {plan.investmentPlan.goalProfile?.strategy}
-  </p>
-</div>
- 
-                      Projected Value
-                    </div>
-
-                    <div className="font-bold text-cyan-300">
-                      KES{" "}
-                      {Number(
-                        plan.investmentPlan.projectedPortfolioValue ||
-                          0
-                      ).toLocaleString()}
-                    </div>
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+                  <div className="font-bold text-cyan-300">
+                    Projected Value
                   </div>
 
-                  <div className="bg-slate-900 rounded-xl p-3">
-                    <div className="text-xs text-slate-400">
-                      Risk Direction
-                    </div>
+                  <div className="text-xl font-bold mt-2">
+                    KES {money(plan.investmentPlan.projectedPortfolioValue)}
+                  </div>
 
-                    <div className="font-bold text-green-300">
-                      {plan.investmentPlan.riskDirection}
-                    </div>
+                  <div className="text-sm text-slate-400 mt-2">
+                    Risk Direction:{" "}
+                    {plan.investmentPlan.riskDirection || "N/A"}
                   </div>
                 </div>
-
-                <h3 className="font-bold text-cyan-300 mt-5">
-                  Projected Sector Exposure
-                </h3>
-
-                {plan.investmentPlan.targetPlan?.map((item) => (
-                  <div
-                    key={item.sector}
-                    className="bg-slate-900 rounded-xl p-3 mt-2"
-                  >
-                    <div className="flex justify-between text-sm">
-                      <span>{item.sector}</span>
-                      <span>
-                        {item.currentWeight}% →{" "}
-                        {item.projectedWeight}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
 
                 <h3 className="font-bold text-green-300 mt-5">
                   Buy Recommendations
                 </h3>
 
-                {plan.investmentPlan.recommendations?.map(
-                  (item) => (
-                    <div
-                      key={item.symbol}
-                      className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 mt-2"
-                    >
-                      <div className="font-bold text-green-300">
-                        {item.symbol}
-                      </div>
-
-                      <div className="text-xs text-slate-400">
-                        {item.name} • {item.sector}
-                      </div>
-
-                      <div className="text-sm mt-2">
-                        Allocate KES{" "}
-                        {Number(
-                          item.suggestedAmount || 0
-                        ).toLocaleString()}
-                      </div>
-
-                      <div className="text-sm text-cyan-300">
-                        Estimated Shares: {item.estimatedShares}
-                      </div>
+                {plan.investmentPlan.recommendations?.map((item) => (
+                  <div
+                    key={item.symbol}
+                    className="bg-green-500/10 border border-green-500/30 rounded-xl p-3 mt-2"
+                  >
+                    <div className="font-bold text-green-300">
+                      {item.symbol}
                     </div>
-                  )
-                )}
 
-                <h3 className="font-bold text-red-300 mt-5">
-                  Avoid / Do Not Add
-                </h3>
-
-                {plan.investmentPlan.blockedInvestments?.map(
-                  (item) => (
-                    <div
-                      key={item.symbol}
-                      className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mt-2"
-                    >
-                      <div className="font-bold text-red-300">
-                        {item.symbol}
-                      </div>
-
-                      <div className="text-xs text-slate-400">
-                        {item.reason}
-                      </div>
+                    <div className="text-xs text-slate-400">
+                      {item.name} • {item.sector}
                     </div>
-                  )
-                )}
+
+                    <div className="text-sm mt-2">
+                      Allocate KES {money(item.suggestedAmount)}
+                    </div>
+
+                    <div className="text-sm text-cyan-300">
+                      Estimated Shares: {item.estimatedShares}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -680,4 +478,48 @@ Intensity:
       )}
     </div>
   );
+}
+
+function Metric({ label, value, color }) {
+  return (
+    <div>
+      <div className="text-xs text-slate-400">
+        {label}
+      </div>
+      <div className={`${color} text-xl font-bold`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SmallCard({
+  label,
+  value,
+  color,
+  className = "bg-slate-950 border-slate-800"
+}) {
+  return (
+    <div className={`${className} border rounded-xl p-3`}>
+      <div className="text-xs text-slate-400">
+        {label}
+      </div>
+      <div className={`${color} font-bold`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function percent(value, total) {
+  if (!total) return "0.00";
+
+  return Number((Number(value || 0) / Number(total || 1)) * 100).toFixed(2);
 }

@@ -2,110 +2,252 @@ import {
   normalizeNseSymbol
 } from "../../data/nseSecurityMaster.js";
 
-function numberValue(value) {
-  return Number(
-    String(value || 0)
-      .replaceAll(",", "")
-      .trim()
-  );
+function cleanNumber(value) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return 0;
+  }
+
+  let str = String(value).trim();
+
+  const negativeByParentheses =
+    str.includes("(") &&
+    str.includes(")");
+
+  str = str
+  .replace(/KES/gi,"")
+  .replace(/[(),]/g,"")
+  .replace(/\s/g,"")
+   .replaceAll("'","");
+
+  const num = Number(str);
+
+  if (Number.isNaN(num)) {
+    return 0;
+  }
+
+  return negativeByParentheses
+    ? -Math.abs(num)
+    : num;
+}
+
+function firstValue(row = {}, keys = []) {
+  for (const key of keys) {
+    if (
+      row[key] !== undefined &&
+      row[key] !== null &&
+      row[key] !== ""
+    ) {
+      return row[key];
+    }
+  }
+
+  return "";
 }
 
 export function normalizeHolding(row = {}) {
-  const rawSymbol =
-    row.symbol ||
-    row.Symbol ||
-    row["Security Code"] ||
-    row["Security"] ||
-    row["Counter"] ||
-    "";
-
-  const symbol = normalizeNseSymbol(rawSymbol);
+  const rawSymbol = firstValue(row, [
+    "symbol",
+    "Symbol",
+    "Security",
+    "Security Code",
+    "Counter"
+  ]);
 
   return {
-    broker: row.broker || "",
-    symbol,
-    name:
-      row.name ||
-      row.Name ||
-      row["Security Name"] ||
-      "",
-    quantity: numberValue(
-      row.quantity ||
-        row.Quantity ||
-        row["Holdings Quantity (Free)"] ||
-        row["Quantity"] ||
-        0
+    broker: String(row.broker || "AIB").toUpperCase(),
+    symbol: normalizeNseSymbol(rawSymbol),
+    name: firstValue(row, [
+      "name",
+      "Name",
+      "Security Name"
+    ]),
+    quantity: cleanNumber(
+      firstValue(row, [
+        "quantity",
+        "Quantity",
+        "Holdings Quantity (Free)"
+      ])
     ),
-    blockedQuantity: numberValue(
-      row.blockedQuantity ||
-        row["Used / Blocked Quantity"] ||
-        0
+    blockedQuantity: cleanNumber(
+      firstValue(row, [
+        "blockedQuantity",
+        "Used / Blocked Quantity"
+      ])
     ),
-    availableQuantity: numberValue(
-      row.availableQuantity ||
-        row["Available Quantity"] ||
-        0
+    availableQuantity: cleanNumber(
+      firstValue(row, [
+        "availableQuantity",
+        "Available Quantity"
+      ])
     )
   };
 }
 
 export function normalizeValuation(row = {}) {
-  const rawSymbol =
-    row.symbol ||
-    row.Symbol ||
-    row["Security Code"] ||
-    row["Counter"] ||
-    "";
+  const rawSymbol = firstValue(row, [
+    "symbol",
+    "Symbol",
+    "Security",
+    "Security Code",
+    "Counter"
+  ]);
+
+  const quantity = cleanNumber(
+    firstValue(row, ["quantity", "Quantity"])
+  );
+
+  const averagePrice = cleanNumber(
+    firstValue(row, [
+      "averagePrice",
+      "Avg.Price",
+      "Avg Price",
+      "AvgPrice",
+      "Average Price"
+    ])
+  );
+
+  const marketPrice = cleanNumber(
+    firstValue(row, ["marketPrice", "Market Price", "Price"])
+  );
+
+  const marketValue = cleanNumber(
+    firstValue(row, ["marketValue", "Market Value", "Value"])
+  );
+
+  let profitLoss = cleanNumber(
+    firstValue(row, [
+      "profitLoss",
+      "Profit / Loss",
+      "Profit/Loss",
+      "P/L",
+      "PnL"
+    ])
+  );
+
+  let profitLossPct = cleanNumber(
+    firstValue(row, [
+      "profitLossPct",
+      "Profit / Loss %",
+      "Profit/Loss %",
+      "P/L %",
+      "PnL %"
+    ])
+  );
+
+  const calculatedProfitLoss = Number(
+    (marketValue - quantity * averagePrice).toFixed(2)
+  );
+
+  if (
+    profitLoss === 0 &&
+    quantity > 0 &&
+    averagePrice > 0 &&
+    marketValue > 0
+  ) {
+    profitLoss = calculatedProfitLoss;
+  }
+
+  if (
+    Math.abs(profitLoss) > Math.abs(marketValue) ||
+    (profitLossPct < 0 && profitLoss > 0)
+  ) {
+    profitLoss = calculatedProfitLoss;
+  }
+
+  const costValue = quantity * averagePrice;
+
+  if (profitLossPct === 0 && costValue > 0) {
+    profitLossPct = Number(((profitLoss / costValue) * 100).toFixed(2));
+  }
 
   return {
-    broker: row.broker || "",
+    broker: String(row.broker || "AIB").toUpperCase(),
     symbol: normalizeNseSymbol(rawSymbol),
-    name:
-      row.name ||
-      row.Name ||
-      row["Security Name"] ||
-      "",
-    quantity: numberValue(row.quantity || row.Quantity || 0),
-    price: numberValue(row.price || row.Price || row["Market Price"] || 0),
-    marketValue: numberValue(
-      row.marketValue || row["Market Value"] || row.Value || 0
-    )
+    quantity,
+    averagePrice,
+    marketPrice,
+    marketValue,
+    profitLoss,
+    profitLossPct
   };
 }
-
 export function normalizeOrder(row = {}) {
-  const rawSymbol =
-    row.symbol ||
-    row.Symbol ||
-    row["Security Code"] ||
-    row["Counter"] ||
-    "";
+  const rawSymbol = firstValue(row, [
+    "symbol",
+    "Symbol",
+    "Security",
+    "Security Code",
+    "Counter"
+  ]);
 
   return {
-    broker: row.broker || "",
+    broker: String(row.broker || "AIB").toUpperCase(),
     symbol: normalizeNseSymbol(rawSymbol),
-    side: row.side || row.Side || row.Type || "",
-    quantity: numberValue(row.quantity || row.Quantity || 0),
-    price: numberValue(row.price || row.Price || 0),
-    status: row.status || row.Status || ""
+    side: firstValue(row, [
+      "side",
+      "Side",
+      "Type"
+    ]),
+    quantity: cleanNumber(
+      firstValue(row, [
+        "quantity",
+        "Quantity"
+      ])
+    ),
+    price: cleanNumber(
+      firstValue(row, [
+        "price",
+        "Price"
+      ])
+    ),
+    status: firstValue(row, [
+      "status",
+      "Status"
+    ])
   };
 }
 
 export function normalizeTransaction(row = {}) {
-  const rawSymbol =
-    row.symbol ||
-    row.Symbol ||
-    row["Security Code"] ||
-    row["Counter"] ||
-    "";
+  const rawSymbol = firstValue(row, [
+    "symbol",
+    "Symbol",
+    "Security",
+    "Security Code",
+    "Counter"
+  ]);
 
   return {
-    broker: row.broker || "",
-    date: row.date || row.Date || "",
+    broker: String(row.broker || "AIB").toUpperCase(),
+    date: firstValue(row, [
+      "date",
+      "Date"
+    ]),
     symbol: normalizeNseSymbol(rawSymbol),
-    type: row.type || row.Type || "",
-    quantity: numberValue(row.quantity || row.Quantity || 0),
-    price: numberValue(row.price || row.Price || 0),
-    amount: numberValue(row.amount || row.Amount || 0)
+    type: firstValue(row, [
+      "type",
+      "Type"
+    ]),
+    quantity: cleanNumber(
+      firstValue(row, [
+        "quantity",
+        "Quantity"
+      ])
+    ),
+    price: cleanNumber(
+      firstValue(row, [
+        "price",
+        "Price"
+      ])
+    ),
+    amount: cleanNumber(
+      firstValue(row, [
+        "amount",
+        "Amount"
+      ])
+    )
   };
 }

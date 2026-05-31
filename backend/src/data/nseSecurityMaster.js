@@ -55,6 +55,14 @@ export const nseSecurityMaster = {
     price: 88.00
   },
 
+KQ: {
+    symbol: "KQ",
+    name: "Kenya Airways",
+    sector: "Commercial and Services",
+    price: 5.88
+  },
+
+
   SCOM: {
     symbol: "SCOM",
     name: "Safaricom PLC",
@@ -100,12 +108,11 @@ KNRE:{
  price:3.34
 },
 
-KPC:{
- symbol:"KPC",
- aliases:["KPC"],
- name:"Kenya Pipeline Company",
- sector:"Energy and Petroleum",
- price:9.20
+KPC: {
+  symbol: "KPC",
+  name: "Kenya Pipeline Company PLC",
+  sector: "Energy and Petroleum",
+  price: 9.20
 },
 
 KPLC:{
