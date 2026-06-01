@@ -20,6 +20,27 @@ const upload = multer({
   storage: multer.memoryStorage()
 });
 
+function normalizeBroker(value) {
+  const broker = String(value || "AIB-AXYS").trim().toUpperCase();
+
+  if (broker === "AIB") return "AIB-AXYS";
+  if (broker === "ABC CAPITAL") return "ABC";
+
+  return broker;
+}
+
+function cleanNumber(value) {
+  const cleaned = String(value ?? 0)
+    .replaceAll(",", "")
+    .replaceAll("'", "")
+    .replace(/KES/gi, "")
+    .trim();
+
+  const num = Number(cleaned);
+
+  return Number.isFinite(num) ? num : 0;
+}
+
 function normalizeUploadedRows(buffer) {
   const workbook = XLSX.read(buffer, {
     type: "buffer"
@@ -33,65 +54,62 @@ function normalizeUploadedRows(buffer) {
   });
 }
 
-function normalizeRows(reportType, rows, broker) {
+function attachContext(row, context) {
+  return {
+    ...row,
+    broker: context.broker,
+    clientNumber: context.clientNumber,
+    cdsNumber: context.cdsNumber,
+    email: context.email,
+    brokerLinkId: context.brokerLinkId
+  };
+}
+
+function normalizeRows(reportType, rows, context) {
   switch (reportType) {
     case "holdings":
-      return rows.map((r) =>
-        normalizeHolding({
-          ...r,
-          broker
-        })
+      return rows.map((row) =>
+        normalizeHolding(attachContext(row, context))
       );
 
     case "valuation":
-      return rows.map((r) =>
-        normalizeValuation({
-          ...r,
-          broker
-        })
+      return rows.map((row) =>
+        normalizeValuation(attachContext(row, context))
       );
 
     case "orders":
-      return rows.map((r) =>
-        normalizeOrder({
-          ...r,
-          broker
-        })
+      return rows.map((row) =>
+        normalizeOrder(attachContext(row, context))
       );
 
     case "transactions":
-      return rows.map((r) =>
-        normalizeTransaction({
-          ...r,
-          broker
-        })
+      return rows.map((row) =>
+        normalizeTransaction(attachContext(row, context))
       );
 
     case "cash":
-      return rows.map((r) => ({
-        broker,
-        date: r.Date || r.date || "",
-        type: r.Type || r.type || "",
+      return rows.map((row) => ({
+        broker: context.broker,
+        clientNumber: context.clientNumber,
+        cdsNumber: context.cdsNumber,
+        email: context.email,
+        brokerLinkId: context.brokerLinkId,
+        date: row.Date || row.date || "",
+        type: row.Type || row.type || "",
         description:
-          r.Particulars ||
-          r.Description ||
-          r.description ||
+          row.Particulars ||
+          row.Description ||
+          row.description ||
           "",
-        quantity: Number(
-          String(r.Quantity || 0).replaceAll(",", "")
-        ),
-        price: Number(
-          String(r.Price || 0).replaceAll(",", "")
-        ),
-        debit: Number(
-          String(r.Debit || 0).replaceAll(",", "")
-        ),
-        credit: Number(
-          String(r.Credit || 0).replaceAll(",", "")
-        ),
+        quantity: cleanNumber(row.Quantity || row.quantity),
+        price: cleanNumber(row.Price || row.price),
+        debit: cleanNumber(row.Debit || row.debit),
+        credit: cleanNumber(row.Credit || row.credit),
         balance:
-          r.Balance ||
-          r.balance ||
+          row.Balance ||
+          row.balance ||
+          row.ledgerBalance ||
+          row.availableCash ||
           ""
       }));
 
@@ -100,28 +118,38 @@ function normalizeRows(reportType, rows, broker) {
   }
 }
 
-function saveReportSnapshot(broker, reportType, normalized) {
+function saveReportSnapshot(context, reportType, normalized) {
   return saveBrokerMirror(
-    broker,
+    context.broker,
     reportType,
     normalized,
     {
-      replace: reportType === "valuation"
+      replace: reportType === "valuation",
+      brokerLinkId: context.brokerLinkId,
+      clientNumber: context.clientNumber,
+      cdsNumber: context.cdsNumber,
+      email: context.email
     }
   );
 }
 
+function buildContext(source = {}) {
+  return {
+    broker: normalizeBroker(source.broker),
+    clientNumber: String(source.clientNumber || "").trim(),
+    cdsNumber: String(source.cdsNumber || "").trim(),
+    email: String(source.email || "").trim(),
+    brokerLinkId: String(source.brokerLinkId || "").trim()
+  };
+}
+
 router.post("/import", async (req, res) => {
   try {
-    const broker = String(req.body.broker || "AIB").toUpperCase();
     const reportType = req.body.reportType || "";
     const rows = req.body.rows || [];
+    const context = buildContext(req.body);
 
-    const normalized = normalizeRows(
-      reportType,
-      rows,
-      broker
-    );
+    const normalized = normalizeRows(reportType, rows, context);
 
     if (!normalized) {
       return res.status(400).json({
@@ -130,15 +158,14 @@ router.post("/import", async (req, res) => {
       });
     }
 
-    const saved = saveReportSnapshot(
-      broker,
-      reportType,
-      normalized
-    );
+    const saved = saveReportSnapshot(context, reportType, normalized);
 
     res.json({
       ok: true,
-      broker,
+      broker: context.broker,
+      clientNumber: context.clientNumber,
+      cdsNumber: context.cdsNumber,
+      brokerLinkId: context.brokerLinkId,
       reportType,
       imported: normalized.length,
       storedCount: saved.length,
@@ -157,160 +184,155 @@ router.post("/import", async (req, res) => {
   }
 });
 
-router.post(
-  "/upload",
-  upload.single("file"),
-  async (req, res) => {
-    try {
-      const broker = String(req.body.broker || "AIB").toUpperCase();
-      const reportType = req.body.reportType || "holdings";
+router.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    const reportType = req.body.reportType || "holdings";
+    const context = buildContext(req.body);
 
-      if (!req.file) {
-        return res.status(400).json({
-          ok: false,
-          error: "file required"
-        });
-      }
-
-      const rows = normalizeUploadedRows(
-        req.file.buffer
-      );
-
-      const normalized = normalizeRows(
-        reportType,
-        rows,
-        broker
-      );
-
-      if (!normalized) {
-        return res.status(400).json({
-          ok: false,
-          error: "unsupported report type"
-        });
-      }
-
-      const saved = saveReportSnapshot(
-        broker,
-        reportType,
-        normalized
-      );
-
-      res.json({
-        ok: true,
-        broker,
-        reportType,
-        filename: req.file.originalname,
-        imported: normalized.length,
-        storedCount: saved.length,
-        duplicatesSkipped:
-          normalized.length > saved.length
-            ? normalized.length - saved.length
-            : 0,
-        stored: true,
-        data: saved
-      });
-    } catch (error) {
-      res.status(500).json({
+    if (!req.file) {
+      return res.status(400).json({
         ok: false,
-        error: error.message
+        error: "file required"
       });
     }
-  }
-);
 
-router.get(
-  "/mirror/:broker/:reportType",
-  (req, res) => {
-    const data = getBrokerMirror(
-      req.params.broker,
-      req.params.reportType
-    );
+    const rows = normalizeUploadedRows(req.file.buffer);
+    const normalized = normalizeRows(reportType, rows, context);
 
-    res.json({
-      ok: true,
-      broker: req.params.broker,
-      reportType: req.params.reportType,
-      count: data.length,
-      data
-    });
-  }
-);
+    if (!normalized) {
+      return res.status(400).json({
+        ok: false,
+        error: "unsupported report type"
+      });
+    }
 
-router.get(
-  "/summary/:broker",
-  (req, res) => {
-    const broker = String(
-      req.params.broker || "AIB"
-    ).toUpperCase();
-
-    const holdings = getBrokerMirror(
-      broker,
-      "holdings"
-    );
-
-    const totalQuantity = holdings.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.quantity || 0),
-      0
-    );
+    const saved = saveReportSnapshot(context, reportType, normalized);
 
     res.json({
       ok: true,
-      broker,
-      holdingsCount: holdings.length,
-      totalQuantity,
-      symbols: holdings.map((x) => x.symbol),
-      topHoldings: [...holdings]
-        .sort(
-          (a, b) =>
-            Number(b.quantity || 0) -
-            Number(a.quantity || 0)
-        )
-        .slice(0, 5)
+      broker: context.broker,
+      clientNumber: context.clientNumber,
+      cdsNumber: context.cdsNumber,
+      brokerLinkId: context.brokerLinkId,
+      reportType,
+      filename: req.file.originalname,
+      imported: normalized.length,
+      storedCount: saved.length,
+      duplicatesSkipped:
+        normalized.length > saved.length
+          ? normalized.length - saved.length
+          : 0,
+      stored: true,
+      data: saved
+    });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error.message
     });
   }
-);
+});
 
-router.get(
-  "/exposure/:broker",
-  (req, res) => {
-    const broker = String(
-      req.params.broker || "AIB"
-    ).toUpperCase();
+router.get("/mirror/:broker/:reportType", (req, res) => {
+  const broker = normalizeBroker(req.params.broker);
+  const clientNumber = String(req.query.clientNumber || "").trim();
+  const cdsNumber = String(req.query.cdsNumber || "").trim();
 
-    const holdings = getBrokerMirror(
-      broker,
-      "holdings"
-    );
+  let data = getBrokerMirror(broker, req.params.reportType);
 
-    const total = holdings.reduce(
-      (sum, x) =>
-        sum + Number(x.quantity || 0),
-      0
-    );
-
-    const exposure = holdings.map((h) => ({
-      symbol: h.symbol,
-      quantity: h.quantity,
-      exposurePct:
-        total > 0
-          ? Number(
-              (
-                (h.quantity / total) *
-                100
-              ).toFixed(2)
-            )
-          : 0
-    }));
-
-    res.json({
-      ok: true,
-      broker,
-      totalQuantity: total,
-      exposure
+  if (clientNumber || cdsNumber) {
+    data = data.filter((row) => {
+      return (
+        (!clientNumber || String(row.clientNumber || "").trim() === clientNumber) &&
+        (!cdsNumber || String(row.cdsNumber || "").trim() === cdsNumber)
+      );
     });
   }
-);
+
+  res.json({
+    ok: true,
+    broker,
+    clientNumber,
+    cdsNumber,
+    reportType: req.params.reportType,
+    count: data.length,
+    data
+  });
+});
+
+router.get("/summary/:broker", (req, res) => {
+  const broker = normalizeBroker(req.params.broker);
+  const clientNumber = String(req.query.clientNumber || "").trim();
+  const cdsNumber = String(req.query.cdsNumber || "").trim();
+
+  let holdings = getBrokerMirror(broker, "holdings");
+
+  if (clientNumber || cdsNumber) {
+    holdings = holdings.filter((row) => {
+      return (
+        (!clientNumber || String(row.clientNumber || "").trim() === clientNumber) &&
+        (!cdsNumber || String(row.cdsNumber || "").trim() === cdsNumber)
+      );
+    });
+  }
+
+  const totalQuantity = holdings.reduce(
+    (sum, item) => sum + Number(item.quantity || 0),
+    0
+  );
+
+  res.json({
+    ok: true,
+    broker,
+    clientNumber,
+    cdsNumber,
+    holdingsCount: holdings.length,
+    totalQuantity,
+    symbols: holdings.map((x) => x.symbol),
+    topHoldings: [...holdings]
+      .sort((a, b) => Number(b.quantity || 0) - Number(a.quantity || 0))
+      .slice(0, 5)
+  });
+});
+
+router.get("/exposure/:broker", (req, res) => {
+  const broker = normalizeBroker(req.params.broker);
+  const clientNumber = String(req.query.clientNumber || "").trim();
+  const cdsNumber = String(req.query.cdsNumber || "").trim();
+
+  let holdings = getBrokerMirror(broker, "holdings");
+
+  if (clientNumber || cdsNumber) {
+    holdings = holdings.filter((row) => {
+      return (
+        (!clientNumber || String(row.clientNumber || "").trim() === clientNumber) &&
+        (!cdsNumber || String(row.cdsNumber || "").trim() === cdsNumber)
+      );
+    });
+  }
+
+  const total = holdings.reduce(
+    (sum, item) => sum + Number(item.quantity || 0),
+    0
+  );
+
+  const exposure = holdings.map((holding) => ({
+    symbol: holding.symbol,
+    quantity: holding.quantity,
+    exposurePct:
+      total > 0
+        ? Number(((holding.quantity / total) * 100).toFixed(2))
+        : 0
+  }));
+
+  res.json({
+    ok: true,
+    broker,
+    clientNumber,
+    cdsNumber,
+    totalQuantity: total,
+    exposure
+  });
+});
 
 export default router;

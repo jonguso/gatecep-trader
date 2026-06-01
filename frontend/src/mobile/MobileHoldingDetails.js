@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -8,22 +7,42 @@ const API_URL =
 
 export default function MobileHoldingDetails() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const brokerLink = useMemo(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("gatecepBrokerLink") || "{}"
+      );
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const broker = brokerLink.broker || "AIB-AXYS";
+  const clientNumber = brokerLink.clientNumber || "";
+  const cdsNumber = brokerLink.cdsNumber || "";
+
+  const brokerQuery = `clientNumber=${encodeURIComponent(
+    clientNumber
+  )}&cdsNumber=${encodeURIComponent(cdsNumber)}`;
 
   const [heatmap, setHeatmap] = useState([]);
   const [expandedSector, setExpandedSector] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [searchParams] = useSearchParams();
-
   async function loadHoldings() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_URL}/broker-heatmap/AIB`);
+      const res = await fetch(
+        `${API_URL}/broker-heatmap/${broker}?${brokerQuery}`
+      );
+
       const data = await res.json();
 
       setHeatmap(data.heatmap || []);
-    } catch (error) {
+    } catch {
       setHeatmap([]);
     } finally {
       setLoading(false);
@@ -31,15 +50,14 @@ export default function MobileHoldingDetails() {
   }
 
   useEffect(() => {
-  loadHoldings();
+    loadHoldings();
 
-  const selectedSector =
-    searchParams.get("sector");
+    const selectedSector = searchParams.get("sector");
 
-  if (selectedSector) {
-    setExpandedSector(selectedSector);
-  }
-}, []);
+    if (selectedSector) {
+      setExpandedSector(selectedSector);
+    }
+  }, []);
 
   const sectorRows = useMemo(() => {
     const grouped = heatmap.reduce((acc, item) => {
@@ -55,7 +73,9 @@ export default function MobileHoldingDetails() {
       }
 
       acc[sector].securities.push(item);
-      acc[sector].totalValue += Number(item.value || 0);
+      acc[sector].totalValue += Number(
+        item.value || item.marketValue || 0
+      );
       acc[sector].totalProfitLoss += Number(item.profitLoss || 0);
 
       return acc;
@@ -103,6 +123,24 @@ export default function MobileHoldingDetails() {
         Current holdings grouped by sector using portfolio valuation.
       </p>
 
+      <div className="mt-4 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4">
+        <div className="font-bold text-cyan-300">
+          Linked Broker
+        </div>
+
+        <div className="text-sm text-slate-300 mt-2">
+          Broker: {broker}
+        </div>
+
+        <div className="text-sm text-slate-300">
+          Client Number: {clientNumber || "N/A"}
+        </div>
+
+        <div className="text-sm text-slate-300">
+          CDS Number: {cdsNumber || "N/A"}
+        </div>
+      </div>
+
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mt-5">
         <div className="grid grid-cols-2 gap-4">
           <Metric
@@ -144,9 +182,9 @@ export default function MobileHoldingDetails() {
 
             return (
               <div
-  key={sector.sector}
-  className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800"
->
+                key={sector.sector}
+                className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800"
+              >
                 <button
                   className="w-full p-4 flex justify-between items-center text-left"
                   onClick={() =>
@@ -224,7 +262,7 @@ export default function MobileHoldingDetails() {
 
                           <Info
                             label="Market Value"
-                            value={`KES ${money(sec.value)}`}
+                            value={`KES ${money(sec.value || sec.marketValue)}`}
                           />
 
                           <Info

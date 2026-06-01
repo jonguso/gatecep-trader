@@ -44,7 +44,6 @@ import {
   initNotificationSocket
 } from "./services/notifications/notificationEngine.service.js";
 
-import { brokerRouter } from "./routes/brokerRoutes.js";
 import brokerReportImportRouter
 from "./routes/brokerReportImport.routes.js";
 import coachGBrokerMirrorRouter from "./routes/coachGBrokerMirror.routes.js";
@@ -71,6 +70,9 @@ import goalTrackerRoutes
 from "./routes/goalTracker.routes.js";
 import stressTestRoutes
 from "./routes/stressTest.routes.js";
+import { brokerRouter, brokerRouter as brokerRoutes } from "./routes/brokerRoutes.js";
+
+
 
 import executionRouter from "./routes/execution.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
@@ -129,7 +131,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 import { seedDefaultAdmin } from "./services/auth/auth.service.js";
 
-import { initDb } from "./db/initDb.js";
+import { initDb } from "./database/initDb.js";
 
 import { initializePositions } from "./services/positions/position.service.js";
 
@@ -253,6 +255,7 @@ app.use(
 "/stress-test",
 stressTestRoutes
 );
+app.use(brokerRoutes);
 
 
 

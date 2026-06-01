@@ -14,9 +14,46 @@ import {
 
 const router = express.Router();
 
+function normalizeBroker(value) {
+  const broker = String(value || "AIB-AXYS").trim().toUpperCase();
+
+  if (broker === "AIB") return "AIB-AXYS";
+  if (broker === "ABC CAPITAL") return "ABC";
+
+  return broker;
+}
+
+function cleanNumber(value) {
+  const cleaned = String(value ?? 0)
+    .replaceAll(",", "")
+    .replaceAll("'", "")
+    .replace(/KES/gi, "")
+    .trim();
+
+  const num = Number(cleaned);
+
+  return Number.isFinite(num) ? num : 0;
+}
+
+function filterByClient(rows = [], clientNumber = "", cdsNumber = "") {
+  if (!clientNumber && !cdsNumber) return rows;
+
+  return rows.filter((row) => {
+    const rowClient = String(row.clientNumber || "").trim();
+    const rowCds = String(row.cdsNumber || "").trim();
+
+    return (
+      (!clientNumber || rowClient === String(clientNumber).trim()) &&
+      (!cdsNumber || rowCds === String(cdsNumber).trim())
+    );
+  });
+}
+
 router.get("/:broker", async (req, res) => {
   try {
-    const broker = String(req.params.broker || "AIB").toUpperCase();
+    const broker = normalizeBroker(req.params.broker);
+    const clientNumber = String(req.query.clientNumber || "").trim();
+    const cdsNumber = String(req.query.cdsNumber || "").trim();
 
     const riskProfiles = {
       conservative: {
@@ -37,10 +74,21 @@ router.get("/:broker", async (req, res) => {
     };
 
     const risk = String(req.query.risk || "balanced").toLowerCase();
+    const goal = String(req.query.goal || "balanced_growth").toLowerCase();
+
     const profile = riskProfiles[risk] || riskProfiles.balanced;
 
-    const valuations = getBrokerMirror(broker, "valuation");
-    const mirrorHoldings = getBrokerMirror(broker, "holdings");
+    const valuations = filterByClient(
+      getBrokerMirror(broker, "valuation"),
+      clientNumber,
+      cdsNumber
+    );
+
+    const mirrorHoldings = filterByClient(
+      getBrokerMirror(broker, "holdings"),
+      clientNumber,
+      cdsNumber
+    );
 
     const sourceRows =
       valuations.length > 0
@@ -62,58 +110,63 @@ router.get("/:broker", async (req, res) => {
       ])
     );
 
-    const valuedHoldings = sourceRows.map((h) => {
-      const symbol = normalizeNseSymbol(h.symbol);
+    const valuedHoldings = sourceRows.map((holding) => {
+      const symbol = normalizeNseSymbol(holding.symbol);
       const market = marketLookup[symbol] || {};
 
-      const quantity = Number(h.quantity || 0);
+      const quantity = cleanNumber(holding.quantity);
 
-      const price = Number(
-        h.marketPrice ||
-          h.price ||
+      const price = cleanNumber(
+        holding.marketPrice ||
+          holding.price ||
           market.price ||
-          market.lastPrice ||
-          0
+          market.lastPrice
       );
 
-      const marketValue = Number(
-        h.marketValue ||
+      const marketValue = cleanNumber(
+        holding.marketValue ||
           quantity * price
       );
 
-      const averagePrice = Number(
-        h.averagePrice ||
-          h.avgPrice ||
-          0
+      const averagePrice = cleanNumber(
+        holding.averagePrice ||
+          holding.avgPrice
       );
 
-      const profitLoss = Number(
-        h.profitLoss ||
-          marketValue - quantity * averagePrice ||
-          0
-      );
+      const costValue = quantity * averagePrice;
 
-      const profitLossPct = Number(
-        h.profitLossPct ||
+      const profitLoss = cleanNumber(
+        holding.profitLoss ||
           (
-            quantity * averagePrice > 0
-              ? (profitLoss / (quantity * averagePrice)) * 100
+            averagePrice > 0
+              ? marketValue - costValue
+              : 0
+          )
+      );
+
+      const profitLossPct = cleanNumber(
+        holding.profitLossPct ||
+          (
+            costValue > 0
+              ? (profitLoss / costValue) * 100
               : 0
           )
       );
 
       return {
-        ...h,
+        ...holding,
+        broker,
+        clientNumber: holding.clientNumber || clientNumber,
+        cdsNumber: holding.cdsNumber || cdsNumber,
         symbol,
-        name: h.name || market.name || "",
+        name: holding.name || market.name || "",
         quantity,
         averagePrice,
         price,
-        sector: market.sector || h.sector || "Unknown",
-        changePct: Number(
-          h.profitLossPct ||
-            market.changePct ||
-            0
+        sector: market.sector || holding.sector || "Unknown",
+        changePct: cleanNumber(
+          holding.profitLossPct ||
+            market.changePct
         ),
         marketValue,
         profitLoss,
@@ -123,8 +176,7 @@ router.get("/:broker", async (req, res) => {
     });
 
     const totalValue = valuedHoldings.reduce(
-      (sum, item) =>
-        sum + Number(item.marketValue || 0),
+      (sum, item) => sum + Number(item.marketValue || 0),
       0
     );
 
@@ -137,24 +189,19 @@ router.get("/:broker", async (req, res) => {
     );
 
     const totalProfitLoss = valuedHoldings.reduce(
-      (sum, item) =>
-        sum + Number(item.profitLoss || 0),
+      (sum, item) => sum + Number(item.profitLoss || 0),
       0
     );
 
     const totalReturnPct =
       totalCost > 0
-        ? Number(
-            ((totalProfitLoss / totalCost) * 100).toFixed(2)
-          )
+        ? Number(((totalProfitLoss / totalCost) * 100).toFixed(2))
         : 0;
 
     valuedHoldings.forEach((item) => {
       item.weight =
         totalValue > 0
-          ? Number(
-              ((item.marketValue / totalValue) * 100).toFixed(2)
-            )
+          ? Number(((item.marketValue / totalValue) * 100).toFixed(2))
           : 0;
     });
 
@@ -172,14 +219,8 @@ router.get("/:broker", async (req, res) => {
         };
       }
 
-      sectorExposureMap[sector].marketValue += Number(
-        item.marketValue || 0
-      );
-
-      sectorExposureMap[sector].profitLoss += Number(
-        item.profitLoss || 0
-      );
-
+      sectorExposureMap[sector].marketValue += Number(item.marketValue || 0);
+      sectorExposureMap[sector].profitLoss += Number(item.profitLoss || 0);
       sectorExposureMap[sector].holdings.push(item.symbol);
     });
 
@@ -190,9 +231,7 @@ router.get("/:broker", async (req, res) => {
         profitLoss: Number(item.profitLoss.toFixed(2)),
         weight:
           totalValue > 0
-            ? Number(
-                ((item.marketValue / totalValue) * 100).toFixed(2)
-              )
+            ? Number(((item.marketValue / totalValue) * 100).toFixed(2))
             : 0
       }))
       .sort((a, b) => b.weight - a.weight);
@@ -200,8 +239,7 @@ router.get("/:broker", async (req, res) => {
     const sellCandidates = valuedHoldings
       .filter((item) => item.weight > profile.maxStockWeight)
       .map((item) => {
-        const excessWeight =
-          item.weight - profile.maxStockWeight;
+        const excessWeight = item.weight - profile.maxStockWeight;
 
         const estimatedSellValue = Number(
           ((excessWeight / 100) * totalValue).toFixed(2)
@@ -215,14 +253,12 @@ router.get("/:broker", async (req, res) => {
           currentWeight: item.weight,
           targetWeight: profile.maxStockWeight,
           estimatedSellValue,
-          reason:
-            `${item.symbol} exceeds ${risk} max stock weight of ${profile.maxStockWeight}%.`
+          reason: `${item.symbol} exceeds ${risk} max stock weight of ${profile.maxStockWeight}%.`
         };
       });
 
     const totalSellValue = sellCandidates.reduce(
-      (sum, item) =>
-        sum + Number(item.estimatedSellValue || 0),
+      (sum, item) => sum + Number(item.estimatedSellValue || 0),
       0
     );
 
@@ -230,8 +266,7 @@ router.get("/:broker", async (req, res) => {
       ((profile.cashBufferPct / 100) * totalSellValue).toFixed(2)
     );
 
-    const allocatableCash =
-      Math.max(totalSellValue - cashBuffer, 0);
+    const allocatableCash = Math.max(totalSellValue - cashBuffer, 0);
 
     const ownedSymbols = new Set(
       valuedHoldings.map((item) => item.symbol)
@@ -253,18 +288,12 @@ router.get("/:broker", async (req, res) => {
         return !overweightSectors.has(sector);
       })
       .filter((item) => Number(item.changePct || 0) > 1)
-      .sort(
-        (a, b) =>
-          Number(b.changePct || 0) -
-          Number(a.changePct || 0)
-      )
+      .sort((a, b) => Number(b.changePct || 0) - Number(a.changePct || 0))
       .slice(0, 5);
 
     const perBuyAllocation =
       rawBuyCandidates.length > 0
-        ? Number(
-            (allocatableCash / rawBuyCandidates.length).toFixed(2)
-          )
+        ? Number((allocatableCash / rawBuyCandidates.length).toFixed(2))
         : 0;
 
     const buyCandidates = rawBuyCandidates.map((item) => ({
@@ -280,12 +309,9 @@ router.get("/:broker", async (req, res) => {
     }));
 
     const largestHolding =
-      [...valuedHoldings].sort(
-        (a, b) => b.weight - a.weight
-      )[0] || null;
+      [...valuedHoldings].sort((a, b) => b.weight - a.weight)[0] || null;
 
-    const largestSector =
-      sectorExposure[0] || null;
+    const largestSector = sectorExposure[0] || null;
 
     const riskBefore =
       largestHolding?.weight >= 40 ||
@@ -293,14 +319,37 @@ router.get("/:broker", async (req, res) => {
         ? "HIGH"
         : "MODERATE";
 
+    const alignmentNotes = [];
+
+    if (goal === "dividend" && totalReturnPct < 0) {
+      alignmentNotes.push(
+        "Your income goal may need stronger dividend quality and loss control."
+      );
+    }
+
+    if (risk === "conservative" && largestHolding?.weight > 20) {
+      alignmentNotes.push(
+        "Your current concentration is higher than a conservative profile should normally carry."
+      );
+    }
+
+    if (risk === "aggressive" && buyCandidates.length === 0) {
+      alignmentNotes.push(
+        "Coach G did not find enough attractive momentum candidates after diversification checks."
+      );
+    }
+
     res.json({
       ok: true,
       broker,
+      clientNumber,
+      cdsNumber,
       source,
       mode: "ADVISORY_ONLY",
       message:
         "This is a Coach G recommendation only. Gatecep will not execute trades.",
       riskProfile: risk,
+      goal,
       profile,
       totalValue: Number(totalValue.toFixed(2)),
       totalCost: Number(totalCost.toFixed(2)),
@@ -316,6 +365,7 @@ router.get("/:broker", async (req, res) => {
       allocatableCash,
       sellCandidates,
       buyCandidates,
+      alignmentNotes,
       recommendation:
         sellCandidates.length > 0
           ? "Reduce concentrated positions or use new capital to diversify into underrepresented sectors."

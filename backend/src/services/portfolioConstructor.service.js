@@ -191,8 +191,14 @@ function rankUniverse(profile) {
 function scoreStock(profile, stock) {
   let score = 50;
 
+  const riskStyleMap = {
+    conservative: "preservation",
+    balanced: "balanced_growth",
+    aggressive: "aggressive"
+  };
+
   if (stock.styles.includes(profile.goal)) score += 25;
-  if (stock.styles.includes(profile.risk)) score += 10;
+  if (stock.styles.includes(riskStyleMap[profile.risk])) score += 10;
 
   if (profile.goal === "dividend") {
     score += Number(stock.dividendYield || 0) * 2;

@@ -2,26 +2,30 @@ import {
   normalizeNseSymbol
 } from "../../data/nseSecurityMaster.js";
 
+function normalizeBroker(value) {
+  const broker = String(value || "AIB-AXYS").trim().toUpperCase();
+
+  if (broker === "AIB") return "AIB-AXYS";
+  if (broker === "ABC CAPITAL") return "ABC";
+
+  return broker;
+}
+
 function cleanNumber(value) {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
+  if (value === undefined || value === null || value === "") {
     return 0;
   }
 
   let str = String(value).trim();
 
   const negativeByParentheses =
-    str.includes("(") &&
-    str.includes(")");
+    str.includes("(") && str.includes(")");
 
   str = str
-  .replace(/KES/gi,"")
-  .replace(/[(),]/g,"")
-  .replace(/\s/g,"")
-   .replaceAll("'","");
+    .replace(/KES/gi, "")
+    .replace(/[(),]/g, "")
+    .replace(/\s/g, "")
+    .replaceAll("'", "");
 
   const num = Number(str);
 
@@ -29,9 +33,7 @@ function cleanNumber(value) {
     return 0;
   }
 
-  return negativeByParentheses
-    ? -Math.abs(num)
-    : num;
+  return negativeByParentheses ? -Math.abs(num) : num;
 }
 
 function firstValue(row = {}, keys = []) {
@@ -58,7 +60,7 @@ export function normalizeHolding(row = {}) {
   ]);
 
   return {
-    broker: String(row.broker || "AIB").toUpperCase(),
+    broker: normalizeBroker(row.broker),
     symbol: normalizeNseSymbol(rawSymbol),
     name: firstValue(row, [
       "name",
@@ -111,11 +113,19 @@ export function normalizeValuation(row = {}) {
   );
 
   const marketPrice = cleanNumber(
-    firstValue(row, ["marketPrice", "Market Price", "Price"])
+    firstValue(row, [
+      "marketPrice",
+      "Market Price",
+      "Price"
+    ])
   );
 
   const marketValue = cleanNumber(
-    firstValue(row, ["marketValue", "Market Value", "Value"])
+    firstValue(row, [
+      "marketValue",
+      "Market Value",
+      "Value"
+    ])
   );
 
   let profitLoss = cleanNumber(
@@ -165,7 +175,7 @@ export function normalizeValuation(row = {}) {
   }
 
   return {
-    broker: String(row.broker || "AIB").toUpperCase(),
+    broker: normalizeBroker(row.broker),
     symbol: normalizeNseSymbol(rawSymbol),
     quantity,
     averagePrice,
@@ -175,6 +185,7 @@ export function normalizeValuation(row = {}) {
     profitLossPct
   };
 }
+
 export function normalizeOrder(row = {}) {
   const rawSymbol = firstValue(row, [
     "symbol",
@@ -185,7 +196,7 @@ export function normalizeOrder(row = {}) {
   ]);
 
   return {
-    broker: String(row.broker || "AIB").toUpperCase(),
+    broker: normalizeBroker(row.broker),
     symbol: normalizeNseSymbol(rawSymbol),
     side: firstValue(row, [
       "side",
@@ -221,7 +232,7 @@ export function normalizeTransaction(row = {}) {
   ]);
 
   return {
-    broker: String(row.broker || "AIB").toUpperCase(),
+    broker: normalizeBroker(row.broker),
     date: firstValue(row, [
       "date",
       "Date"

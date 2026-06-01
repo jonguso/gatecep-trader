@@ -6,4 +6,4 @@ backend/.env.production
 dist/
 build/
 .DS_Store
-npm-debug.log*
+npm-debug.log*backend/_archive/

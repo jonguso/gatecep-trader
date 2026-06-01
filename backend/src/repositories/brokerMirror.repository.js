@@ -4,11 +4,18 @@ import path from "path";
 const DATA_DIR = path.resolve("data");
 const FILE = path.join(DATA_DIR, "brokerMirror.json");
 
+function normalizeBroker(value) {
+  const broker = String(value || "AIB-AXYS").trim().toUpperCase();
+
+  if (broker === "AIB") return "AIB-AXYS";
+  if (broker === "ABC CAPITAL") return "ABC";
+
+  return broker;
+}
+
 function ensureFile() {
   if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, {
-      recursive: true
-    });
+    fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
   if (!fs.existsSync(FILE)) {
@@ -31,19 +38,12 @@ function ensureFile() {
 
 function readMirror() {
   ensureFile();
-
-  return JSON.parse(
-    fs.readFileSync(FILE, "utf-8")
-  );
+  return JSON.parse(fs.readFileSync(FILE, "utf-8"));
 }
 
 function writeMirror(data) {
   ensureFile();
-
-  fs.writeFileSync(
-    FILE,
-    JSON.stringify(data, null, 2)
-  );
+  fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
 }
 
 function cleanValue(value) {
@@ -54,19 +54,46 @@ function cleanValue(value) {
 }
 
 function makeMirrorKey(row = {}, reportType = "") {
+  const broker = normalizeBroker(row.broker);
+
   if (reportType === "holdings") {
     return [
-      cleanValue(row.broker),
+      broker,
+      cleanValue(row.clientNumber),
+      cleanValue(row.cdsNumber),
       cleanValue(row.symbol)
     ].join("|");
   }
 
-  if (
-    reportType === "transactions" ||
-    reportType === "cash"
-  ) {
+  if (reportType === "valuation") {
     return [
-      cleanValue(row.broker),
+      broker,
+      cleanValue(row.clientNumber),
+      cleanValue(row.cdsNumber),
+      cleanValue(row.symbol),
+      cleanValue(row.quantity),
+      cleanValue(row.marketValue)
+    ].join("|");
+  }
+
+  if (reportType === "orders") {
+    return [
+      broker,
+      cleanValue(row.clientNumber),
+      cleanValue(row.cdsNumber),
+      cleanValue(row.symbol),
+      cleanValue(row.side),
+      cleanValue(row.quantity),
+      cleanValue(row.price),
+      cleanValue(row.status)
+    ].join("|");
+  }
+
+  if (reportType === "transactions" || reportType === "cash") {
+    return [
+      broker,
+      cleanValue(row.clientNumber),
+      cleanValue(row.cdsNumber),
       cleanValue(row.date),
       cleanValue(row.type),
       cleanValue(row.symbol),
@@ -80,79 +107,47 @@ function makeMirrorKey(row = {}, reportType = "") {
     ].join("|");
   }
 
-  if (reportType === "valuation") {
-    return [
-      cleanValue(row.broker),
-      cleanValue(row.symbol),
-      cleanValue(row.quantity),
-      cleanValue(row.marketValue)
-    ].join("|");
-  }
-
-  if (reportType === "orders") {
-    return [
-      cleanValue(row.broker),
-      cleanValue(row.symbol),
-      cleanValue(row.side),
-      cleanValue(row.quantity),
-      cleanValue(row.price),
-      cleanValue(row.status)
-    ].join("|");
-  }
-
   return JSON.stringify(row);
 }
 
-function mergeUniqueRows(
-  existing = [],
-  incoming = [],
-  reportType = ""
-) {
+function mergeUniqueRows(existing = [], incoming = [], reportType = "") {
   const map = new Map();
 
   for (const row of existing) {
-    map.set(
-      makeMirrorKey(row, reportType),
-      row
-    );
+    map.set(makeMirrorKey(row, reportType), row);
   }
 
   for (const row of incoming) {
-    map.set(
-      makeMirrorKey(row, reportType),
-      row
-    );
+    map.set(makeMirrorKey(row, reportType), row);
   }
 
   return Array.from(map.values());
 }
 
-export function saveBrokerMirror(
-  broker,
-  reportType,
-  data,
-  options = {}
-) {
+export function saveBrokerMirror(broker, reportType, data, options = {}) {
   const mirror = readMirror();
-
-  const normalizedBroker =
-    String(broker || "AIB").toUpperCase();
+  const normalizedBroker = normalizeBroker(broker);
 
   if (!mirror[reportType]) {
     mirror[reportType] = {};
   }
 
-  const existing =
-    mirror[reportType][normalizedBroker] || [];
+  const existing = mirror[reportType][normalizedBroker] || [];
 
-  const merged =
-    options.replace
-      ? data
-      : mergeUniqueRows(
-          existing,
-          data,
-          reportType
-        );
+  const enrichedData = Array.isArray(data)
+    ? data.map((row) => ({
+        ...row,
+        broker: normalizedBroker,
+        clientNumber: row.clientNumber || options.clientNumber || "",
+        cdsNumber: row.cdsNumber || options.cdsNumber || "",
+        email: row.email || options.email || "",
+        brokerLinkId: row.brokerLinkId || options.brokerLinkId || ""
+      }))
+    : [];
+
+  const merged = options.replace
+    ? enrichedData
+    : mergeUniqueRows(existing, enrichedData, reportType);
 
   mirror[reportType][normalizedBroker] = merged;
 
@@ -161,19 +156,11 @@ export function saveBrokerMirror(
   return merged;
 }
 
-export function getBrokerMirror(
-  broker,
-  reportType
-) {
+export function getBrokerMirror(broker, reportType) {
   const mirror = readMirror();
+  const normalizedBroker = normalizeBroker(broker);
 
-  const normalizedBroker =
-    String(broker || "AIB").toUpperCase();
-
-  return (
-    mirror?.[reportType]?.[normalizedBroker] ||
-    []
-  );
+  return mirror?.[reportType]?.[normalizedBroker] || [];
 }
 
 export function getEntireMirror() {

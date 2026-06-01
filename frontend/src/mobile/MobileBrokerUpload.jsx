@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_URL =
@@ -7,12 +7,14 @@ const API_URL =
 
 const documentTypes = [
   {
-  type: "valuation",
-  title: "Portfolio Valuation",
-  required: true,
-  description: "Primary report for Coach G analysis. Includes quantity, average price, market value, and profit/loss.",
-  examples: "Security, Quantity, Avg.Price, Market Price, Market Value, Profit / Loss"
-},
+    type: "valuation",
+    title: "Portfolio Valuation",
+    required: true,
+    description:
+      "Primary report for Coach G analysis. Includes quantity, average price, market value, and profit/loss.",
+    examples:
+      "Security, Quantity, Avg.Price, Market Price, Market Value, Profit / Loss"
+  },
   {
     type: "transactions",
     title: "Transaction History",
@@ -22,12 +24,13 @@ const documentTypes = [
     examples: "Date, Symbol, Buy/Sell, Quantity, Price"
   },
   {
-  type: "holdings",
-  title: "Holdings Report",
-  required: false,
-  description: "Shows shares you currently own. Optional fallback if valuation is unavailable.",
-  examples: "Security Code, Security Name, Quantity"
-},
+    type: "holdings",
+    title: "Holdings Report",
+    required: false,
+    description:
+      "Shows shares you currently own. Optional fallback if valuation is unavailable.",
+    examples: "Security Code, Security Name, Quantity"
+  },
   {
     type: "cash",
     title: "Cash / Ledger Statement",
@@ -41,10 +44,28 @@ const documentTypes = [
 export default function MobileBrokerUpload() {
   const navigate = useNavigate();
 
-  const [broker, setBroker] = useState("AIB");
+  const [brokerLink, setBrokerLink] = useState(null);
+  const [broker, setBroker] = useState("AIB-AXYS");
   const [selectedType, setSelectedType] = useState("valuation");
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("gatecepBrokerLink");
+
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setBrokerLink(parsed);
+
+        if (parsed?.broker) {
+          setBroker(parsed.broker);
+        }
+      } catch {
+        setBrokerLink(null);
+      }
+    }
+  }, []);
 
   async function uploadFile() {
     try {
@@ -54,19 +75,33 @@ export default function MobileBrokerUpload() {
       }
 
       const form = new FormData();
+
       form.append("file", file);
       form.append("broker", broker);
       form.append("reportType", selectedType);
 
+      if (brokerLink?.id) {
+        form.append("brokerLinkId", brokerLink.id);
+      }
+
+      if (brokerLink?.clientNumber) {
+        form.append("clientNumber", brokerLink.clientNumber);
+      }
+
+      if (brokerLink?.cdsNumber) {
+        form.append("cdsNumber", brokerLink.cdsNumber);
+      }
+
+      if (brokerLink?.email) {
+        form.append("email", brokerLink.email);
+      }
+
       setStatus("Uploading...");
 
-      const res = await fetch(
-        `${API_URL}/broker-reports/upload`,
-        {
-          method: "POST",
-          body: form
-        }
-      );
+      const res = await fetch(`${API_URL}/broker-reports/upload`, {
+        method: "POST",
+        body: form
+      });
 
       const text = await res.text();
 
@@ -78,19 +113,30 @@ export default function MobileBrokerUpload() {
         throw new Error(text);
       }
 
-      if (data.ok) {
-        setStatus(
-  `Upload completed. Imported ${
-    data.imported ?? data.count ?? 0
-  } records. Stored ${
-    data.storedCount ?? data.count ?? 0
-  } records. Duplicates skipped ${
-    data.duplicatesSkipped ?? 0
-  }.`
-);
-      } else {
-        setStatus(data.error || "Upload failed.");
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Upload failed.");
       }
+
+      setStatus(
+        `Upload completed. Imported ${
+          data.imported ?? data.count ?? 0
+        } records. Stored ${
+          data.storedCount ?? data.count ?? 0
+        } records. Duplicates skipped ${
+          data.duplicatesSkipped ?? 0
+        }.`
+      );
+
+      localStorage.setItem(
+        "gatecepLastBrokerUpload",
+        JSON.stringify({
+          broker,
+          reportType: selectedType,
+          fileName: file.name,
+          uploadedAt: new Date().toISOString(),
+          result: data
+        })
+      );
     } catch (error) {
       console.error(error);
       setStatus(error.message || "Upload failed.");
@@ -104,8 +150,54 @@ export default function MobileBrokerUpload() {
       </h1>
 
       <p className="text-sm text-slate-400 mt-2">
-        Upload exported CSV or Excel reports from your broker.
+        Upload exported CSV or Excel reports from your broker. Coach G will use
+        these reports to compare your actual portfolio against your investment
+        profile.
       </p>
+
+      {brokerLink && (
+        <div className="mt-5 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4">
+          <div className="font-bold text-cyan-300">
+            Linked Broker Profile
+          </div>
+
+          <div className="text-sm text-slate-300 mt-2">
+            Broker: {brokerLink.broker}
+          </div>
+
+          <div className="text-sm text-slate-300">
+            Client Number: {brokerLink.clientNumber}
+          </div>
+
+          <div className="text-sm text-slate-300">
+            CDS Number: {brokerLink.cdsNumber}
+          </div>
+
+          <div className="text-xs text-slate-500 mt-2">
+            Status: {brokerLink.status}
+          </div>
+        </div>
+      )}
+
+      {!brokerLink && (
+        <div className="mt-5 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4">
+          <div className="font-bold text-yellow-300">
+            Broker not linked yet
+          </div>
+
+          <p className="text-sm text-slate-300 mt-2">
+            You can upload a report, but linking your broker first gives Coach G
+            better context.
+          </p>
+
+          <button
+            onClick={() => navigate("/mobile/broker-link")}
+            className="w-full bg-yellow-600 rounded-2xl p-3 font-bold mt-4"
+          >
+            Link Broker First
+          </button>
+        </div>
+      )}
 
       <div className="mt-5">
         <label className="text-sm text-slate-400">
@@ -117,9 +209,13 @@ export default function MobileBrokerUpload() {
           onChange={(e) => setBroker(e.target.value)}
           className="mt-2 w-full bg-slate-900 border border-slate-700 rounded-xl p-3"
         >
-          <option value="AIB">AIB-AXYS</option>
+          <option value="AIB-AXYS">AIB-AXYS</option>
           <option value="ABC">ABC Capital</option>
-          <option value="NCBA">NCBA</option>
+          <option value="Dyer & Blair">Dyer & Blair</option>
+          <option value="NCBA Investment Bank">NCBA Investment Bank</option>
+          <option value="Standard Investment Bank">
+            Standard Investment Bank
+          </option>
         </select>
       </div>
 
@@ -173,9 +269,7 @@ export default function MobileBrokerUpload() {
         <input
           type="file"
           accept=".csv,.xls,.xlsx"
-          onChange={(e) =>
-            setFile(e.target.files?.[0] || null)
-          }
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="mt-3 w-full text-sm"
         />
 

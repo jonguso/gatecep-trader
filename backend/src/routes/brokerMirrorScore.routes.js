@@ -18,6 +18,15 @@ import {
 
 const router = express.Router();
 
+function normalizeBroker(value) {
+  const broker = String(value || "AIB-AXYS").trim().toUpperCase();
+
+  if (broker === "AIB") return "AIB-AXYS";
+  if (broker === "ABC CAPITAL") return "ABC";
+
+  return broker;
+}
+
 function cleanNumber(value) {
   const cleaned = String(value ?? 0)
     .replaceAll(",", "")
@@ -30,24 +39,54 @@ function cleanNumber(value) {
   return Number.isFinite(num) ? num : 0;
 }
 
+function filterByClient(rows = [], clientNumber = "", cdsNumber = "") {
+  if (!clientNumber && !cdsNumber) return rows;
+
+  return rows.filter((row) => {
+    const rowClient = String(row.clientNumber || "").trim();
+    const rowCds = String(row.cdsNumber || "").trim();
+
+    return (
+      (!clientNumber || rowClient === String(clientNumber).trim()) &&
+      (!cdsNumber || rowCds === String(cdsNumber).trim())
+    );
+  });
+}
+
 router.get("/:broker", async (req, res) => {
   try {
-    const broker = String(req.params.broker || "AIB").toUpperCase();
+    const broker = normalizeBroker(req.params.broker);
 
-    const valuations = getBrokerMirror(broker, "valuation");
+    const clientNumber = String(req.query.clientNumber || "").trim();
+    const cdsNumber = String(req.query.cdsNumber || "").trim();
+
+    const valuationRows = filterByClient(
+      getBrokerMirror(broker, "valuation"),
+      clientNumber,
+      cdsNumber
+    );
+
+    const holdingRows = filterByClient(
+      getBrokerMirror(broker, "holdings"),
+      clientNumber,
+      cdsNumber
+    );
 
     const holdings =
-      valuations.length > 0
-        ? valuations
-        : getBrokerMirror(broker, "holdings");
+      valuationRows.length > 0
+        ? valuationRows
+        : holdingRows;
 
-    const actions = getBrokerMirrorActions(broker);
+    const actions = getBrokerMirrorActions(
+      broker,
+      clientNumber,
+      cdsNumber
+    );
 
     const prices = await marketDataGateway.getPrices();
-    const marketRows = prices.data || [];
 
     const marketLookup = Object.fromEntries(
-      marketRows.map((item) => [
+      (prices.data || []).map((item) => [
         normalizeNseSymbol(item.symbol),
         item
       ])
@@ -56,45 +95,47 @@ router.get("/:broker", async (req, res) => {
     const valuedHoldings = holdings.map((h) => {
       const symbol = normalizeNseSymbol(h.symbol);
       const market = marketLookup[symbol] || {};
-      const quantity = Number(h.quantity || 0);
+      const quantity = cleanNumber(h.quantity);
 
-      const price = Number(
+      const price = cleanNumber(
         h.marketPrice ||
-          h.price ||
-          market.price ||
-          market.lastPrice ||
-          0
+        h.price ||
+        market.price ||
+        market.lastPrice
       );
 
-      const marketValue = Number(
+      const marketValue = cleanNumber(
         h.marketValue ||
-          quantity * price
+        h.value ||
+        quantity * price
       );
 
-      const averagePrice = Number(
-        h.averagePrice ||
-          0
-      );
+      const averagePrice = cleanNumber(h.averagePrice);
 
-      const profitLoss = Number(
+      const profitLoss = cleanNumber(
         h.profitLoss ||
-          (
-            averagePrice > 0
-              ? marketValue - quantity * averagePrice
-              : 0
-          )
+        (
+          averagePrice > 0
+            ? marketValue - quantity * averagePrice
+            : 0
+        )
       );
 
-      const profitLossPct = Number(
+      const costValue = quantity * averagePrice;
+
+      const profitLossPct = cleanNumber(
         h.profitLossPct ||
-          (
-            quantity * averagePrice > 0
-              ? (profitLoss / (quantity * averagePrice)) * 100
-              : 0
-          )
+        (
+          costValue > 0
+            ? (profitLoss / costValue) * 100
+            : 0
+        )
       );
 
       return {
+        broker,
+        clientNumber: h.clientNumber || clientNumber,
+        cdsNumber: h.cdsNumber || cdsNumber,
         symbol,
         name: h.name || market.name || "",
         sector: market.sector || h.sector || "Unknown",
@@ -113,78 +154,40 @@ router.get("/:broker", async (req, res) => {
       0
     );
 
-    const cashRows = getBrokerMirror(
-      broker,
-      "cash"
-    );
-
-    let runningBalance = 0;
-
-cashRows.forEach((row) => {
-
- const debit =
-  cleanNumber(
-   row.debit
-  );
-
- const credit =
-  cleanNumber(
-   row.credit
-  );
-
- const explicitBalance =
-  cleanNumber(
-   row.balance
-  );
-
- /*
- if broker provides balance
- use it
- otherwise calculate
- */
-
- if (
-  explicitBalance !== 0
- ) {
-
-  runningBalance =
-   explicitBalance;
-
- } else {
-
-  runningBalance =
-   runningBalance +
-   credit -
-   debit;
-
- }
-
-});
-
-const ledgerBalance =
- Number(
-  runningBalance.toFixed(2)
- );
-
-    const netWorth =
-      totalValue + ledgerBalance;
-
-    const cashRatio =
-      netWorth > 0
-        ? Number(
-            (
-              (ledgerBalance / netWorth) *
-              100
-            ).toFixed(2)
-          )
-        : 0;
-
     valuedHoldings.forEach((item) => {
       item.weight =
         totalValue > 0
           ? Number(((item.marketValue / totalValue) * 100).toFixed(2))
           : 0;
     });
+
+    const cashRows = filterByClient(
+      getBrokerMirror(broker, "cash"),
+      clientNumber,
+      cdsNumber
+    );
+
+    let runningBalance = 0;
+
+    cashRows.forEach((row) => {
+      const debit = cleanNumber(row.debit);
+      const credit = cleanNumber(row.credit);
+      const explicitBalance = cleanNumber(row.balance);
+
+      if (explicitBalance !== 0) {
+        runningBalance = explicitBalance;
+      } else {
+        runningBalance = runningBalance + credit - debit;
+      }
+    });
+
+    const ledgerBalance = Number(runningBalance.toFixed(2));
+    const netWorth = totalValue + ledgerBalance;
+
+    const cashRatio =
+      netWorth > 0
+        ? Number(((ledgerBalance / netWorth) * 100).toFixed(2))
+        : 0;
 
     const largestHolding =
       [...valuedHoldings].sort(
@@ -212,81 +215,56 @@ const ledgerBalance =
       }))
       .sort((a, b) => b.weight - a.weight);
 
-    const largestSector =
-      sectorExposure[0] || null;
+    const largestSector = sectorExposure[0] || null;
 
     const negativePositions = valuedHoldings.filter(
       (item) => Number(item.profitLossPct || 0) < 0
     );
 
-const totalProfitLoss =
-  valuedHoldings.reduce(
-    (sum,item)=>
-      sum +
-      Number(
-        item.profitLoss || 0
-      ),
-    0
-  );
+    const totalProfitLoss = valuedHoldings.reduce(
+      (sum, item) => sum + Number(item.profitLoss || 0),
+      0
+    );
 
-const investedCost =
-  valuedHoldings.reduce(
-    (sum,item)=>
-      sum +
-      (
-        Number(
-          item.averagePrice || 0
-        ) *
-        Number(
-          item.quantity || 0
-        )
-      ),
-    0
-  );
+    const investedCost = valuedHoldings.reduce(
+      (sum, item) =>
+        sum +
+        Number(item.averagePrice || 0) *
+          Number(item.quantity || 0),
+      0
+    );
 
-const totalProfitLossPct =
-  investedCost > 0
-    ? Number(
-        (
-          totalProfitLoss /
-          investedCost *
-          100
-        ).toFixed(2)
-      )
-    : 0;
+    const totalProfitLossPct =
+      investedCost > 0
+        ? Number(((totalProfitLoss / investedCost) * 100).toFixed(2))
+        : 0;
 
     const sectorCount =
-      new Set(
-        valuedHoldings.map((item) => item.sector)
-      ).size;
+      new Set(valuedHoldings.map((item) => item.sector)).size;
 
     const reducedValue = actions
       .filter((x) => x.action === "REDUCED")
       .reduce((sum, x) => {
         const symbol = normalizeNseSymbol(x.symbol);
-        const holding = valuedHoldings.find(
-          (h) => h.symbol === symbol
-        );
-
+        const holding = valuedHoldings.find((h) => h.symbol === symbol);
         const fallbackMarket = marketLookup[symbol] || {};
+
         const price = Number(
           holding?.price ||
-            fallbackMarket.price ||
-            fallbackMarket.lastPrice ||
-            0
+          fallbackMarket.price ||
+          fallbackMarket.lastPrice ||
+          0
         );
 
         return sum + Number(x.quantity || 0) * price;
       }, 0);
 
-    const concentrationBefore =
-      largestHolding?.weight || 0;
+    const concentrationBefore = largestHolding?.weight || 0;
 
     const concentrationAfter =
       totalValue > 0
         ? Math.max(
-            concentrationBefore -
-              (reducedValue / totalValue) * 100,
+            concentrationBefore - (reducedValue / totalValue) * 100,
             0
           )
         : 0;
@@ -314,8 +292,7 @@ const totalProfitLossPct =
       score -= 8;
     }
 
-    let cashAdvice =
-      "Cash level is acceptable.";
+    let cashAdvice = "Cash level is acceptable.";
 
     if (cashRatio > 25) {
       score -= 10;
@@ -327,13 +304,7 @@ const totalProfitLossPct =
         "You have moderate cash available. Coach G can help deploy it gradually.";
     }
 
-    score = Math.max(
-      0,
-      Math.min(
-        100,
-        Number(score.toFixed(1))
-      )
-    );
+    score = Math.max(0, Math.min(100, Number(score.toFixed(1))));
 
     const rating =
       score >= 80
@@ -345,49 +316,26 @@ const totalProfitLossPct =
     res.json({
       ok: true,
       broker,
-      method:
-        valuations.length > 0
-          ? "BROKER_VALUATION"
-          : "MARKET_ESTIMATE",
+      clientNumber,
+      cdsNumber,
+      method: valuationRows.length > 0 ? "BROKER_VALUATION" : "MARKET_ESTIMATE",
       totalValue: Number(totalValue.toFixed(2)),
       netWorth: Number(netWorth.toFixed(2)),
       cashSummary: {
-        ledgerBalance: Number(ledgerBalance.toFixed(2)),
+        ledgerBalance,
         cashRatio,
         cashAdvice
       },
-
-portfolioSummary:{
-
- portfolioValue:
-  Number(
-   totalValue.toFixed(2)
-  ),
-
- availableCash:
-  Number(
-   ledgerBalance.toFixed(2)
-  ),
-
- netWorth:
-  Number(
-   netWorth.toFixed(2)
-  ),
-
- profitLoss:
-  Number(
-   totalProfitLoss.toFixed(2)
-  ),
-
- profitLossPct:
-  totalProfitLossPct
-
-},
+      portfolioSummary: {
+        portfolioValue: Number(totalValue.toFixed(2)),
+        availableCash: ledgerBalance,
+        netWorth: Number(netWorth.toFixed(2)),
+        profitLoss: Number(totalProfitLoss.toFixed(2)),
+        profitLossPct: totalProfitLossPct
+      },
       concentrationBefore,
       concentrationAfter: Number(concentrationAfter.toFixed(2)),
-      improvement: Number(
-        (concentrationBefore - concentrationAfter).toFixed(2)
-      ),
+      improvement: Number((concentrationBefore - concentrationAfter).toFixed(2)),
       score,
       rating,
       actionsTaken: actions.length,
@@ -396,7 +344,8 @@ portfolioSummary:{
       largestSector,
       sectorCount,
       negativePositions: negativePositions.length,
-      sectorExposure
+      sectorExposure,
+      holdings: valuedHoldings
     });
   } catch (error) {
     res.status(500).json({

@@ -1,7 +1,7 @@
 // src/mobile/MobileBrokerLink.jsx
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
@@ -9,9 +9,20 @@ const API_URL =
 
 export default function MobileBrokerLink() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const routeState = location.state || {};
+  const source = routeState.source || "EXISTING_INVESTOR";
+  const recommendedBroker = routeState.recommendedBroker || null;
+
+  const defaultBroker = useMemo(() => {
+    if (recommendedBroker?.name === "AIB") return "AIB-AXYS";
+    if (recommendedBroker?.name) return recommendedBroker.name;
+    return "AIB-AXYS";
+  }, [recommendedBroker]);
 
   const [form, setForm] = useState({
-    broker: "AIB-AXYS",
+    broker: defaultBroker,
     clientNumber: "",
     cdsNumber: "",
     email: ""
@@ -25,26 +36,34 @@ export default function MobileBrokerLink() {
       setSaving(true);
       setMessage("");
 
-      const res = await fetch(`${API_URL}/broker-link`, {
+      const res = await fetch(`${API_URL}/coach-g/broker-link`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           ...form,
+          source,
+          recommendedBroker,
+          customerProfile: routeState.customerProfile || null,
+          recommendation: routeState.recommendation || null,
+          confidence: routeState.confidence || null,
           status: "LINKED_PENDING_UPLOAD"
         })
       });
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || !data.ok) {
         throw new Error(data.error || "Failed to link broker");
       }
 
-      localStorage.setItem("gatecepBrokerLink", JSON.stringify(data));
+      localStorage.setItem(
+        "gatecepBrokerLink",
+        JSON.stringify(data.brokerLink)
+      );
 
-      navigate("/mobile/broker-upload");
+      navigate(data.nextStep || "/mobile/broker-upload");
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -63,6 +82,40 @@ export default function MobileBrokerLink() {
         to your investment profile.
       </p>
 
+      {source === "NEW_INVESTOR" && recommendedBroker && (
+        <div className="mt-5 bg-green-500/10 border border-green-500/30 rounded-2xl p-4">
+          <div className="text-xs text-green-300 font-bold">
+            Coach G Recommended Broker
+          </div>
+
+          <div className="text-xl font-bold mt-1">
+            {recommendedBroker.name}
+          </div>
+
+          <div className="text-sm text-slate-300 mt-1">
+            {recommendedBroker.bestFor}
+          </div>
+
+          <div className="text-sm text-cyan-300 font-bold mt-2">
+            Score: {recommendedBroker.score}/100
+          </div>
+
+          {recommendedBroker.signupUrl && (
+            <button
+              onClick={() => window.open(recommendedBroker.signupUrl, "_blank")}
+              className="w-full bg-green-600 rounded-2xl p-4 font-bold mt-4"
+            >
+              Continue to Broker Website
+            </button>
+          )}
+
+          <p className="text-xs text-slate-400 mt-3">
+            After opening your broker account, return here and enter your client
+            number and CDS number to link it with Gatecep.
+          </p>
+        </div>
+      )}
+
       <div className="mt-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
         <div>
           <label className="text-sm text-slate-400">
@@ -80,7 +133,9 @@ export default function MobileBrokerLink() {
             <option value="ABC">ABC</option>
             <option value="Dyer & Blair">Dyer & Blair</option>
             <option value="NCBA Investment Bank">NCBA Investment Bank</option>
-            <option value="Standard Investment Bank">Standard Investment Bank</option>
+            <option value="Standard Investment Bank">
+              Standard Investment Bank
+            </option>
           </select>
         </div>
 

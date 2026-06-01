@@ -16,11 +16,16 @@ const router = express.Router();
 
 router.get("/:broker", async (req, res) => {
   try {
-    const broker = String(req.params.broker || "AIB").toUpperCase();
+    const broker = String(req.params.broker || "AIB-AXYS").toUpperCase();
+
+    const clientNumber = String(req.query.clientNumber || "");
+    const cdsNumber = String(req.query.cdsNumber || "");
 
     const valuations = getBrokerMirror(
       broker,
-      "valuation"
+      "valuation",
+      clientNumber,
+      cdsNumber
     );
 
     const holdings =
@@ -28,11 +33,12 @@ router.get("/:broker", async (req, res) => {
         ? valuations
         : getBrokerMirror(
             broker,
-            "holdings"
+            "holdings",
+            clientNumber,
+            cdsNumber
           );
 
-    const prices =
-      await marketDataGateway.getPrices();
+    const prices = await marketDataGateway.getPrices();
 
     const lookup = Object.fromEntries(
       (prices.data || []).map((x) => [
@@ -81,6 +87,9 @@ router.get("/:broker", async (req, res) => {
       );
 
       return {
+        broker,
+        clientNumber,
+        cdsNumber,
         symbol,
         sector,
         quantity,
@@ -95,10 +104,10 @@ router.get("/:broker", async (req, res) => {
     res.json({
       ok: true,
       broker,
-      source:
-        valuations.length > 0
-          ? "VALUATION"
-          : "HOLDINGS",
+      clientNumber,
+      cdsNumber,
+      source: valuations.length > 0 ? "VALUATION" : "HOLDINGS",
+      count: enriched.length,
       heatmap: enriched
     });
   } catch (error) {

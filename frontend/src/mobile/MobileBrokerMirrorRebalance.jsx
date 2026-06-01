@@ -26,6 +26,24 @@ const COLORS = [
 export default function MobileBrokerMirrorRebalance() {
   const navigate = useNavigate();
 
+  const brokerLink = useMemo(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("gatecepBrokerLink") || "{}"
+      );
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const broker = brokerLink.broker || "AIB-AXYS";
+  const clientNumber = brokerLink.clientNumber || "";
+  const cdsNumber = brokerLink.cdsNumber || "";
+
+  const brokerQuery = `clientNumber=${encodeURIComponent(
+    clientNumber
+  )}&cdsNumber=${encodeURIComponent(cdsNumber)}`;
+
   const [plan, setPlan] = useState(null);
   const [heatmap, setHeatmap] = useState([]);
   const [showSimulator, setShowSimulator] = useState(false);
@@ -38,15 +56,19 @@ export default function MobileBrokerMirrorRebalance() {
   const [intensity, setIntensity] = useState(50);
 
   async function loadPlan() {
-    const scoreRes = await fetch(`${API_URL}/broker-mirror-score/AIB`);
+    const scoreRes = await fetch(
+      `${API_URL}/broker-mirror-score/${broker}?${brokerQuery}`
+    );
     const score = await scoreRes.json();
 
     const rebalanceRes = await fetch(
-      `${API_URL}/broker-mirror-rebalance/AIB?risk=${risk}`
+      `${API_URL}/broker-mirror-rebalance/${broker}?risk=${risk}&goal=${goal}&${brokerQuery}`
     );
     const rebalance = await rebalanceRes.json();
 
-    const heatmapRes = await fetch(`${API_URL}/broker-heatmap/AIB`);
+    const heatmapRes = await fetch(
+      `${API_URL}/broker-heatmap/${broker}?${brokerQuery}`
+    );
     const heatmapData = await heatmapRes.json();
 
     setPlan({
@@ -59,7 +81,7 @@ export default function MobileBrokerMirrorRebalance() {
 
   async function loadInvestmentPlan() {
     const res = await fetch(
-      `${API_URL}/investment-planner/AIB?amount=${amount}&goal=${goal}&risk=${risk}&intensity=${intensity}`
+      `${API_URL}/investment-planner/${broker}?amount=${amount}&goal=${goal}&risk=${risk}&intensity=${intensity}&${brokerQuery}`
     );
 
     const data = await res.json();
@@ -72,7 +94,7 @@ export default function MobileBrokerMirrorRebalance() {
 
   useEffect(() => {
     loadPlan();
-  }, [risk]);
+  }, [risk, goal]);
 
   useEffect(() => {
     document.body.style.overflow = showSimulator ? "hidden" : "auto";
@@ -86,6 +108,7 @@ export default function MobileBrokerMirrorRebalance() {
     function handleEsc(event) {
       if (event.key === "Escape") {
         setShowSimulator(false);
+        setSelectedSector(null);
       }
     }
 
@@ -110,16 +133,14 @@ export default function MobileBrokerMirrorRebalance() {
       }
 
       acc[sector].securities.push(item);
-      acc[sector].totalValue += Number(item.value || 0);
+      acc[sector].totalValue += Number(item.value || item.marketValue || 0);
       acc[sector].totalProfitLoss += Number(item.profitLoss || 0);
 
       return acc;
     }, {});
 
     return Object.values(grouped).sort(
-      (a, b) =>
-        Number(b.totalValue || 0) -
-        Number(a.totalValue || 0)
+      (a, b) => Number(b.totalValue || 0) - Number(a.totalValue || 0)
     );
   }, [heatmap]);
 
@@ -150,46 +171,36 @@ export default function MobileBrokerMirrorRebalance() {
 
   const largestSector = sectorRows[0];
 
-const diversificationScore =
-Math.min(
-sectorRows.length * 4,
-30
-);
+  const diversificationScore = Math.min(sectorRows.length * 4, 30);
 
-const cashScore =
-summary.availableCash > 5000
-? 20
-: summary.availableCash > 1000
-? 12
-: 5;
+  const cashScore =
+    summary.availableCash > 5000
+      ? 20
+      : summary.availableCash > 1000
+      ? 12
+      : 5;
 
-const riskPenalty =
-plan.score?.rating === "HIGH_RISK"
-? 20
-: 8;
+  const riskPenalty =
+    plan.score?.rating === "HIGH_RISK"
+      ? 20
+      : 8;
 
-const profitScore =
-summary.profitLoss > 0
-? 20
-: -10;
+  const profitScore =
+    summary.profitLoss > 0
+      ? 20
+      : -10;
 
-const healthScore =
-Math.max(
-0,
-
-Math.min(
-
-100,
-
-diversificationScore +
-cashScore +
-profitScore -
-riskPenalty +
-40
-
-)
-
-);
+  const healthScore = Math.max(
+    0,
+    Math.min(
+      100,
+      diversificationScore +
+        cashScore +
+        profitScore -
+        riskPenalty +
+        40
+    )
+  );
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 pb-16">
@@ -200,6 +211,24 @@ riskPenalty +
       <p className="text-sm text-slate-400 mt-2">
         Advisory only. Gatecep will not execute trades.
       </p>
+
+      <div className="mt-4 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4">
+        <div className="font-bold text-cyan-300">
+          Linked Broker
+        </div>
+
+        <div className="text-sm text-slate-300 mt-2">
+          Broker: {broker}
+        </div>
+
+        <div className="text-sm text-slate-300">
+          Client Number: {clientNumber || "N/A"}
+        </div>
+
+        <div className="text-sm text-slate-300">
+          CDS Number: {cdsNumber || "N/A"}
+        </div>
+      </div>
 
       <div className="bg-slate-900 rounded-2xl p-4 mt-4 border border-slate-800">
         <div className="grid grid-cols-2 gap-4">
@@ -307,44 +336,34 @@ riskPenalty +
                 </defs>
 
                 <Pie
- data={sectorRows.map((sector)=>({
+                  data={sectorRows.map((sector) => ({
+                    name: sector.sector,
+                    value: sector.totalValue,
+                    weight:
+                      summary.portfolioValue > 0
+                        ? (sector.totalValue / summary.portfolioValue) * 100
+                        : 0
+                  }))}
+                  onClick={(data) => {
+                    const sector = sectorRows.find(
+                      (item) => item.sector === data.name
+                    );
 
-name: sector.sector,
-
-value: sector.totalValue,
-
-weight:
-summary.portfolioValue>0
-? (sector.totalValue/summary.portfolioValue)*100
-:0
-
-}))}
-
-onClick={(data) => {
-  const sector = sectorRows.find(
-    (item) => item.sector === data.name
-  );
-
-  setSelectedSector(sector || null);
-}}
-
- style={{
-cursor:"pointer"
-}}
-
- dataKey="value"
- nameKey="name"
- innerRadius={80}
- outerRadius={135}
- paddingAngle={2}
-
-                    label={({ cx, cy, midAngle, outerRadius, weight }) => {
+                    setSelectedSector(sector || null);
+                  }}
+                  style={{
+                    cursor: "pointer"
+                  }}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={80}
+                  outerRadius={135}
+                  paddingAngle={2}
+                  label={({ cx, cy, midAngle, outerRadius, weight }) => {
                     const RADIAN = Math.PI / 180;
                     const radius = outerRadius + 24;
-                    const x =
-                      cx + radius * Math.cos(-midAngle * RADIAN);
-                    const y =
-                      cy + radius * Math.sin(-midAngle * RADIAN);
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
                     return (
                       <text
@@ -424,12 +443,10 @@ cursor:"pointer"
 
             {sectorRows.map((sector, index) => (
               <div
-  key={sector.sector}
-
-  onClick={() => setSelectedSector(sector)}
-
-  className="grid grid-cols-3 items-center py-3 border-b border-slate-800 text-sm cursor-pointer active:scale-[0.98] transition"
->
+                key={sector.sector}
+                onClick={() => setSelectedSector(sector)}
+                className="grid grid-cols-3 items-center py-3 border-b border-slate-800 text-sm cursor-pointer active:scale-[0.98] transition"
+              >
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full"
@@ -439,14 +456,15 @@ cursor:"pointer"
                   />
 
                   <span
-  className={
-    sector.totalProfitLoss >= 0
-      ? "text-green-300"
-      : "text-red-300"
-  }
->
-  {sector.totalProfitLoss >= 0 ? "▲" : "▼"} {sector.sector}
-</span>
+                    className={
+                      sector.totalProfitLoss >= 0
+                        ? "text-green-300"
+                        : "text-red-300"
+                    }
+                  >
+                    {sector.totalProfitLoss >= 0 ? "▲" : "▼"}{" "}
+                    {sector.sector}
+                  </span>
                 </div>
 
                 <div className="text-right">
@@ -463,171 +481,68 @@ cursor:"pointer"
             ))}
           </div>
         </div>
-
       </div>
 
+      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4 mt-5">
+        <div className="font-bold text-cyan-300">
+          Coach G Recommendations
+        </div>
 
+        <div className="mt-3 space-y-2 text-sm text-slate-300">
+          <div>
+            • Largest exposure is{" "}
+            <span className="font-bold text-purple-300">
+              {largestSector?.sector || "N/A"}
+            </span>
+            . Avoid adding more unless it supports your goal.
+          </div>
 
-<div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-4 mt-5">
-  <div className="font-bold text-cyan-300">
-    Coach G Recommendations
-  </div>
+          <div>
+            • Use new money to strengthen underrepresented sectors.
+          </div>
 
-  <div className="mt-3 space-y-2 text-sm text-slate-300">
-    <div>
-      • Largest exposure is{" "}
-      <span className="font-bold text-purple-300">
-        {largestSector?.sector || "N/A"}
-      </span>
-      . Avoid adding more unless it supports your goal.
-    </div>
+          <div>
+            • Since available cash is{" "}
+            <span className="font-bold text-green-300">
+              KES {money(summary.availableCash)}
+            </span>
+            , Coach G will prioritize future deposits or new investment amounts.
+          </div>
 
-    <div>
-      • Use new money to strengthen underrepresented sectors.
-    </div>
+          <div>
+            • Open simulator to test how new capital changes allocation.
+          </div>
+        </div>
+      </div>
 
-    <div>
-      • Since available cash is{" "}
-      <span className="font-bold text-green-300">
-        KES {money(summary.availableCash)}
-      </span>
-      , Coach G will prioritize future deposits or new investment amounts.
-    </div>
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mt-5">
+        <div className="flex justify-between items-center">
+          <div>
+            <div className="text-slate-400 text-sm">
+              Portfolio Health
+            </div>
 
-    <div>
-      • Open simulator to test how new capital changes allocation.
-    </div>
-  </div>
-</div>
+            <div className="text-3xl font-bold text-cyan-300">
+              {healthScore}/100
+            </div>
+          </div>
 
-<div className="
-bg-slate-900
-border
-border-slate-800
-rounded-2xl
-p-5
-mt-5
-">
+          <div className="text-right text-xs text-slate-400">
+            Coach G Score
+          </div>
+        </div>
 
-<div className="
-flex
-justify-between
-items-center
-">
-
-<div>
-
-<div className="
-text-slate-400
-text-sm
-">
-
-Portfolio Health
-
-</div>
-
-<div className="
-text-3xl
-font-bold
-text-cyan-300
-">
-
-{healthScore}/100
-
-</div>
-
-</div>
-
-<div className="
-text-right
-text-xs
-text-slate-400
-">
-
-Coach G Score
-
-</div>
-
-</div>
-
-<div className="
-mt-4
-space-y-2
-text-sm
-">
-
-<div className="
-flex
-justify-between
-">
-
-<span>Diversification</span>
-
-<span className="text-cyan-300">
-
-+{diversificationScore}
-
-</span>
-
-</div>
-
-<div className="
-flex
-justify-between
-">
-
-<span>Cash Position</span>
-
-<span className="text-green-300">
-
-+{cashScore}
-
-</span>
-
-</div>
-
-<div className="
-flex
-justify-between
-">
-
-<span>Risk Exposure</span>
-
-<span className="text-red-300">
-
--{riskPenalty}
-
-</span>
-
-</div>
-
-<div className="
-flex
-justify-between
-">
-
-<span>Profitability</span>
-
-<span className={
-summary.profitLoss>=0
-?
-"text-green-300"
-:
-"text-red-300"
-}
->
-
-{profitScore>=0?"+":""}
-
-{profitScore}
-
-</span>
-
-</div>
-
-</div>
-
-</div>
+        <div className="mt-4 space-y-2 text-sm">
+          <ScoreRow label="Diversification" value={`+${diversificationScore}`} color="text-cyan-300" />
+          <ScoreRow label="Cash Position" value={`+${cashScore}`} color="text-green-300" />
+          <ScoreRow label="Risk Exposure" value={`-${riskPenalty}`} color="text-red-300" />
+          <ScoreRow
+            label="Profitability"
+            value={`${profitScore >= 0 ? "+" : ""}${profitScore}`}
+            color={profitScore >= 0 ? "text-green-300" : "text-red-300"}
+          />
+        </div>
+      </div>
 
       <button
         onClick={() => navigate("/mobile/holding-details")}
@@ -657,51 +572,12 @@ summary.profitLoss>=0
         Simulate Coach G Recommendations
       </button>
 
-     {selectedSector && (
-  <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center overflow-y-auto pt-8 pb-8">
-    <div className="bg-slate-950 border border-cyan-500/40 rounded-3xl p-5 w-full max-w-3xl mx-4">
-      <div className="flex justify-between">
-        <h2 className="text-xl font-bold text-cyan-300">
-          {selectedSector.sector}
-        </h2>
-
-        <button
-          onClick={() => setSelectedSector(null)}
-          className="text-slate-400"
-        >
-          Close
-        </button>
-      </div>
-
-      <p className="text-sm text-slate-400 mt-2">
-        {selectedSector.securities.length} securities • KES {money(selectedSector.totalValue)}
-      </p>
-
-      <div className="mt-5 space-y-3">
-        {selectedSector.securities.map((sec) => (
-          <div
-            key={sec.symbol}
-            className="bg-slate-900 rounded-2xl p-4 border border-slate-800"
-          >
-            <div className="flex justify-between">
-              <div className="font-bold">{sec.symbol}</div>
-              <div className={sec.profitLoss >= 0 ? "text-green-300" : "text-red-300"}>
-                KES {money(sec.profitLoss)}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-3 text-xs text-slate-400">
-              <div>Qty: {Number(sec.quantity || 0).toLocaleString()}</div>
-              <div>Price: KES {money(sec.price)}</div>
-              <div>Value: KES {money(sec.value)}</div>
-              <div>Return: {Number(sec.changePct || 0).toFixed(2)}%</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-)}
+      {selectedSector && (
+        <SectorModal
+          sector={selectedSector}
+          onClose={() => setSelectedSector(null)}
+        />
+      )}
 
       {showSimulator && (
         <div
@@ -806,10 +682,7 @@ summary.profitLoss>=0
                   </div>
 
                   <div className="text-xl font-bold mt-2">
-                    KES{" "}
-                    {money(
-                      plan.investmentPlan.projectedPortfolioValue
-                    )}
+                    KES {money(plan.investmentPlan.projectedPortfolioValue)}
                   </div>
 
                   <div className="text-sm text-slate-400 mt-2">
@@ -853,6 +726,75 @@ summary.profitLoss>=0
   );
 }
 
+function SectorModal({ sector, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-start justify-center overflow-y-auto pt-8 pb-8">
+      <div className="bg-slate-950 border border-cyan-500/40 rounded-3xl p-5 w-full max-w-3xl mx-4">
+        <div className="flex justify-between">
+          <h2 className="text-xl font-bold text-cyan-300">
+            {sector.sector}
+          </h2>
+
+          <button
+            onClick={onClose}
+            className="text-slate-400"
+          >
+            Close
+          </button>
+        </div>
+
+        <p className="text-sm text-slate-400 mt-2">
+          {sector.securities.length} securities • KES{" "}
+          {money(sector.totalValue)}
+        </p>
+
+        <div className="mt-5 space-y-3">
+          {sector.securities.map((sec) => (
+            <div
+              key={sec.symbol}
+              className="bg-slate-900 rounded-2xl p-4 border border-slate-800"
+            >
+              <div className="flex justify-between">
+                <div className="font-bold">
+                  {sec.symbol}
+                </div>
+
+                <div
+                  className={
+                    sec.profitLoss >= 0
+                      ? "text-green-300"
+                      : "text-red-300"
+                  }
+                >
+                  KES {money(sec.profitLoss)}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mt-3 text-xs text-slate-400">
+                <div>
+                  Qty: {Number(sec.quantity || 0).toLocaleString()}
+                </div>
+
+                <div>
+                  Price: KES {money(sec.price)}
+                </div>
+
+                <div>
+                  Value: KES {money(sec.value || sec.marketValue)}
+                </div>
+
+                <div>
+                  Return: {Number(sec.changePct || 0).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Metric({ label, value, color }) {
   return (
     <div>
@@ -882,6 +824,15 @@ function SmallCard({
       <div className={`${color} font-bold`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function ScoreRow({ label, value, color }) {
+  return (
+    <div className="flex justify-between">
+      <span>{label}</span>
+      <span className={color}>{value}</span>
     </div>
   );
 }

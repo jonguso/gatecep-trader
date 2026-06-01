@@ -3,6 +3,7 @@ export function buildInvestorProfile(input = {}) {
   const risk = String(input.risk || "balanced");
   const experience = String(input.experience || "beginner");
   const timeHorizon = String(input.timeHorizon || "3_5_years");
+  const contribution = String(input.contribution || "flexible");
 
   let sectorCap = 30;
   let cashReserve = 15;
@@ -34,17 +35,27 @@ export function buildInvestorProfile(input = {}) {
   }
 
   return {
+    profileVersion: "COACH_G_PROFILE_V1",
     goal,
     risk,
     experience,
     timeHorizon,
+    contribution,
     investorType: getInvestorType(goal, risk),
     constraints: {
       sectorCap,
       cashReserve,
       maxSinglePosition,
       minimumHoldings
-    }
+    },
+    alignmentRules: {
+      compareUploadedPortfolio: true,
+      flagGoalMismatch: true,
+      flagSectorConcentration: true,
+      flagCashMismatch: true,
+      flagBehaviorMismatch: true
+    },
+    createdAt: new Date().toISOString()
   };
 }
 

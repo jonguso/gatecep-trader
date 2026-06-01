@@ -2,71 +2,124 @@ import express from "express";
 
 const router = express.Router();
 
-router.get("/", (req,res)=>{
+router.get("/", (req, res) => {
 
-const portfolio =
-Number(req.query.portfolio||0);
+  const portfolio =
+    Number(req.query.portfolio || 0);
 
-const conservative =
-portfolio*0.85;
+  const risk =
+    String(
+      req.query.risk || "balanced"
+    );
 
-const moderate =
-portfolio*1.12;
+  const goal =
+    String(
+      req.query.goal || ""
+    );
 
-const aggressive =
-portfolio*1.30;
+  let crashPct = -15;
+  let expectedPct = 12;
+  let bullPct = 30;
 
-res.json({
+  if (risk === "conservative") {
 
-ok:true,
+    crashPct = -8;
+    expectedPct = 8;
+    bullPct = 18;
 
-portfolio,
+  }
 
-scenarios:[
+  if (risk === "aggressive") {
 
-{
+    crashPct = -25;
+    expectedPct = 18;
+    bullPct = 45;
 
-name:"Market Crash",
+  }
 
-change:-15,
+  if (goal === "dividend") {
 
-value:
-Number(
-conservative.toFixed(2)
-)
+    expectedPct -= 2;
 
-},
+  }
 
-{
+  const scenarios = [
 
-name:"Expected Growth",
+    {
+      name: "Market Crash",
 
-change:+12,
+      change: crashPct,
 
-value:
-Number(
-moderate.toFixed(2)
-)
+      value: calculate(
+        portfolio,
+        crashPct
+      ),
 
-},
+      description:
+        "Stress scenario for major downside movement."
+    },
 
-{
+    {
+      name: "Expected Growth",
 
-name:"Bull Market",
+      change: expectedPct,
 
-change:+30,
+      value: calculate(
+        portfolio,
+        expectedPct
+      ),
 
-value:
-Number(
-aggressive.toFixed(2)
-)
+      description:
+        "Expected long-term portfolio outcome."
+    },
+
+    {
+      name: "Bull Market",
+
+      change: bullPct,
+
+      value: calculate(
+        portfolio,
+        bullPct
+      ),
+
+      description:
+        "Optimistic market scenario."
+    }
+
+  ];
+
+  res.json({
+
+    ok: true,
+
+    portfolio,
+
+    risk,
+
+    goal,
+
+    scenarios,
+
+    generatedAt:
+      new Date().toISOString()
+
+  });
+
+});
+
+function calculate(
+  portfolio,
+  change
+) {
+
+  return Number(
+    (
+      portfolio *
+      (1 + change / 100)
+    ).toFixed(2)
+  );
 
 }
-
-]
-
-});
-
-});
 
 export default router;

@@ -1,5 +1,9 @@
 import express from "express";
 
+import {
+  buildInvestorProfile
+} from "../services/investorProfile.service.js";
+
 const router = express.Router();
 
 router.get("/", async (req, res) => {
@@ -16,191 +20,46 @@ router.get("/", async (req, res) => {
     const investmentAmount =
       Number(amount || 0);
 
-    const brokers = [
-      {
-        name: "AIB",
-        beginner: 9,
-        research: 9,
-        fees: 8,
-        active: 7
-      },
-      {
-        name: "ABC",
-        beginner: 8,
-        research: 7,
-        fees: 8,
-        active: 9
-      }
-    ];
+    const profile =
+      buildInvestorProfile({
+        goal,
+        risk,
+        experience,
+        timeHorizon
+      });
 
-    function scoreBroker(broker){
+    const brokerComparison =
+      buildBrokerComparison(profile);
 
-      let score = 50;
+    const recommendedBroker =
+      brokerComparison[0];
 
-      score += broker.beginner;
-
-      score += broker.research;
-
-      score += broker.fees;
-
-      if(
-        risk==="aggressive"
-      ){
-        score += broker.active;
-      }
-
-      if(
-        experience==="beginner"
-      ){
-        score += broker.beginner;
-      }
-
-      return score;
-    }
-
-    const ranked =
-      brokers
-      .map(b=>({
-
-        ...b,
-
-        score:
-          scoreBroker(b)
-
-      }))
-      .sort(
-        (a,b)=>
-          b.score-a.score
-      );
-
-    const broker =
-      ranked[0];
-
-    let starterPortfolio=[];
-
-    if(goal==="dividend"){
-
-      starterPortfolio=[
-
-        {
-          bucket:"Dividend Basket",
-          weight:40
-        },
-
-        {
-          bucket:"Banking",
-          weight:25
-        },
-
-        {
-          bucket:"ETF",
-          weight:20
-        },
-
-        {
-          bucket:"Cash",
-          weight:15
-        }
-
-      ];
-
-    } else if(risk==="aggressive"){
-
-      starterPortfolio=[
-
-        {
-          bucket:"Growth Stocks",
-          weight:45
-        },
-
-        {
-          bucket:"ETF",
-          weight:20
-        },
-
-        {
-          bucket:"Banking",
-          weight:20
-        },
-
-        {
-          bucket:"Cash",
-          weight:15
-        }
-
-      ];
-
-    } else {
-
-      starterPortfolio=[
-
-        {
-          bucket:"ETF",
-          weight:30
-        },
-
-        {
-          bucket:"Banking",
-          weight:25
-        },
-
-        {
-          bucket:"Dividend Basket",
-          weight:25
-        },
-
-        {
-          bucket:"Cash",
-          weight:20
-        }
-
-      ];
-
-    }
-
-    starterPortfolio =
-      starterPortfolio.map(
-        x=>({
-
-          ...x,
-
-          amount:
-
-          (
-            investmentAmount *
-            x.weight
-          )/100
-
-        })
+    const starterPortfolio =
+      buildStarterPortfolio(
+        profile,
+        investmentAmount
       );
 
     res.json({
 
-      ok:true,
+      ok: true,
 
-      recommendedBroker:{
+      profile,
 
-        name:
-          broker.name,
+      recommendedBroker,
 
-        score:
-          broker.score,
-
-        reason:
-
-        `${broker.name} best matches your risk profile and experience.`
-
-      },
+      brokerComparison,
 
       starterPortfolio,
 
       advice:
-
-      `Based on ${risk} risk and ${goal}, begin slowly and invest consistently.`
+        buildAdvice(
+          profile
+        )
 
     });
 
-  } catch(error){
+  } catch (error) {
 
     res.status(500).json({
 
@@ -213,5 +72,241 @@ router.get("/", async (req, res) => {
   }
 
 });
+
+function buildBrokerComparison(
+  profile
+) {
+
+  const brokers = [
+
+    {
+      name:"AIB-AXYS",
+
+      baseScore:82,
+
+      bestFor:
+        "Beginners and long-term investors",
+
+      strengths:[
+        "Beginner friendly",
+        "Research support",
+        "Portfolio building"
+      ]
+    },
+
+    {
+      name:"ABC",
+
+      baseScore:78,
+
+      bestFor:
+        "Active investors",
+
+      strengths:[
+        "Trading tools",
+        "Execution speed",
+        "Market access"
+      ]
+    },
+
+    {
+      name:"Dyer & Blair",
+
+      baseScore:76,
+
+      bestFor:
+        "Research-focused investors",
+
+      strengths:[
+        "Research depth",
+        "Advisory support",
+        "Institutional experience"
+      ]
+    }
+
+  ];
+
+  return brokers
+  .map((broker)=>{
+
+    let score =
+      broker.baseScore;
+
+    if (
+      profile.experience==="beginner" &&
+      broker.name==="AIB-AXYS"
+    ) {
+      score+=5;
+    }
+
+    if (
+      profile.risk==="aggressive" &&
+      broker.name==="ABC"
+    ) {
+      score+=5;
+    }
+
+    if (
+      profile.goal==="dividend" &&
+      broker.name==="Dyer & Blair"
+    ) {
+      score+=4;
+    }
+
+    return {
+
+      ...broker,
+
+      score:
+        Math.min(
+          score,
+          100
+        )
+
+    };
+
+  })
+  .sort(
+    (a,b)=>
+      b.score-a.score
+  );
+
+}
+
+function buildStarterPortfolio(
+  profile,
+  amount
+){
+
+ let buckets=[];
+
+ if(
+  profile.goal==="dividend"
+ ){
+
+  buckets=[
+
+   {
+    bucket:
+     "Dividend Basket",
+    weight:40
+   },
+
+   {
+    bucket:
+     "Banking",
+    weight:25
+   },
+
+   {
+    bucket:
+     "ETF",
+    weight:20
+   },
+
+   {
+    bucket:
+     "Cash",
+    weight:15
+   }
+
+  ];
+
+ }
+
+ else if(
+  profile.risk==="aggressive"
+ ){
+
+  buckets=[
+
+   {
+    bucket:
+     "Growth Stocks",
+    weight:45
+   },
+
+   {
+    bucket:
+     "ETF",
+    weight:20
+   },
+
+   {
+    bucket:
+     "Banking",
+    weight:20
+   },
+
+   {
+    bucket:
+     "Cash",
+    weight:15
+   }
+
+  ];
+
+ }
+
+ else{
+
+  buckets=[
+
+   {
+    bucket:
+     "ETF",
+    weight:30
+   },
+
+   {
+    bucket:
+     "Banking",
+    weight:25
+   },
+
+   {
+    bucket:
+     "Dividend Basket",
+    weight:25
+   },
+
+   {
+    bucket:
+     "Cash",
+    weight:20
+   }
+
+  ];
+
+ }
+
+ return buckets.map(
+  (bucket)=>({
+
+   ...bucket,
+
+   amount:
+
+   Number(
+
+    (
+      amount*
+      bucket.weight
+    )/100
+
+   .toFixed(2))
+
+  })
+ );
+
+}
+
+function buildAdvice(
+ profile
+){
+
+ return `Coach G believes a ${profile.risk} investor with a ${profile.goal} objective should focus on consistency, diversification, and periodic portfolio reviews.`;
+
+}
 
 export default router;

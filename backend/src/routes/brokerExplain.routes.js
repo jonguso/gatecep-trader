@@ -1,138 +1,229 @@
 import express from "express";
 
 import {
- getBrokerMirror
-}
-from "../repositories/brokerMirror.repository.js";
+  getBrokerMirror
+} from "../repositories/brokerMirror.repository.js";
 
 import {
- marketDataGateway
-}
-from "../services/marketData/MarketDataGateway.js";
+  marketDataGateway
+} from "../services/marketData/MarketDataGateway.js";
+
+import {
+  normalizeNseSymbol
+} from "../data/nseSecurityMaster.js";
 
 const router = express.Router();
 
-router.get(
- "/:broker/:symbol",
- async (req,res)=>{
+router.get("/:broker/:symbol", async (req, res) => {
+  try {
 
-try{
+    const broker =
+      String(req.params.broker || "AIB")
+      .toUpperCase();
 
-const broker =
- String(
-  req.params.broker
- ).toUpperCase();
+    const symbol =
+      normalizeNseSymbol(
+        req.params.symbol
+      );
 
-const symbol =
- String(
-  req.params.symbol
- ).toUpperCase();
+    /*
+      Prefer valuation data
+      fallback to holdings
+    */
 
-const holdings =
- getBrokerMirror(
-  broker,
-  "holdings"
- );
+    const valuationRows =
+      getBrokerMirror(
+        broker,
+        "valuation"
+      );
 
-const holding =
- holdings.find(
-  x =>
-   String(
-    x.symbol
-   ).toUpperCase()
-   === symbol
- );
+    const holdingsRows =
+      getBrokerMirror(
+        broker,
+        "holdings"
+      );
 
-if(!holding){
+    const sourceRows =
+      valuationRows.length > 0
+        ? valuationRows
+        : holdingsRows;
 
- return res
- .status(404)
- .json({
-  ok:false,
-  error:
-   "holding not found"
- });
+    const holding =
+      sourceRows.find(
+        item =>
+          normalizeNseSymbol(
+            item.symbol
+          ) === symbol
+      );
 
-}
+    if (!holding) {
 
-const prices =
- await marketDataGateway
- .getPrices();
+      return res
+      .status(404)
+      .json({
 
-const market =
- prices.data.find(
-  x =>
-   String(
-    x.symbol
-   ).toUpperCase()
-   === symbol
- ) || {};
+        ok:false,
 
-const quantity =
- Number(
-  holding.quantity||0
- );
+        error:
+          "Holding not found"
 
-const price =
- Number(
-  market.price||0
- );
+      });
 
-const marketValue =
- quantity*price;
+    }
 
-let recommendation;
+    const prices =
+      await marketDataGateway
+      .getPrices();
 
-if(
- Number(
-  market.changePct||0
- ) < 0
-){
+    const market =
+      (prices.data || [])
+      .find(
+        item =>
+          normalizeNseSymbol(
+            item.symbol
+          ) === symbol
+      ) || {};
 
- recommendation =
-  "Momentum weakening.";
+    const quantity =
+      Number(
+        holding.quantity || 0
+      );
 
-}else{
+    const averagePrice =
+      Number(
+        holding.averagePrice ||
+        0
+      );
 
- recommendation =
-  "Momentum improving.";
+    const price =
+      Number(
+        holding.marketPrice ||
+        market.price ||
+        market.lastPrice ||
+        0
+      );
 
-}
+    const marketValue =
+      Number(
+        holding.marketValue ||
+        quantity * price
+      );
 
-res.json({
+    const costValue =
+      quantity *
+      averagePrice;
 
- ok:true,
+    const profitLoss =
+      Number(
+        holding.profitLoss ||
+        (
+          costValue > 0
+            ? marketValue - costValue
+            : 0
+        )
+      );
 
- broker,
+    const profitLossPct =
+      Number(
+        holding.profitLossPct ||
+        (
+          costValue > 0
+            ? (
+                profitLoss /
+                costValue
+              ) * 100
+            : 0
+        )
+      );
 
- symbol,
+    const changePct =
+      Number(
+        market.changePct || 0
+      );
 
- quantity,
+    let recommendation =
+      "Maintain current monitoring.";
 
- price,
+    if (changePct < -3) {
 
- marketValue,
+      recommendation =
+        "Momentum weakening. Coach G recommends reviewing concentration and thesis.";
 
- sector:
-  market.sector,
+    } else if (
+      changePct > 3
+    ) {
 
- changePct:
-  market.changePct,
+      recommendation =
+        "Momentum improving. Continue monitoring position sizing.";
 
- explanation:
+    }
 
- `${symbol} represents approximately KES ${marketValue.toFixed(2)} in your broker mirror. Current trend is ${market.changePct}% and sector is ${market.sector}. ${recommendation}`
+    res.json({
 
-});
+      ok:true,
 
-}catch(error){
+      broker,
 
-res.status(500).json({
- ok:false,
- error:error.message
-});
+      symbol,
 
-}
+      source:
+
+        valuationRows.length > 0
+          ? "VALUATION"
+          : "HOLDINGS",
+
+      name:
+
+        holding.name ||
+        market.name ||
+        "",
+
+      sector:
+
+        market.sector ||
+        holding.sector ||
+        "Unknown",
+
+      quantity,
+
+      averagePrice,
+
+      marketPrice: price,
+
+      marketValue:
+        Number(
+          marketValue.toFixed(2)
+        ),
+
+      profitLoss:
+        Number(
+          profitLoss.toFixed(2)
+        ),
+
+      profitLossPct:
+        Number(
+          profitLossPct.toFixed(2)
+        ),
+
+      changePct,
+
+      explanation:
+
+`${symbol} currently represents KES ${marketValue.toFixed(2)} of your portfolio. Position return is ${profitLossPct.toFixed(2)}%. Market momentum is ${changePct}% and Coach G assessment is: ${recommendation}`
+
+    });
+
+  } catch(error){
+
+    res.status(500).json({
+
+      ok:false,
+
+      error:error.message
+
+    });
+
+  }
 
 });
 

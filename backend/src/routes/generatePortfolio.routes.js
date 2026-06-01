@@ -17,6 +17,7 @@ router.get("/", (req, res) => {
       risk = "balanced",
       experience = "beginner",
       timeHorizon = "3_5_years",
+      contribution = "flexible",
       amount = 10000
     } = req.query;
 
@@ -24,11 +25,14 @@ router.get("/", (req, res) => {
       goal,
       risk,
       experience,
-      timeHorizon
+      timeHorizon,
+      contribution
     });
 
-    const recommendation =
-      buildRecommendedPortfolio(profile, Number(amount || 0));
+    const recommendation = buildRecommendedPortfolio(
+      profile,
+      Number(amount || 0)
+    );
 
     const confidence = calculateConfidence(profile, recommendation);
 
@@ -41,6 +45,8 @@ router.get("/", (req, res) => {
       explanation: [
         `Goal matched: ${profile.goal}`,
         `Risk profile: ${profile.risk}`,
+        `Experience level: ${profile.experience}`,
+        `Contribution plan: ${profile.contribution}`,
         `Cash reserve maintained at ${profile.constraints.cashReserve}%`,
         `Sector cap applied at ${profile.constraints.sectorCap}%`,
         `Single-position cap applied at ${profile.constraints.maxSinglePosition}%`
@@ -57,10 +63,7 @@ router.get("/", (req, res) => {
 function calculateConfidence(profile, recommendation) {
   let score = 100;
 
-  if (
-    recommendation.portfolio.length <
-    profile.constraints.minimumHoldings
-  ) {
+  if (recommendation.portfolio.length < profile.constraints.minimumHoldings) {
     score -= 15;
   }
 
@@ -69,10 +72,7 @@ function calculateConfidence(profile, recommendation) {
       ? (recommendation.cash / recommendation.amount) * 100
       : 0;
 
-  if (
-    cashWeight <
-    profile.constraints.cashReserve
-  ) {
+  if (cashWeight < profile.constraints.cashReserve) {
     score -= 10;
   }
 
@@ -85,19 +85,34 @@ function buildBrokerComparison(profile) {
       name: "AIB",
       baseScore: 82,
       bestFor: "Beginners and long-term investors",
-      strengths: ["Beginner friendly", "Research support", "Good for portfolio building"]
+      signupUrl: "https://www.aib-axysafrica.com/",
+      strengths: [
+        "Beginner friendly",
+        "Research support",
+        "Good for portfolio building"
+      ]
     },
     {
       name: "ABC",
       baseScore: 78,
       bestFor: "Active investors",
-      strengths: ["Trading tools", "Execution speed", "Market access"]
+      signupUrl: "https://abc-capital.com/",
+      strengths: [
+        "Trading tools",
+        "Execution speed",
+        "Market access"
+      ]
     },
     {
       name: "Dyer & Blair",
       baseScore: 76,
       bestFor: "Research-focused investors",
-      strengths: ["Research depth", "Institutional experience", "Advisory support"]
+      signupUrl: "https://dyerandblair.com/",
+      strengths: [
+        "Research depth",
+        "Institutional experience",
+        "Advisory support"
+      ]
     }
   ];
 

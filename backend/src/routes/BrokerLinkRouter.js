@@ -6,21 +6,47 @@ router.post("/", async (req, res) => {
 
   try {
 
+    const {
+
+      broker,
+
+      clientNumber,
+
+      cdsNumber,
+
+      email,
+
+      source = "EXISTING_INVESTOR",
+
+      recommendedBroker = null,
+
+      customerProfile = null,
+
+      status = "LINKED_PENDING_UPLOAD"
+
+    } = req.body;
+
     const brokerLink = {
 
       id: `BL-${Date.now()}`,
 
-      broker: req.body.broker,
+      broker,
 
-      clientNumber: req.body.clientNumber,
+      clientNumber,
 
-      cdsNumber: req.body.cdsNumber,
+      cdsNumber,
 
-      email: req.body.email,
+      email,
 
-      status:
-        req.body.status ||
-        "LINKED_PENDING_UPLOAD",
+      source,
+
+      recommendedBroker,
+
+      customerProfile,
+
+      status,
+
+      uploadRequired: true,
 
       createdAt:
         new Date().toISOString()
@@ -31,7 +57,10 @@ router.post("/", async (req, res) => {
 
       ok: true,
 
-      brokerLink
+      brokerLink,
+
+      nextStep:
+        "/mobile/broker-upload"
 
     });
 
@@ -39,9 +68,9 @@ router.post("/", async (req, res) => {
 
     res.status(500).json({
 
-      ok:false,
+      ok: false,
 
-      error:error.message
+      error: error.message
 
     });
 

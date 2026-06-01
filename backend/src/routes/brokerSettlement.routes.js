@@ -10,12 +10,58 @@ import {
 
 const router = express.Router();
 
+function normalizeBroker(value) {
+  const broker = String(value || "AIB-AXYS").trim().toUpperCase();
+
+  if (broker === "AIB") return "AIB-AXYS";
+  if (broker === "ABC CAPITAL") return "ABC";
+
+  return broker;
+}
+
+function cleanNumber(value) {
+  const cleaned = String(value ?? 0)
+    .replaceAll(",", "")
+    .replaceAll("'", "")
+    .replace(/KES/gi, "")
+    .trim();
+
+  const num = Number(cleaned);
+
+  return Number.isFinite(num) ? num : 0;
+}
+
+function filterByClient(rows = [], clientNumber = "", cdsNumber = "") {
+  if (!clientNumber && !cdsNumber) return rows;
+
+  return rows.filter((row) => {
+    const rowClient = String(row.clientNumber || "").trim();
+    const rowCds = String(row.cdsNumber || "").trim();
+
+    return (
+      (!clientNumber || rowClient === String(clientNumber).trim()) &&
+      (!cdsNumber || rowCds === String(cdsNumber).trim())
+    );
+  });
+}
+
 router.get("/:broker", (req, res) => {
   try {
-    const broker = String(req.params.broker || "AIB").toUpperCase();
+    const broker = normalizeBroker(req.params.broker);
+    const clientNumber = String(req.query.clientNumber || "").trim();
+    const cdsNumber = String(req.query.cdsNumber || "").trim();
 
-    const valuation = getBrokerMirror(broker, "valuation");
-    const holdings = getBrokerMirror(broker, "holdings");
+    const valuation = filterByClient(
+      getBrokerMirror(broker, "valuation"),
+      clientNumber,
+      cdsNumber
+    );
+
+    const holdings = filterByClient(
+      getBrokerMirror(broker, "holdings"),
+      clientNumber,
+      cdsNumber
+    );
 
     const settledLookup = Object.fromEntries(
       holdings.map((item) => [
@@ -29,21 +75,18 @@ router.get("/:broker", (req, res) => {
         const symbol = normalizeNseSymbol(item.symbol);
         const settled = settledLookup[symbol] || {};
 
-        const currentQty = Number(item.quantity || 0);
-        const settledQty = Number(settled.quantity || 0);
+        const currentQty = cleanNumber(item.quantity);
+        const settledQty = cleanNumber(settled.quantity);
         const pendingQty = currentQty - settledQty;
 
-        const marketPrice = Number(
+        const marketPrice = cleanNumber(
           item.marketPrice ||
-          item.price ||
-          0
+            item.price ||
+            0
         );
 
         const pendingValue = Number(
-          (
-            pendingQty *
-            marketPrice
-          ).toFixed(2)
+          (pendingQty * marketPrice).toFixed(2)
         );
 
         let direction = "SETTLED";
@@ -57,6 +100,9 @@ router.get("/:broker", (req, res) => {
         }
 
         return {
+          broker,
+          clientNumber: item.clientNumber || clientNumber,
+          cdsNumber: item.cdsNumber || cdsNumber,
           symbol,
           name: item.name || "",
           currentQty,
@@ -80,6 +126,8 @@ router.get("/:broker", (req, res) => {
     res.json({
       ok: true,
       broker,
+      clientNumber,
+      cdsNumber,
       valuationCount: valuation.length,
       settledHoldingCount: holdings.length,
       totalUnsettledBuyValue: Number(totalUnsettledBuyValue.toFixed(2)),
