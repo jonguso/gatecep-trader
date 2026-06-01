@@ -66,6 +66,11 @@ import brokerCashSummaryRouter from "./routes/brokerCashSummary.routes.js";
 import newInvestorPlanRoutes
 from "./routes/newInvestorPlan.routes.js";
 import starterBasketRoutes from "./routes/starterBasket.routes.js";
+import generatePortfolioRoutes from "./routes/generatePortfolio.routes.js";
+import goalTrackerRoutes
+from "./routes/goalTracker.routes.js";
+import stressTestRoutes
+from "./routes/stressTest.routes.js";
 
 import executionRouter from "./routes/execution.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
@@ -239,6 +244,15 @@ app.use(
 newInvestorPlanRoutes
 );
 app.use("/starter-basket", starterBasketRoutes);
+app.use("/generate-portfolio", generatePortfolioRoutes);
+app.use(
+"/goal-tracker",
+goalTrackerRoutes
+);
+app.use(
+"/stress-test",
+stressTestRoutes
+);
 
 
 

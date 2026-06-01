@@ -1,5 +1,5 @@
 export const securities = [
-  { symbol: "SCOM", name: "Safaricom PLC", sector: "Telecommunication", price: 29.85, prevClose: 29.20, volume: 115664, marketCap: 1000000000000 },
+  { symbol: "SCOM", name: "Safaricom PLC", sector: "Telecom", price: 29.85, prevClose: 29.20, volume: 115664, marketCap: 1000000000000 },
   { symbol: "KCB", name: "KCB Group PLC", sector: "Banking", price: 67.50, prevClose: 66.10, volume: 33209, marketCap: 210000000000 },
   { symbol: "EQTY", name: "Equity Group Holdings", sector: "Banking", price: 74.50, prevClose: 73.20, volume: 20119, marketCap: 280000000000 },
   { symbol: "EABL", name: "East African Breweries PLC", sector: "Manufacturing", price: 241.75, prevClose: 238.20, volume: 2039, marketCap: 190000000000 },

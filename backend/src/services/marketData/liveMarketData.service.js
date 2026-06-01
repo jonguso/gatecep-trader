@@ -1,10 +1,10 @@
 const symbols = ["SCOM", "EQTY", "KCB", "COOP"];
 
 const prices = {
-  SCOM: 18.45,
-  EQTY: 47.2,
-  KCB: 31.8,
-  COOP: 15.6
+  SCOM: 30.60,
+  EQTY: 75.20,
+  KCB: 67.50,
+  COOP: 31.50
 };
 
 export function generateMarketTick() {

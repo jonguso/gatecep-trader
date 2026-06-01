@@ -15,7 +15,7 @@ export default function MobileInvestorHome() {
 
       <div className="mt-6 space-y-4">
         <button
-          onClick={() => navigate("/mobile/broker-rebalance")}
+          onClick={() => navigate("/mobile/broker-link")}
           className="w-full bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-5 text-left"
         >
           <div className="text-xl font-bold text-cyan-300">
@@ -23,7 +23,7 @@ export default function MobileInvestorHome() {
           </div>
 
           <p className="text-sm text-slate-300 mt-2">
-            Upload broker reports and let Coach G analyze your current portfolio.
+            Link your broker, upload reports, and let Coach G analyze your current portfolio.
           </p>
         </button>
 
