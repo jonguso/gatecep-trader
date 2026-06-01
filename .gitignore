@@ -7,3 +7,5 @@ dist/
 build/
 .DS_Store
 npm-debug.log*backend/_archive/
+mobile/node_modules/
+mobile/.expo/
