@@ -63,6 +63,9 @@ from "./routes/investmentPlanner.routes.js";
 import brokerAccountSummaryRouter from "./routes/brokerAccountSummary.routes.js";
 import brokerSettlementRouter from "./routes/brokerSettlement.routes.js";
 import brokerCashSummaryRouter from "./routes/brokerCashSummary.routes.js";
+import newInvestorPlanRoutes
+from "./routes/newInvestorPlan.routes.js";
+import starterBasketRoutes from "./routes/starterBasket.routes.js";
 
 import executionRouter from "./routes/execution.routes.js";
 import analyticsRouter from "./routes/analytics.routes.js";
@@ -191,6 +194,8 @@ app.get("/prices", async (req, res) => {
 app.get("/account/:userId", (req, res) => {
   res.json(state.users[req.params.userId]);
 });
+
+
 app.get("/candles/:symbol", getCandles);
 app.use("/portfolio", unifiedPortfolioRouter);
 app.use("/portfolio", portfolioAnalyticsRoutes);
@@ -229,6 +234,14 @@ app.use(
  "/broker-explain",
  brokerExplainRouter
 );
+app.use(
+"/new-investor-plan",
+newInvestorPlanRoutes
+);
+app.use("/starter-basket", starterBasketRoutes);
+
+
+
 app.use(errorHandler);
 app.use("/broker-mirror/action", brokerMirrorActionsRouter);
 app.use(

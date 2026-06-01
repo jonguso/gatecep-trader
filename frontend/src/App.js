@@ -52,6 +52,8 @@ import MobileBrokerMirrorRebalance from "./mobile/MobileBrokerMirrorRebalance";
 import MobileBrokerMirrorHome from "./mobile/MobileBrokerMirrorHome";
 import MobileBrokerUpload from "./mobile/MobileBrokerUpload";
 import MobileHoldingDetails from "./mobile/MobileHoldingDetails";
+import MobileNewInvestorWizard from "./mobile/MobileNewInvestorWizard";
+import MobileInvestorHome from "./mobile/MobileInvestorHome";
 
 import OrderSplitterPanel from "./components/OrderSplitterPanel";
 import ChildOrderExecutionPanel from "./components/ChildOrderExecutionPanel";
@@ -436,6 +438,16 @@ element={<MobileBrokerUpload />}
 <Route
   path="/mobile/holding-details"
   element={<MobileHoldingDetails />}
+/>
+
+<Route
+  path="/mobile/new-investor"
+  element={<MobileNewInvestorWizard />}
+/>
+
+<Route
+  path="/mobile/investor-home"
+  element={<MobileInvestorHome />}
 />
 
 </Routes>
