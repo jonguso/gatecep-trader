@@ -1,63 +1,405 @@
-import { useEffect, useState } from "react";
-import { ScrollView, View, Text, StyleSheet } from "react-native";
-import { Page } from "../../src/components/ProTradingUI";
-import BrokerHeader from "../../src/components/BrokerHeader";
-import { getBrokerFunds } from "../../src/services/brokerMirrorApi";
-import { kes } from "../../src/utils/money";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ScrollView,
+  Text,
+  View,
+  Pressable,
+  StyleSheet
+} from "react-native";
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { router } from "expo-router";
 
 export default function Funds() {
-  const [payload, setPayload] = useState(null);
 
-  useEffect(() => {
-    getBrokerFunds("u1").then(setPayload).catch(() => {});
-  }, []);
+  const [portfolio,setPortfolio]=useState([]);
 
-  const totals = payload?.totals || {};
+  useEffect(()=>{
 
-  return (
-    <Page>
-      <BrokerHeader title="Funds" subtitle="Broker mirrored balances" />
-      <ScrollView style={styles.body}>
-        <View style={styles.summary}>
-          <Text style={styles.label}>TOTAL AVAILABLE CASH</Text>
-          <Text style={styles.big}>{kes(totals.availableCash || 0)}</Text>
-          <Text style={styles.rowText}>Ledger Balance: {kes(totals.ledgerBalance || 0)}</Text>
-          <Text style={styles.rowText}>Pending Payments: {kes(totals.pendingPayments || 0)}</Text>
-          <Text style={styles.rowText}>Pending Buy Orders: {kes(totals.pendingBuyOrders || 0)}</Text>
-        </View>
+    load();
 
-        <Text style={styles.section}>Broker Cash Balances</Text>
+  },[]);
 
-        {(payload?.brokerFunds || []).map(f => (
-          <View key={f.brokerId} style={styles.card}>
-            <Text style={styles.broker}>{f.brokerName}</Text>
-            <Text style={styles.account}>Account: {f.accountNumber}</Text>
-            <Row label="Ledger Balance" value={f.ledgerBalance} />
-            <Row label="Available Cash" value={f.availableCash} />
-            <Row label="Pending Payments" value={f.pendingPayments} />
-            <Row label="Pending Buy Orders" value={f.pendingBuyOrders} />
-          </View>
-        ))}
-      </ScrollView>
-    </Page>
-  );
+  async function load(){
+
+    const raw=
+      await AsyncStorage.getItem(
+        "gatecepManualPortfolio"
+      );
+
+    if(raw){
+
+      setPortfolio(
+        JSON.parse(raw)
+      );
+
+    }
+
+  }
+
+  const holdingsValue=
+  useMemo(()=>{
+
+    return portfolio.reduce(
+
+      (sum,h)=>
+
+        sum+
+
+        Number(
+
+          h.marketValue||
+
+          h.value||
+
+          0
+
+        ),
+
+      0
+
+    );
+
+  },[portfolio]);
+
+  const estimatedCash=
+  useMemo(()=>{
+
+    return holdingsValue*0.12;
+
+  },[holdingsValue]);
+
+  const liquidityRatio=
+  useMemo(()=>{
+
+    if(
+      holdingsValue===0
+    ) return 0;
+
+    return (
+      estimatedCash/
+      holdingsValue
+    )*100;
+
+  },[
+    estimatedCash,
+    holdingsValue
+  ]);
+
+  return(
+
+<ScrollView
+style={styles.screen}
+contentContainerStyle={styles.content}
+>
+
+<View style={styles.topBar}>
+
+<Pressable
+style={styles.icon}
+onPress={()=>
+router.push("/menu")
+}
+>
+
+<Text style={styles.iconText}>
+☰
+</Text>
+
+</Pressable>
+
+<Text style={styles.title}>
+Funds
+</Text>
+
+<Pressable
+style={styles.icon}
+>
+
+<Text>
+🔔
+</Text>
+
+</Pressable>
+
+</View>
+
+<View style={styles.card}>
+
+<Text style={styles.metricLabel}>
+Available Cash
+</Text>
+
+<Text style={styles.metric}>
+
+KES {money(
+estimatedCash
+)}
+
+</Text>
+
+<Text style={styles.small}>
+
+Estimated from portfolio profile
+
+</Text>
+
+</View>
+
+<View style={styles.grid}>
+
+<Metric
+label="Portfolio Value"
+value={
+`KES ${money(
+holdingsValue
+)}`
+}
+/>
+
+<Metric
+label="Liquidity"
+value={
+`${liquidityRatio.toFixed(1)}%`
+}
+/>
+
+<Metric
+label="Cash Status"
+value={
+liquidityRatio<10
+?
+"Low"
+:
+"Healthy"
+}
+/>
+
+<Metric
+label="Funding"
+value="Manual"
+/>
+
+</View>
+
+<View style={styles.card}>
+
+<Text style={styles.section}>
+
+Cash Guidance
+
+</Text>
+
+<Text style={styles.body}>
+
+Coach G recommends keeping enough liquidity for opportunities while avoiding excessive idle cash.
+
+</Text>
+
+<Text style={styles.body}>
+
+Current cash profile:
+
+{liquidityRatio<10
+?
+" Low liquidity. Consider reserving more cash."
+:
+" Healthy liquidity profile."
 }
 
-function Row({ label, value }) {
-  return <View style={styles.line}><Text style={styles.lineLabel}>{label}</Text><Text style={styles.lineValue}>{kes(value || 0)}</Text></View>
+</Text>
+
+</View>
+
+<Pressable
+style={styles.primary}
+>
+
+<Text style={styles.primaryText}>
+
+Deposit Funds
+
+</Text>
+
+</Pressable>
+
+<Pressable
+style={styles.secondary}
+>
+
+<Text style={styles.secondaryText}>
+
+Withdraw Funds
+
+</Text>
+
+</Pressable>
+
+</ScrollView>
+
+)
+
 }
 
-const styles = StyleSheet.create({
-  body:{backgroundColor:"#08111F",padding:16},
-  summary:{backgroundColor:"#111D35",borderRadius:16,padding:18,marginBottom:18},
-  label:{color:"#94A3B8",fontSize:11,fontWeight:"900"},
-  big:{color:"#fff",fontSize:30,fontWeight:"900",marginTop:6},
-  rowText:{color:"#CBD5E1",marginTop:8,fontWeight:"800"},
-  section:{color:"#fff",fontSize:18,fontWeight:"900",marginBottom:10},
-  card:{backgroundColor:"#111D35",borderRadius:14,padding:14,marginBottom:12,borderWidth:1,borderColor:"rgba(148,163,184,.22)"},
-  broker:{color:"#fff",fontSize:18,fontWeight:"900"},
-  account:{color:"#38BDF8",fontWeight:"800",marginTop:4,marginBottom:10},
-  line:{flexDirection:"row",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"rgba(148,163,184,.18)",paddingVertical:10},
-  lineLabel:{color:"#CBD5E1"},
-  lineValue:{color:"#fff",fontWeight:"900"}
-});
+function Metric({
+label,
+value
+}){
+
+return(
+
+<View style={styles.metricBox}>
+
+<Text style={styles.metricBoxLabel}>
+{label}
+</Text>
+
+<Text style={styles.metricBoxValue}>
+{value}
+</Text>
+
+</View>
+
+)
+
+}
+
+function money(v){
+
+return Number(
+v||0
+).toLocaleString(
+undefined,
+{
+maximumFractionDigits:2
+}
+)
+
+}
+
+const styles=
+StyleSheet.create({
+
+screen:{
+flex:1,
+backgroundColor:"#020617"
+},
+
+content:{
+padding:20,
+paddingTop:60,
+paddingBottom:120
+},
+
+topBar:{
+flexDirection:"row",
+justifyContent:"space-between",
+alignItems:"center"
+},
+
+icon:{
+width:42,
+height:42,
+borderRadius:14,
+backgroundColor:"#1e293b",
+justifyContent:"center",
+alignItems:"center"
+},
+
+iconText:{
+color:"white",
+fontSize:22
+},
+
+title:{
+fontSize:32,
+fontWeight:"900",
+color:"white"
+},
+
+card:{
+marginTop:20,
+backgroundColor:"#0f172a",
+padding:18,
+borderRadius:20
+},
+
+metricLabel:{
+color:"#94a3b8"
+},
+
+metric:{
+fontSize:30,
+fontWeight:"900",
+color:"#67e8f9"
+},
+
+small:{
+color:"#94a3b8",
+marginTop:6
+},
+
+grid:{
+marginTop:20,
+flexDirection:"row",
+flexWrap:"wrap",
+gap:10
+},
+
+metricBox:{
+width:"47%",
+backgroundColor:"#0f172a",
+padding:16,
+borderRadius:18
+},
+
+metricBoxLabel:{
+color:"#94a3b8",
+fontSize:12
+},
+
+metricBoxValue:{
+marginTop:8,
+color:"white",
+fontWeight:"900"
+},
+
+section:{
+color:"#67e8f9",
+fontWeight:"900"
+},
+
+body:{
+color:"#cbd5e1",
+marginTop:12,
+lineHeight:21
+},
+
+primary:{
+marginTop:20,
+backgroundColor:"#9333ea",
+padding:18,
+borderRadius:16
+},
+
+primaryText:{
+color:"white",
+fontWeight:"900",
+textAlign:"center"
+},
+
+secondary:{
+marginTop:12,
+backgroundColor:"#1e293b",
+padding:16,
+borderRadius:16
+},
+
+secondaryText:{
+color:"#67e8f9",
+fontWeight:"900",
+textAlign:"center"
+}
+
+})

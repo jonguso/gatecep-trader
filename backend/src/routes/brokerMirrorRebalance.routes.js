@@ -36,16 +36,26 @@ function cleanNumber(value) {
 }
 
 function filterByClient(rows = [], clientNumber = "", cdsNumber = "") {
-  if (!clientNumber && !cdsNumber) return rows;
+  const targetClient = String(clientNumber || "").trim();
+  const targetCds = String(cdsNumber || "").trim();
+
+  if (!targetClient && !targetCds) return rows;
 
   return rows.filter((row) => {
     const rowClient = String(row.clientNumber || "").trim();
     const rowCds = String(row.cdsNumber || "").trim();
 
-    return (
-      (!clientNumber || rowClient === String(clientNumber).trim()) &&
-      (!cdsNumber || rowCds === String(cdsNumber).trim())
-    );
+    const clientOk =
+      !targetClient ||
+      !rowClient ||
+      rowClient === targetClient;
+
+    const cdsOk =
+      !targetCds ||
+      !rowCds ||
+      rowCds === targetCds;
+
+    return clientOk && cdsOk;
   });
 }
 

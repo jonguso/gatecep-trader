@@ -5,10 +5,11 @@ const DATA_DIR = path.resolve("data");
 const FILE = path.join(DATA_DIR, "brokerMirror.json");
 
 function normalizeBroker(value) {
-  const broker = String(value || "AIB-AXYS").trim().toUpperCase();
+  const broker = String(value || "AIB").trim().toUpperCase();
 
-  if (broker === "AIB") return "AIB-AXYS";
-  if (broker === "ABC CAPITAL") return "ABC";
+  if (broker.includes("AIB")) return "AIB";
+  if (broker.includes("ABC")) return "ABC";
+  if (broker.includes("NCBA")) return "NCBA";
 
   return broker;
 }

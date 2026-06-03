@@ -149,7 +149,11 @@
         "marketPrice": 29,
         "marketValue": 2900,
         "profitLoss": -278.85,
-        "profitLossPct": -8.77
+        "profitLossPct": -8.77,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -159,7 +163,11 @@
         "marketPrice": 520,
         "marketValue": 26000,
         "profitLoss": -865.9,
-        "profitLossPct": -3.22
+        "profitLossPct": -3.22,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -169,7 +177,11 @@
         "marketPrice": 31.6,
         "marketValue": 3160,
         "profitLoss": -9.85,
-        "profitLossPct": -0.31
+        "profitLossPct": -0.31,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -179,7 +191,11 @@
         "marketPrice": 149,
         "marketValue": 2235,
         "profitLoss": -40.8,
-        "profitLossPct": -1.79
+        "profitLossPct": -1.79,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -189,7 +205,11 @@
         "marketPrice": 248,
         "marketValue": 4960,
         "profitLoss": -124.5,
-        "profitLossPct": -2.45
+        "profitLossPct": -2.45,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -199,7 +219,11 @@
         "marketPrice": 75.25,
         "marketValue": 11287.5,
         "profitLoss": -20.81,
-        "profitLossPct": -0.18
+        "profitLossPct": -0.18,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -209,7 +233,11 @@
         "marketPrice": 5650,
         "marketValue": 11300,
         "profitLoss": -778.85,
-        "profitLossPct": -6.45
+        "profitLossPct": -6.45,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -219,7 +247,11 @@
         "marketPrice": 50.5,
         "marketValue": 3535,
         "profitLoss": 38.65,
-        "profitLossPct": 1.11
+        "profitLossPct": 1.11,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -229,7 +261,11 @@
         "marketPrice": 67.75,
         "marketValue": 13550,
         "profitLoss": -467.7,
-        "profitLossPct": -3.34
+        "profitLossPct": -3.34,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -239,7 +275,11 @@
         "marketPrice": 9.12,
         "marketValue": 4560,
         "profitLoss": -149.45,
-        "profitLossPct": -3.17
+        "profitLossPct": -3.17,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -249,7 +289,11 @@
         "marketPrice": 3.34,
         "marketValue": 3340,
         "profitLoss": -89.8,
-        "profitLossPct": -2.62
+        "profitLossPct": -2.62,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -259,7 +303,11 @@
         "marketPrice": 9.2,
         "marketValue": 4600,
         "profitLoss": -55,
-        "profitLossPct": -1.16
+        "profitLossPct": -1.16,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -269,7 +317,11 @@
         "marketPrice": 16.1,
         "marketValue": 11270,
         "profitLoss": -543.83,
-        "profitLossPct": -4.6
+        "profitLossPct": -4.6,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -279,7 +331,11 @@
         "marketPrice": 5.88,
         "marketValue": 588,
         "profitLoss": -13.6,
-        "profitLossPct": -2.26
+        "profitLossPct": -2.26,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -289,7 +345,11 @@
         "marketPrice": 270,
         "marketValue": 6750,
         "profitLoss": -356.3,
-        "profitLossPct": -5.01
+        "profitLossPct": -5.01,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -299,7 +359,11 @@
         "marketPrice": 336,
         "marketValue": 2016,
         "profitLoss": -45.2,
-        "profitLossPct": -2.19
+        "profitLossPct": -2.19,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -309,7 +373,11 @@
         "marketPrice": 30.6,
         "marketValue": 27540,
         "profitLoss": 679.86,
-        "profitLossPct": 2.53
+        "profitLossPct": 2.53,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       },
       {
         "broker": "AIB",
@@ -319,7 +387,11 @@
         "marketPrice": 940,
         "marketValue": 4700,
         "profitLoss": 150.65,
-        "profitLossPct": 3.31
+        "profitLossPct": 3.31,
+        "clientNumber": "137971",
+        "cdsNumber": "52470471",
+        "email": "",
+        "brokerLinkId": ""
       }
     ]
   },

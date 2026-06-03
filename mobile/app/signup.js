@@ -1,117 +1,204 @@
-import { useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useState } from "react";
+import {
+ View,
+ Text,
+ TextInput,
+ Pressable,
+ StyleSheet,
+ ScrollView
+} from "react-native";
+
 import { router } from "expo-router";
-import GatecepLogo from "../src/components/GatecepLogo";
-import { useAuth } from "../src/auth/AuthContext";
 
 export default function Signup() {
-  const { signup } = useAuth();
-  const [tradingAccount, setTradingAccount] = useState("");
-  const [clientIdType, setClientIdType] = useState("National ID");
-  const [clientId, setClientId] = useState("");
-  const [email, setEmail] = useState("");
-  const [createdCustomer, setCreatedCustomer] = useState(null);
-  const [busy, setBusy] = useState(false);
 
-  const submit = async () => {
-    if (!tradingAccount.trim() || !clientId.trim() || !email.trim()) {
-      Alert.alert("Missing Information", "Enter trading account number, client ID, and email.");
-      return;
-    }
+ const [form,setForm]=useState({
+   email:"",
+   phone:"",
+   password:"",
+   confirm:""
+ });
 
-    setBusy(true);
-    try {
-      const customer = await signup({
-        tradingAccount,
-        clientIdType,
-        clientId,
-        email: email.trim().toLowerCase()
-      });
-      setCreatedCustomer(customer);
-    } catch (err) {
-      Alert.alert("Sign Up Failed", err.response?.data?.error || "Could not create customer.");
-    } finally {
-      setBusy(false);
-    }
-  };
+ function signup(){
 
-  const goLogin = () => {
-    setCreatedCustomer(null);
-    router.replace("/login");
-  };
+   if(form.password!==form.confirm){
 
-  return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <View style={styles.topRow}>
-        <GatecepLogo />
-        <Pressable onPress={() => router.back()}><Text style={styles.close}>×</Text></Pressable>
-      </View>
+     alert("Passwords do not match");
 
-      <Text style={styles.title}>Sign Up</Text>
+     return;
+   }
 
-      <Text style={styles.label}>Trading Account No.</Text>
-      <TextInput value={tradingAccount} onChangeText={setTradingAccount} placeholder="Enter CDSC acc. no. / CBKCDS acc. no. / Client code" placeholderTextColor="#C7CDD8" style={styles.input} />
+   /*
+   backend signup later
+   */
 
-      <Text style={styles.label}>Client ID</Text>
-      <View style={styles.segment}>
-        {["National ID", "Passport", "In Corporation No."].map(x => (
-          <Pressable key={x} onPress={() => setClientIdType(x)} style={[styles.segmentBtn, clientIdType === x && styles.segmentActive]}>
-            <Text style={[styles.segmentText, clientIdType === x && styles.segmentTextActive]}>{x}</Text>
-          </Pressable>
-        ))}
-      </View>
+   router.replace("/login");
+ }
 
-      <TextInput value={clientId} onChangeText={setClientId} placeholder={`Enter ${clientIdType}`} placeholderTextColor="#C7CDD8" style={styles.input} />
+ return (
 
-      <Text style={styles.label}>Email ID</Text>
-      <TextInput value={email} onChangeText={setEmail} placeholder="e.g.guest@gmail.com" placeholderTextColor="#C7CDD8" autoCapitalize="none" keyboardType="email-address" style={styles.input} />
+<ScrollView
+style={styles.screen}
+contentContainerStyle={styles.content}
+>
 
-      <Pressable onPress={submit} style={styles.primary}>
-        <Text style={styles.primaryText}>{busy ? "SUBMITTING..." : "SUBMIT"}</Text>
-      </Pressable>
+<Text style={styles.title}>
 
-      <Text style={styles.centerText}>Already have an account?</Text>
-      <Pressable onPress={() => router.push("/login")} style={styles.secondary}><Text style={styles.secondaryText}>LOGIN</Text></Pressable>
+Create Account
 
-      <Modal visible={!!createdCustomer} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Customer Created</Text>
-            <Text style={styles.modalText}>Your GATECEP customer number has been created.</Text>
-            <Text style={styles.customerNumber}>{createdCustomer?.customerNumber}</Text>
-            <Text style={styles.modalText}>Username: {createdCustomer?.username}</Text>
-            <Text style={styles.modalText}>Temporary password has been sent to your email.</Text>
-            {createdCustomer?.devPassword ? <Text style={styles.devPassword}>Dev password: {createdCustomer.devPassword}</Text> : null}
-            <Pressable onPress={goLogin} style={styles.primary}><Text style={styles.primaryText}>GO TO LOGIN</Text></Pressable>
-          </View>
-        </View>
-      </Modal>
-    </ScrollView>
-  );
+</Text>
+
+<Text style={styles.subtitle}>
+
+Start building your investment profile.
+
+</Text>
+
+<Input
+placeholder="Email"
+value={form.email}
+onChangeText={(v)=>
+setForm({
+...form,
+email:v
+})
+}
+/>
+
+<Input
+placeholder="Phone Number"
+value={form.phone}
+onChangeText={(v)=>
+setForm({
+...form,
+phone:v
+})
+}
+/>
+
+<Input
+placeholder="Password"
+secureTextEntry
+value={form.password}
+onChangeText={(v)=>
+setForm({
+...form,
+password:v
+})
+}
+/>
+
+<Input
+placeholder="Confirm Password"
+secureTextEntry
+value={form.confirm}
+onChangeText={(v)=>
+setForm({
+...form,
+confirm:v
+})
+}
+/>
+
+<Pressable
+style={styles.button}
+onPress={signup}
+>
+
+<Text style={styles.buttonText}>
+
+Create Account
+
+</Text>
+
+</Pressable>
+
+<Pressable
+onPress={()=>router.push("/login")}
+>
+
+<Text style={styles.login}>
+
+Already have account? Login
+
+</Text>
+
+</Pressable>
+
+</ScrollView>
+
+ );
 }
 
-const styles = StyleSheet.create({
-  page:{flex:1,backgroundColor:"#fff"},
-  content:{paddingHorizontal:34,paddingTop:42,paddingBottom:40},
-  topRow:{alignItems:"center"},
-  close:{position:"absolute",right:-120,top:-20,color:"#111827",fontSize:30},
-  title:{color:"#111827",fontSize:22,fontWeight:"900",textAlign:"center",marginTop:56,marginBottom:44},
-  label:{color:"#6B7280",fontWeight:"700",marginBottom:8},
-  input:{borderWidth:1,borderColor:"#E5E7EB",minHeight:56,paddingHorizontal:12,color:"#111827",marginBottom:22},
-  segment:{flexDirection:"row",borderWidth:1,borderColor:"#E5E7EB",marginBottom:22},
-  segmentBtn:{flex:1,minHeight:56,alignItems:"center",justifyContent:"center",borderRightWidth:1,borderRightColor:"#E5E7EB"},
-  segmentActive:{backgroundColor:"#BFE3FF"},
-  segmentText:{color:"#111827",fontWeight:"700",textAlign:"center"},
-  segmentTextActive:{color:"#0878BF",fontWeight:"900"},
-  primary:{backgroundColor:"#0878BF",minHeight:56,alignItems:"center",justifyContent:"center",borderRadius:4,marginTop:4},
-  primaryText:{color:"#fff",fontWeight:"900",fontSize:20},
-  centerText:{textAlign:"center",color:"#111827",marginTop:34,marginBottom:16},
-  secondary:{borderWidth:2,borderColor:"#0878BF",minHeight:56,alignItems:"center",justifyContent:"center",borderRadius:4},
-  secondaryText:{color:"#0878BF",fontWeight:"900",fontSize:20},
-  modalBackdrop:{flex:1,backgroundColor:"rgba(0,0,0,.62)",justifyContent:"center",padding:24},
-  modal:{backgroundColor:"#fff",borderRadius:16,padding:22},
-  modalTitle:{color:"#111827",fontSize:22,fontWeight:"900",textAlign:"center"},
-  modalText:{color:"#334155",textAlign:"center",marginTop:12,lineHeight:20},
-  customerNumber:{color:"#0878BF",fontSize:24,fontWeight:"900",textAlign:"center",marginVertical:20},
-  devPassword:{color:"#B45309",textAlign:"center",fontWeight:"900",marginVertical:10}
+function Input(props){
+
+return(
+
+<TextInput
+
+{...props}
+
+placeholderTextColor="#64748b"
+
+style={styles.input}
+
+/>
+
+);
+
+}
+
+const styles=StyleSheet.create({
+
+screen:{
+flex:1,
+backgroundColor:"#020617"
+},
+
+content:{
+padding:24,
+paddingTop:80
+},
+
+title:{
+fontSize:34,
+fontWeight:"900",
+color:"white"
+},
+
+subtitle:{
+color:"#94a3b8",
+marginTop:10,
+marginBottom:30
+},
+
+input:{
+backgroundColor:"#0f172a",
+borderWidth:1,
+borderColor:"#1e293b",
+padding:16,
+borderRadius:18,
+marginBottom:14,
+color:"white"
+},
+
+button:{
+backgroundColor:"#9333ea",
+padding:18,
+borderRadius:18,
+marginTop:12
+},
+
+buttonText:{
+color:"white",
+textAlign:"center",
+fontWeight:"900"
+},
+
+login:{
+color:"#67e8f9",
+textAlign:"center",
+marginTop:24
+}
+
 });
