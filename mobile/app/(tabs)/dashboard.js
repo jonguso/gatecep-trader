@@ -20,10 +20,13 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedSector, setSelectedSector] = useState(null);
   const [showSimulator, setShowSimulator] = useState(false);
+  const [showHealth, setShowHealth] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState("");
 
   useEffect(() => {
     load();
   }, []);
+
 
   async function load() {
     setLoading(true);
@@ -41,6 +44,8 @@ export default function Dashboard() {
     }
 
     setLoading(false);
+
+setLastUpdated(new Date().toLocaleString());
   }
 
   const sectorRows = useMemo(() => {
@@ -225,6 +230,10 @@ export default function Dashboard() {
 
       <Text style={styles.subtitle}>Coach G portfolio overview</Text>
 
+      <Text style={styles.timestamp}>
+Updated {lastUpdated}
+</Text>
+
       <View style={styles.summary}>
         <Metric label="Invested Value" value={`KES ${money(investedValue)}`} color="white" />
         <Metric label="Current Value" value={`KES ${money(currentValue)}`} color="#67e8f9" />
@@ -327,27 +336,65 @@ export default function Dashboard() {
         </View>
       </View>
 
-      <View style={styles.healthCard}>
-        <View>
-          <Text style={styles.metricLabel}>Portfolio Health</Text>
-          <Text style={styles.health}>{health}/100</Text>
-        </View>
+ <Pressable
+  style={styles.healthCard}
+  onPress={() => setShowHealth(!showHealth)}
+>
+  <View>
+    <Text style={styles.metricLabel}>Portfolio Health</Text>
+    <Text style={styles.health}>{health}/100</Text>
+    <Text style={styles.smallHint}>Tap for details</Text>
+  </View>
 
-        <View style={{ flex: 1 }}>
-          <HealthRow label="Diversification" value="+28" positive />
-          <HealthRow label="Cash Position" value="+5" positive />
-          <HealthRow label="Risk Exposure" value="-20" />
-          <HealthRow
-            label="Profitability"
-            value={netGainLoss >= 0 ? "+15" : "-10"}
-            positive={netGainLoss >= 0}
-          />
-        </View>
-      </View>
+  {showHealth && (
+    <View style={{ flex: 1 }}>
+      <HealthRow
+        label="Diversification"
+        value={`+${Math.min(30, sectorRows.length * 4)}`}
+        positive
+      />
 
-      <Pressable style={styles.primary} onPress={() => setShowSimulator(true)}>
-        <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
-      </Pressable>
+      <HealthRow
+        label="Cash Position"
+        value={`+${cash > 1000 ? 10 : 5}`}
+        positive
+      />
+
+      <HealthRow
+        label="Risk Exposure"
+        value={`-${risk === "HIGH_RISK" ? 20 : 10}`}
+      />
+
+      <HealthRow
+        label="Profitability"
+        value={netGainLoss >= 0 ? "+15" : "-10"}
+        positive={netGainLoss >= 0}
+      />
+    </View>
+  )}
+
+</Pressable>
+
+<Pressable
+  style={styles.primary}
+  onPress={async () => {
+    await AsyncStorage.setItem(
+      "gatecepCoachContext",
+      JSON.stringify({
+        largestSector: largest?.sector,
+        risk,
+        cash,
+        health,
+        recommendations,
+        timestamp: new Date().toISOString()
+      })
+    );
+
+    router.push("/coach");
+  }}
+>
+  <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
+</Pressable>
 
       <SectorModal sector={selectedSector} onClose={() => setSelectedSector(null)} />
       <Simulator visible={showSimulator} onClose={() => setShowSimulator(false)} />
@@ -375,28 +422,143 @@ function HealthRow({ label, value, positive }) {
 }
 
 function SectorModal({ sector, onClose }) {
-  if (!sector) return null;
 
-  return (
-    <Modal visible transparent animationType="slide">
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
-          <Text style={styles.modalTitle}>{sector.sector}</Text>
+if (!sector) return null;
 
-          {sector.securities.map((x) => (
-            <View key={`${x.symbol}-${x.quantity}`} style={styles.modalRow}>
-              <Text style={styles.white}>{x.symbol}</Text>
-              <Text style={styles.white}>KES {money(x.marketValue || x.value)}</Text>
-            </View>
-          ))}
+return (
 
-          <Pressable style={styles.primary} onPress={onClose}>
-            <Text style={styles.primaryText}>Close</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
+<Modal
+visible
+transparent
+animationType="fade"
+>
+
+<View style={styles.modalOverlay}>
+
+<View style={styles.sectorPopup}>
+
+<View style={styles.popupHeader}>
+
+<View>
+
+<Text style={styles.popupTitle}>
+{sector.sector}
+</Text>
+
+<Text style={styles.popupSub}>
+
+{sector.securities.length} securities •
+ Total Value: KES {money(sector.totalValue)}
+
+</Text>
+
+</View>
+
+<Pressable
+style={styles.closeCircle}
+onPress={onClose}
+>
+
+<Text style={{color:"white"}}>
+
+✕
+
+</Text>
+
+</Pressable>
+
+</View>
+
+
+<View style={styles.popupTableHeader}>
+
+<Text style={styles.popupCol1}>
+Security
+</Text>
+
+<Text style={styles.popupCol2}>
+Qty
+</Text>
+
+<Text style={styles.popupCol3}>
+Market Value
+</Text>
+
+</View>
+
+
+<ScrollView
+style={{
+maxHeight:340
+}}
+showsVerticalScrollIndicator
+>
+
+{
+
+sector.securities.map(
+(item,index)=>(
+
+<View
+key={`${item.symbol}-${index}`}
+style={styles.popupRow}
+>
+
+<Text
+style={styles.popupCol1Text}
+>
+
+{item.symbol}
+
+</Text>
+
+<Text
+style={styles.popupCol2Text}
+>
+
+{item.quantity||0}
+
+</Text>
+
+<Text
+style={styles.popupCol3Text}
+>
+
+KES {money(
+item.marketValue||
+item.value
+)}
+
+</Text>
+
+</View>
+
+))
+
+}
+
+</ScrollView>
+
+
+<Pressable
+style={styles.primary}
+onPress={onClose}
+>
+
+<Text style={styles.primaryText}>
+Close
+</Text>
+
+</Pressable>
+
+</View>
+
+</View>
+
+</Modal>
+
+)
+
 }
 
 function Simulator({ visible, onClose }) {
@@ -694,6 +856,183 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 6
   },
+
+smallHint: {
+  color: "#94a3b8",
+  fontSize: 11,
+  marginTop: 6
+},
+
+miniOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,.45)",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 20
+},
+
+miniModal: {
+  width: "92%",
+  maxWidth: 560,
+  backgroundColor: "#0f172a",
+  borderColor: "#334155",
+  borderWidth: 1,
+  borderRadius: 24,
+  padding: 18,
+  shadowColor: "#000",
+  shadowOpacity: 0.35,
+  shadowRadius: 20,
+  elevation: 8
+},
+
+modalHeader: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center"
+},
+
+closeCircle: {
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  backgroundColor: "#1e293b",
+  alignItems: "center",
+  justifyContent: "center"
+},
+
+closeText: {
+  color: "white",
+  fontSize: 22,
+  fontWeight: "900",
+  lineHeight: 24
+},
+
+modalSub: {
+  color: "#94a3b8",
+  marginTop: 6
+},
+
+miniRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  paddingVertical: 12,
+  borderBottomColor: "#1e293b",
+  borderBottomWidth: 1
+},
+
+whiteBold: {
+  color: "white",
+  fontWeight: "900"
+},
+
+mutedSmall: {
+  color: "#94a3b8",
+  fontSize: 12,
+  marginTop: 3
+},
+
+timestamp:{
+ color:"#64748b",
+ marginTop:6,
+ fontSize:12
+},
+
+modalOverlay:{
+flex:1,
+backgroundColor:"rgba(0,0,0,.55)",
+justifyContent:"center",
+alignItems:"center",
+padding:20
+},
+
+sectorPopup:{
+width:"92%",
+maxWidth:760,
+backgroundColor:"#0f172a",
+borderRadius:28,
+padding:22,
+borderColor:"#334155",
+borderWidth:1
+},
+
+popupHeader:{
+flexDirection:"row",
+justifyContent:"space-between",
+alignItems:"center",
+marginBottom:20
+},
+
+popupTitle:{
+fontSize:24,
+fontWeight:"900",
+color:"white"
+},
+
+popupSub:{
+color:"#94a3b8",
+marginTop:6
+},
+
+closeCircle:{
+width:40,
+height:40,
+borderRadius:20,
+backgroundColor:"#1e293b",
+justifyContent:"center",
+alignItems:"center"
+},
+
+popupTableHeader:{
+flexDirection:"row",
+paddingBottom:12,
+borderBottomColor:"#334155",
+borderBottomWidth:1
+},
+
+popupRow:{
+flexDirection:"row",
+paddingVertical:14,
+borderBottomColor:"#1e293b",
+borderBottomWidth:1
+},
+
+popupCol1:{
+flex:1.3,
+color:"#cbd5e1"
+},
+
+popupCol2:{
+width:90,
+textAlign:"center",
+color:"#cbd5e1"
+},
+
+popupCol3:{
+width:160,
+textAlign:"right",
+color:"#cbd5e1"
+},
+
+popupCol1Text:{
+flex:1.3,
+color:"white",
+fontWeight:"800"
+},
+
+popupCol2Text:{
+width:90,
+textAlign:"center",
+color:"#cbd5e1"
+},
+
+popupCol3Text:{
+width:160,
+textAlign:"right",
+fontWeight:"900",
+color:"white"
+},
+
   healthRow: {
     flexDirection: "row",
     justifyContent: "space-between",
