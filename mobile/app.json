@@ -16,8 +16,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f78c2a49-6803-4314-bfee-16aa16267550"
+        "projectId": "e9704f51-aef9-4066-8a73-5d51f212bbd4"
       }
-    }
+    },
+    "owner": "gatecep-mob"
   }
 }

@@ -16,12 +16,13 @@ const COLORS = ["#06b6d4", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#3b82f6"
 
 export default function Dashboard() {
   const [holdings, setHoldings] = useState([]);
-  const [cash, setCash] = useState(112.75);
+  const [cash, setCash] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedSector, setSelectedSector] = useState(null);
   const [showSimulator, setShowSimulator] = useState(false);
   const [showHealth, setShowHealth] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("");
+  const [hasStatement,setHasStatement]=useState(false);
 
   useEffect(() => {
     load();
@@ -35,6 +36,10 @@ export default function Dashboard() {
     const cashRaw =
       (await AsyncStorage.getItem("gatecepAvailableCash")) ||
       (await AsyncStorage.getItem("gatecepTradingSpace"));
+    const statementRaw =
+  await AsyncStorage.getItem("gatecepStatementUploaded");
+
+setHasStatement(statementRaw === "true");
 
     if (raw) setHoldings(JSON.parse(raw));
 
@@ -138,9 +143,11 @@ setLastUpdated(new Date().toLocaleString());
         : "balanced";
 
     const cashMessage =
-      cash <= 1000
-        ? "Available cash is limited, so Coach G will prioritize future deposits or new investment amounts."
-        : "Available cash can support small allocation changes while keeping a cash reserve.";
+  !hasStatement
+    ? "Statement upload is required before Coach G can evaluate available cash or trading space."
+    : cash <= 1000
+    ? "Available cash is limited, so Coach G will prioritize future deposits or new investment amounts."
+    : "Available cash can support small allocation changes while keeping a cash reserve.";
 
     return {
       largestName,
@@ -160,19 +167,23 @@ setLastUpdated(new Date().toLocaleString());
       );
     }
 
-    if (cash < 500) {
-      recs.push(
-        `Available cash is low (KES ${money(cash)}). Coach G recommends preserving liquidity or waiting for future deposits.`
-      );
-    } else if (cash < 5000) {
-      recs.push(
-        "Available cash can support small diversification moves without significantly increasing risk."
-      );
-    } else {
-      recs.push(
-        "Available cash can support meaningful portfolio adjustments while maintaining reserves."
-      );
-    }
+    if (!hasStatement) {
+  recs.push(
+    "Statement upload is required to calculate available cash and trading space."
+  );
+} else if (cash < 500) {
+  recs.push(
+    `Available cash is low (KES ${money(cash)}). Coach G recommends preserving liquidity or waiting for future deposits.`
+  );
+} else if (cash < 5000) {
+  recs.push(
+    "Available cash can support small diversification moves without significantly increasing risk."
+  );
+} else {
+  recs.push(
+    "Available cash can support meaningful portfolio adjustments while maintaining reserves."
+  );
+}
 
     const underweight = sectorRows
       .filter((s) => Number(s.weight || 0) < 10 && s.sector !== largest?.sector)
@@ -243,11 +254,11 @@ Updated {lastUpdated}
           color={netGainLoss >= 0 ? "#86efac" : "#fca5a5"}
         />
         <Metric
-          label="Available Cash"
-          value={`KES ${money(cash)}`}
-          color="#86efac"
-          sub="Broker trading space"
-        />
+  label="Available Cash"
+  value={hasStatement ? `KES ${money(cash)}` : "Statement Required"}
+  color={hasStatement ? "#86efac" : "#fbbf24"}
+  sub={hasStatement ? "Broker trading space" : "Upload statement to calculate"}
+/>
         <Metric
           label="Risk"
           value={risk}
@@ -581,8 +592,8 @@ function Simulator({ visible, onClose }) {
 function SectorDonut({ data, total, onSelect }) {
   return (
     <View style={{ alignItems: "center" }}>
-      <Svg width={300} height={300}>
-        <G x={150} y={150}>
+      <Svg width={260} height={260}>
+            <G x={130} y={130}>
           {data.map((item, index) => {
             const start = data.slice(0, index).reduce((sum, x) => sum + x.weight, 0);
             const end = start + item.weight;
@@ -592,12 +603,13 @@ function SectorDonut({ data, total, onSelect }) {
             return (
               <G key={item.sector}>
                 <Path
-                  d={describeArc(0, 0, 110, 62, start * 3.6, end * 3.6)}
-                  fill={COLORS[index % COLORS.length]}
-                  stroke="#020617"
-                  strokeWidth={2}
-                  onPress={() => onSelect(item)}
-                />
+  d={describeArc(0, 0, 100, 58, start * 3.6, end * 3.6)}
+  fill={COLORS[index % COLORS.length]}
+  stroke="#020617"
+  strokeWidth={2}
+  onPress={() => onSelect(item)}
+  onPressIn={() => onSelect(item)}
+/>
 
                 {item.weight >= 3 && (
                   <SvgText
@@ -765,28 +777,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1
   },
   sectorContainer: {
-    marginTop: 16,
-    flexDirection: "row",
-    gap: 18,
-    alignItems: "stretch"
-  },
-  chartPanel: {
-    flex: 1,
-    backgroundColor: "#0f172a",
-    borderColor: "#1e293b",
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 18,
-    justifyContent: "center"
-  },
-  tablePanel: {
-    flex: 1.2,
-    backgroundColor: "#0f172a",
-    borderColor: "#1e293b",
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 18
-  },
+  marginTop: 16,
+  flexDirection: "column",
+  gap: 18
+},
+
+chartPanel: {
+  backgroundColor: "#0f172a",
+  borderColor: "#1e293b",
+  borderWidth: 1,
+  borderRadius: 20,
+  padding: 18,
+  justifyContent: "center",
+  alignItems: "center"
+},
+
+tablePanel: {
+  backgroundColor: "#0f172a",
+  borderColor: "#1e293b",
+  borderWidth: 1,
+  borderRadius: 20,
+  padding: 18
+},
   tableHeader: {
     flexDirection: "row",
     borderBottomColor: "#1e293b",
@@ -997,40 +1009,40 @@ borderBottomColor:"#1e293b",
 borderBottomWidth:1
 },
 
-popupCol1:{
-flex:1.3,
-color:"#cbd5e1"
+popupCol1: {
+  flex: 1.2,
+  color: "#cbd5e1"
 },
 
-popupCol2:{
-width:90,
-textAlign:"center",
-color:"#cbd5e1"
+popupCol2: {
+  flex: 0.6,
+  textAlign: "center",
+  color: "#cbd5e1"
 },
 
-popupCol3:{
-width:160,
-textAlign:"right",
-color:"#cbd5e1"
+popupCol3: {
+  flex: 1.2,
+  textAlign: "right",
+  color: "#cbd5e1"
 },
 
-popupCol1Text:{
-flex:1.3,
-color:"white",
-fontWeight:"800"
+popupCol1Text: {
+  flex: 1.2,
+  color: "white",
+  fontWeight: "800"
 },
 
-popupCol2Text:{
-width:90,
-textAlign:"center",
-color:"#cbd5e1"
+popupCol2Text: {
+  flex: 0.6,
+  textAlign: "center",
+  color: "#cbd5e1"
 },
 
-popupCol3Text:{
-width:160,
-textAlign:"right",
-fontWeight:"900",
-color:"white"
+popupCol3Text: {
+  flex: 1.2,
+  textAlign: "right",
+  fontWeight: "900",
+  color: "white"
 },
 
   healthRow: {

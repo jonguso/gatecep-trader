@@ -1,405 +1,147 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
-  ScrollView,
-  Text,
-  View,
+  Alert,
   Pressable,
-  StyleSheet
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from "react-native";
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { router } from "expo-router";
 
 export default function Funds() {
+  const [cash, setCash] = useState("");
+  const [broker, setBroker] = useState("AIB");
 
-  const [portfolio,setPortfolio]=useState([]);
+  async function saveStatement() {
+    const amount = Number(String(cash).replaceAll(",", ""));
 
-  useEffect(()=>{
-
-    load();
-
-  },[]);
-
-  async function load(){
-
-    const raw=
-      await AsyncStorage.getItem(
-        "gatecepManualPortfolio"
-      );
-
-    if(raw){
-
-      setPortfolio(
-        JSON.parse(raw)
-      );
-
+    if (!Number.isFinite(amount) || amount < 0) {
+      Alert.alert("Invalid Amount", "Enter available cash / trading space.");
+      return;
     }
 
-  }
+    await AsyncStorage.setItem("gatecepStatementUploaded", "true");
+    await AsyncStorage.setItem("gatecepAvailableCash", String(amount));
 
-  const holdingsValue=
-  useMemo(()=>{
-
-    return portfolio.reduce(
-
-      (sum,h)=>
-
-        sum+
-
-        Number(
-
-          h.marketValue||
-
-          h.value||
-
-          0
-
-        ),
-
-      0
-
+    await AsyncStorage.setItem(
+      "gatecepStatementSummary",
+      JSON.stringify({
+        broker,
+        availableCash: amount,
+        uploadedAt: new Date().toISOString(),
+        source: "MANUAL_STATEMENT_ENTRY"
+      })
     );
 
-  },[portfolio]);
+    Alert.alert("Statement Saved", "Available cash updated.");
 
-  const estimatedCash=
-  useMemo(()=>{
+    router.replace("/dashboard");
+  }
 
-    return holdingsValue*0.12;
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Funds</Text>
 
-  },[holdingsValue]);
+      <Text style={styles.subtitle}>
+        Import or enter your broker cash / ledger statement to calculate
+        available cash for Coach G.
+      </Text>
 
-  const liquidityRatio=
-  useMemo(()=>{
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Broker</Text>
 
-    if(
-      holdingsValue===0
-    ) return 0;
+        {["AIB", "ABC", "NCBA", "Dyer & Blair"].map((b) => (
+          <Pressable
+            key={b}
+            style={[styles.option, broker === b && styles.optionActive]}
+            onPress={() => setBroker(b)}
+          >
+            <Text style={broker === b ? styles.optionTextActive : styles.optionText}>
+              {b}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
-    return (
-      estimatedCash/
-      holdingsValue
-    )*100;
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Cash / Trading Space</Text>
 
-  },[
-    estimatedCash,
-    holdingsValue
-  ]);
+        <Text style={styles.help}>
+          Enter the available cash or trading space from your broker statement.
+        </Text>
 
-  return(
+        <TextInput
+          placeholder="Available Cash e.g. 12500"
+          placeholderTextColor="#64748b"
+          keyboardType="numeric"
+          value={cash}
+          onChangeText={setCash}
+          style={styles.input}
+        />
+      </View>
 
-<ScrollView
-style={styles.screen}
-contentContainerStyle={styles.content}
->
+      <Pressable style={styles.primary} onPress={saveStatement}>
+        <Text style={styles.primaryText}>Save Statement</Text>
+      </Pressable>
 
-<View style={styles.topBar}>
-
-<Pressable
-style={styles.icon}
-onPress={()=>
-router.push("/menu")
-}
->
-
-<Text style={styles.iconText}>
-☰
-</Text>
-
-</Pressable>
-
-<Text style={styles.title}>
-Funds
-</Text>
-
-<Pressable
-style={styles.icon}
->
-
-<Text>
-🔔
-</Text>
-
-</Pressable>
-
-</View>
-
-<View style={styles.card}>
-
-<Text style={styles.metricLabel}>
-Available Cash
-</Text>
-
-<Text style={styles.metric}>
-
-KES {money(
-estimatedCash
-)}
-
-</Text>
-
-<Text style={styles.small}>
-
-Estimated from portfolio profile
-
-</Text>
-
-</View>
-
-<View style={styles.grid}>
-
-<Metric
-label="Portfolio Value"
-value={
-`KES ${money(
-holdingsValue
-)}`
-}
-/>
-
-<Metric
-label="Liquidity"
-value={
-`${liquidityRatio.toFixed(1)}%`
-}
-/>
-
-<Metric
-label="Cash Status"
-value={
-liquidityRatio<10
-?
-"Low"
-:
-"Healthy"
-}
-/>
-
-<Metric
-label="Funding"
-value="Manual"
-/>
-
-</View>
-
-<View style={styles.card}>
-
-<Text style={styles.section}>
-
-Cash Guidance
-
-</Text>
-
-<Text style={styles.body}>
-
-Coach G recommends keeping enough liquidity for opportunities while avoiding excessive idle cash.
-
-</Text>
-
-<Text style={styles.body}>
-
-Current cash profile:
-
-{liquidityRatio<10
-?
-" Low liquidity. Consider reserving more cash."
-:
-" Healthy liquidity profile."
+      <Pressable style={styles.secondary} onPress={() => router.replace("/dashboard")}>
+        <Text style={styles.secondaryText}>Back to Dashboard</Text>
+      </Pressable>
+    </ScrollView>
+  );
 }
 
-</Text>
-
-</View>
-
-<Pressable
-style={styles.primary}
->
-
-<Text style={styles.primaryText}>
-
-Deposit Funds
-
-</Text>
-
-</Pressable>
-
-<Pressable
-style={styles.secondary}
->
-
-<Text style={styles.secondaryText}>
-
-Withdraw Funds
-
-</Text>
-
-</Pressable>
-
-</ScrollView>
-
-)
-
-}
-
-function Metric({
-label,
-value
-}){
-
-return(
-
-<View style={styles.metricBox}>
-
-<Text style={styles.metricBoxLabel}>
-{label}
-</Text>
-
-<Text style={styles.metricBoxValue}>
-{value}
-</Text>
-
-</View>
-
-)
-
-}
-
-function money(v){
-
-return Number(
-v||0
-).toLocaleString(
-undefined,
-{
-maximumFractionDigits:2
-}
-)
-
-}
-
-const styles=
-StyleSheet.create({
-
-screen:{
-flex:1,
-backgroundColor:"#020617"
-},
-
-content:{
-padding:20,
-paddingTop:60,
-paddingBottom:120
-},
-
-topBar:{
-flexDirection:"row",
-justifyContent:"space-between",
-alignItems:"center"
-},
-
-icon:{
-width:42,
-height:42,
-borderRadius:14,
-backgroundColor:"#1e293b",
-justifyContent:"center",
-alignItems:"center"
-},
-
-iconText:{
-color:"white",
-fontSize:22
-},
-
-title:{
-fontSize:32,
-fontWeight:"900",
-color:"white"
-},
-
-card:{
-marginTop:20,
-backgroundColor:"#0f172a",
-padding:18,
-borderRadius:20
-},
-
-metricLabel:{
-color:"#94a3b8"
-},
-
-metric:{
-fontSize:30,
-fontWeight:"900",
-color:"#67e8f9"
-},
-
-small:{
-color:"#94a3b8",
-marginTop:6
-},
-
-grid:{
-marginTop:20,
-flexDirection:"row",
-flexWrap:"wrap",
-gap:10
-},
-
-metricBox:{
-width:"47%",
-backgroundColor:"#0f172a",
-padding:16,
-borderRadius:18
-},
-
-metricBoxLabel:{
-color:"#94a3b8",
-fontSize:12
-},
-
-metricBoxValue:{
-marginTop:8,
-color:"white",
-fontWeight:"900"
-},
-
-section:{
-color:"#67e8f9",
-fontWeight:"900"
-},
-
-body:{
-color:"#cbd5e1",
-marginTop:12,
-lineHeight:21
-},
-
-primary:{
-marginTop:20,
-backgroundColor:"#9333ea",
-padding:18,
-borderRadius:16
-},
-
-primaryText:{
-color:"white",
-fontWeight:"900",
-textAlign:"center"
-},
-
-secondary:{
-marginTop:12,
-backgroundColor:"#1e293b",
-padding:16,
-borderRadius:16
-},
-
-secondaryText:{
-color:"#67e8f9",
-fontWeight:"900",
-textAlign:"center"
-}
-
-})
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#020617" },
+  content: { padding: 22, paddingTop: 70, paddingBottom: 90 },
+  title: { color: "white", fontSize: 34, fontWeight: "900" },
+  subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
+  card: {
+    marginTop: 22,
+    backgroundColor: "#0f172a",
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 18
+  },
+  cardTitle: {
+    color: "#67e8f9",
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 12
+  },
+  option: {
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#1e293b",
+    marginTop: 10
+  },
+  optionActive: { backgroundColor: "#9333ea" },
+  optionText: { color: "#cbd5e1", fontWeight: "800" },
+  optionTextActive: { color: "white", fontWeight: "900" },
+  help: { color: "#94a3b8", lineHeight: 20, marginBottom: 14 },
+  input: {
+    backgroundColor: "#1e293b",
+    color: "white",
+    padding: 18,
+    borderRadius: 16,
+    fontSize: 16
+  },
+  primary: {
+    marginTop: 22,
+    backgroundColor: "#9333ea",
+    padding: 18,
+    borderRadius: 18
+  },
+  primaryText: { color: "white", textAlign: "center", fontWeight: "900" },
+  secondary: {
+    marginTop: 14,
+    backgroundColor: "#1e293b",
+    padding: 16,
+    borderRadius: 18
+  },
+  secondaryText: { color: "#67e8f9", textAlign: "center", fontWeight: "900" }
+});

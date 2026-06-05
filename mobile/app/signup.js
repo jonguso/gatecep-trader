@@ -113,10 +113,7 @@ Create Account
 
 </Pressable>
 
-<Pressable
-onPress={()=>router.push("/login")}
->
-
+<Pressable style={styles.secondary} onPress={() => router.replace("/login")}>
 <Text style={styles.login}>
 
 Already have account? Login

@@ -9,14 +9,36 @@ import {
 import { router } from "expo-router";
 
 const items = [
-  { title: "Dashboard", detail: "Portfolio health and Coach G summary", route: "/dashboard" },
-  { title: "Import Portfolio", detail: "Upload CSV and review holdings", route: "/import-portfolio" },
-  { title: "Manual Portfolio Entry", detail: "Enter holdings manually", route: "/manual-portfolio-entry" },
-  { title: "Checklist", detail: "View setup and analysis status", route: "/dashboard" },
-  { title: "Broker Education", detail: "Learn about broker registration", route: "/brokers" },
-  { title: "Risk Questionnaire", detail: "Update investor profile", route: "/questionnaire" },
-  { title: "Recommendation History", detail: "Saved Coach G recommendations", route: "/recommendation-history" },
-  { title: "Investor Home", detail: "Choose investor path", route: "/investor-home" }
+  {
+    title: "Dashboard",
+    detail: "Portfolio health and Coach G summary",
+    route: "/dashboard"
+  },
+  {
+    title: "Upload Center",
+    detail: "Upload valuation, statement, holdings, and order history",
+    route: "/broker-upload"
+  },
+  {
+    title: "Manual Portfolio Entry",
+    detail: "Enter holdings manually",
+    route: "/manual-portfolio-entry"
+  },
+  {
+    title: "Risk Questionnaire",
+    detail: "Update investor profile",
+    route: "/questionnaire"
+  },
+  {
+    title: "Recommendation History",
+    detail: "Saved Coach G recommendations",
+    route: "/recommendation-history"
+  },
+  {
+    title: "Broker Education",
+    detail: "Learn about broker registration",
+    route: "/brokers"
+  }
 ];
 
 export default function Menu() {
