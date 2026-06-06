@@ -12,22 +12,28 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router } from "expo-router";
 
-const COLORS = ["#06b6d4", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899"];
+const COLORS = [
+  "#06b6d4",
+  "#8b5cf6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#3b82f6",
+  "#ec4899"
+];
 
 export default function Dashboard() {
   const [holdings, setHoldings] = useState([]);
   const [cash, setCash] = useState(0);
+  const [hasStatement, setHasStatement] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedSector, setSelectedSector] = useState(null);
-  const [showSimulator, setShowSimulator] = useState(false);
   const [showHealth, setShowHealth] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("");
-  const [hasStatement,setHasStatement]=useState(false);
 
   useEffect(() => {
     load();
   }, []);
-
 
   async function load() {
     setLoading(true);
@@ -36,10 +42,7 @@ export default function Dashboard() {
     const cashRaw =
       (await AsyncStorage.getItem("gatecepAvailableCash")) ||
       (await AsyncStorage.getItem("gatecepTradingSpace"));
-    const statementRaw =
-  await AsyncStorage.getItem("gatecepStatementUploaded");
-
-setHasStatement(statementRaw === "true");
+    const statementRaw = await AsyncStorage.getItem("gatecepStatementUploaded");
 
     if (raw) setHoldings(JSON.parse(raw));
 
@@ -48,9 +51,9 @@ setHasStatement(statementRaw === "true");
       if (Number.isFinite(parsed)) setCash(parsed);
     }
 
+    setHasStatement(statementRaw === "true");
+    setLastUpdated(new Date().toLocaleString());
     setLoading(false);
-
-setLastUpdated(new Date().toLocaleString());
   }
 
   const sectorRows = useMemo(() => {
@@ -127,6 +130,9 @@ setLastUpdated(new Date().toLocaleString());
     )
   );
 
+  const coachSummary = buildCoachSummary();
+  const recommendations = buildRecommendations();
+
   function buildCoachSummary() {
     const largestName = largest?.sector || "N/A";
     const largestWeight = Number(largest?.weight || 0).toFixed(1);
@@ -142,12 +148,11 @@ setLastUpdated(new Date().toLocaleString());
         ? "moderate"
         : "balanced";
 
-    const cashMessage =
-  !hasStatement
-    ? "Statement upload is required before Coach G can evaluate available cash or trading space."
-    : cash <= 1000
-    ? "Available cash is limited, so Coach G will prioritize future deposits or new investment amounts."
-    : "Available cash can support small allocation changes while keeping a cash reserve.";
+    const cashMessage = !hasStatement
+      ? "Statement upload is required before Coach G can evaluate available cash or trading space."
+      : cash <= 1000
+      ? "Available cash is limited, so Coach G will prioritize future deposits or new investment amounts."
+      : "Available cash can support allocation changes while keeping a cash reserve.";
 
     return {
       largestName,
@@ -168,22 +173,20 @@ setLastUpdated(new Date().toLocaleString());
     }
 
     if (!hasStatement) {
-  recs.push(
-    "Statement upload is required to calculate available cash and trading space."
-  );
-} else if (cash < 500) {
-  recs.push(
-    `Available cash is low (KES ${money(cash)}). Coach G recommends preserving liquidity or waiting for future deposits.`
-  );
-} else if (cash < 5000) {
-  recs.push(
-    "Available cash can support small diversification moves without significantly increasing risk."
-  );
-} else {
-  recs.push(
-    "Available cash can support meaningful portfolio adjustments while maintaining reserves."
-  );
-}
+      recs.push("Statement upload is required to calculate available cash and trading space.");
+    } else if (cash < 500) {
+      recs.push(
+        `Available cash is low (KES ${money(cash)}). Coach G recommends preserving liquidity or waiting for future deposits.`
+      );
+    } else if (cash < 5000) {
+      recs.push(
+        "Available cash can support small diversification moves without significantly increasing risk."
+      );
+    } else {
+      recs.push(
+        "Available cash can support meaningful portfolio adjustments while maintaining reserves."
+      );
+    }
 
     const underweight = sectorRows
       .filter((s) => Number(s.weight || 0) < 10 && s.sector !== largest?.sector)
@@ -198,12 +201,6 @@ setLastUpdated(new Date().toLocaleString());
       );
     }
 
-    if (largest?.sector === "Banking" && largest.weight > 30) {
-      recs.push(
-        "Coach G will avoid recommending additional banking allocations unless your selected goal specifically requires it."
-      );
-    }
-
     if (recs.length === 0) {
       recs.push(
         "Portfolio allocation appears balanced. Future investments should maintain diversification and avoid overconcentration."
@@ -213,8 +210,21 @@ setLastUpdated(new Date().toLocaleString());
     return recs;
   }
 
-  const coach = buildCoachSummary();
-  const recommendations = buildRecommendations();
+  async function openCoach() {
+    await AsyncStorage.setItem(
+      "gatecepCoachContext",
+      JSON.stringify({
+        largestSector: largest?.sector,
+        risk,
+        cash,
+        health,
+        recommendations,
+        timestamp: new Date().toISOString()
+      })
+    );
+
+    router.push("/coach");
+  }
 
   if (loading) {
     return (
@@ -234,61 +244,78 @@ setLastUpdated(new Date().toLocaleString());
 
         <Text style={styles.title}>Dashboard</Text>
 
-        <Pressable style={styles.icon}>
+        <View style={styles.icon}>
           <Text>🔔</Text>
-        </Pressable>
+        </View>
       </View>
 
       <Text style={styles.subtitle}>Coach G portfolio overview</Text>
+      <Text style={styles.timestamp}>Updated {lastUpdated}</Text>
 
-      <Text style={styles.timestamp}>
-Updated {lastUpdated}
-</Text>
+      <View style={styles.summaryOuter}>
+        <View style={styles.summaryTopPlain}>
+          <PlainMetric label="Invested Value" value={`KES ${money(investedValue)}`} color="white" />
+          <PlainMetric label="Current Value" value={`KES ${money(currentValue)}`} color="#67e8f9" />
 
-      <View style={styles.summary}>
-        <Metric label="Invested Value" value={`KES ${money(investedValue)}`} color="white" />
-        <Metric label="Current Value" value={`KES ${money(currentValue)}`} color="#67e8f9" />
+          <PlainMetric
+            label="Net Gain/Loss"
+            value={`KES ${money(netGainLoss)} (${gainLossPct.toFixed(2)}%)`}
+            color={netGainLoss >= 0 ? "#86efac" : "#fca5a5"}
+          />
+
+          <PlainMetric
+            label="Available Cash"
+            value={hasStatement ? `KES ${money(cash)}` : "Statement Required"}
+            color={hasStatement ? "#86efac" : "#fbbf24"}
+            sub={hasStatement ? "Broker trading space" : "Upload statement"}
+          />
+        </View>
+
+        <View style={styles.summaryRiskRow}>
+          <Metric
+            label="Risk"
+            value={risk}
+            color={risk === "HIGH_RISK" ? "#fca5a5" : "#86efac"}
+          />
+
+          <Metric label="Sectors" value={String(sectorRows.length)} color="#67e8f9" />
+        </View>
+      </View>
+
+      <View style={styles.summaryBottom}>
+        <Metric label="Diversification" value={diversification} color="#67e8f9" highlight="cyan" />
+
         <Metric
-          label="Net Gain/Loss"
-          value={`KES ${money(netGainLoss)} (${gainLossPct.toFixed(2)}%)`}
-          color={netGainLoss >= 0 ? "#86efac" : "#fca5a5"}
+          label="Largest Sector"
+          value={
+            largest
+              ? `${largest.sector} (${Number(largest.weight || 0).toFixed(2)}%)`
+              : "N/A"
+          }
+          color="#c084fc"
+          highlight="purple"
         />
-        <Metric
-  label="Available Cash"
-  value={hasStatement ? `KES ${money(cash)}` : "Statement Required"}
-  color={hasStatement ? "#86efac" : "#fbbf24"}
-  sub={hasStatement ? "Broker trading space" : "Upload statement to calculate"}
-/>
-        <Metric
-          label="Risk"
-          value={risk}
-          color={risk === "HIGH_RISK" ? "#fca5a5" : "#86efac"}
-        />
-        <Metric label="Sectors" value={String(sectorRows.length)} color="#67e8f9" />
-        <Metric label="Diversification" value={diversification} color="#67e8f9" />
-        <Metric label="Largest Sector" value={largest?.sector || "N/A"} color="#c084fc" />
       </View>
 
       <View style={styles.coachSummary}>
         <Text style={styles.cardTitle}>Coach G Summary</Text>
 
         <Text style={styles.body}>
-          <Text style={styles.highlight}>{coach.largestName}</Text> is the largest exposure at{" "}
-          <Text style={styles.highlight}>{coach.largestWeight}%</Text>, creating a{" "}
-          <Text style={styles.highlight}>{coach.concentration}</Text> concentration profile.{" "}
-          {coach.cashMessage}
+          <Text style={styles.highlight}>{coachSummary.largestName}</Text> is the largest exposure at{" "}
+          <Text style={styles.highlight}>{coachSummary.largestWeight}%</Text>, creating a{" "}
+          <Text style={styles.highlight}>{coachSummary.concentration}</Text> concentration profile.{" "}
+          {coachSummary.cashMessage}
         </Text>
 
-        {coach.lowSectors.length > 0 ? (
+        {coachSummary.lowSectors.length > 0 ? (
           <Text style={styles.body}>
             Underrepresented sectors include{" "}
-            <Text style={styles.highlight}>{coach.lowSectors.join(", ")}</Text>. Future
-            allocations should improve diversification before adding more to overweight sectors.
+            <Text style={styles.highlight}>{coachSummary.lowSectors.join(", ")}</Text>. Future
+            allocations should improve diversification.
           </Text>
         ) : (
           <Text style={styles.body}>
-            Sector coverage is broad. Future allocations should maintain balance and avoid
-            increasing the largest exposure.
+            Sector coverage is broad. Future allocations should maintain balance.
           </Text>
         )}
       </View>
@@ -347,75 +374,55 @@ Updated {lastUpdated}
         </View>
       </View>
 
- <Pressable
-  style={styles.healthCard}
-  onPress={() => setShowHealth(!showHealth)}
->
-  <View>
-    <Text style={styles.metricLabel}>Portfolio Health</Text>
-    <Text style={styles.health}>{health}/100</Text>
-    <Text style={styles.smallHint}>Tap for details</Text>
-  </View>
+      <Pressable style={styles.healthCard} onPress={() => setShowHealth(!showHealth)}>
+        <View>
+          <Text style={styles.metricLabel}>Portfolio Health</Text>
+          <Text style={styles.health}>{health}/100</Text>
+          <Text style={styles.smallHint}>Tap for details</Text>
+        </View>
 
-  {showHealth && (
-    <View style={{ flex: 1 }}>
-      <HealthRow
-        label="Diversification"
-        value={`+${Math.min(30, sectorRows.length * 4)}`}
-        positive
-      />
+        {showHealth && (
+          <View style={{ flex: 1 }}>
+            <HealthRow label="Diversification" value={`+${Math.min(30, sectorRows.length * 4)}`} positive />
+            <HealthRow label="Cash Position" value={`+${cash > 1000 ? 10 : 5}`} positive />
+            <HealthRow label="Risk Exposure" value={`-${risk === "HIGH_RISK" ? 20 : 10}`} />
+            <HealthRow
+              label="Profitability"
+              value={netGainLoss >= 0 ? "+15" : "-10"}
+              positive={netGainLoss >= 0}
+            />
+          </View>
+        )}
+      </Pressable>
 
-      <HealthRow
-        label="Cash Position"
-        value={`+${cash > 1000 ? 10 : 5}`}
-        positive
-      />
-
-      <HealthRow
-        label="Risk Exposure"
-        value={`-${risk === "HIGH_RISK" ? 20 : 10}`}
-      />
-
-      <HealthRow
-        label="Profitability"
-        value={netGainLoss >= 0 ? "+15" : "-10"}
-        positive={netGainLoss >= 0}
-      />
-    </View>
-  )}
-
-</Pressable>
-
-<Pressable
-  style={styles.primary}
-  onPress={async () => {
-    await AsyncStorage.setItem(
-      "gatecepCoachContext",
-      JSON.stringify({
-        largestSector: largest?.sector,
-        risk,
-        cash,
-        health,
-        recommendations,
-        timestamp: new Date().toISOString()
-      })
-    );
-
-    router.push("/coach");
-  }}
->
-  <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
-</Pressable>
+      <Pressable style={styles.primary} onPress={openCoach}>
+        <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
+      </Pressable>
 
       <SectorModal sector={selectedSector} onClose={() => setSelectedSector(null)} />
-      <Simulator visible={showSimulator} onClose={() => setShowSimulator(false)} />
     </ScrollView>
   );
 }
 
-function Metric({ label, value, color, sub }) {
+function PlainMetric({ label, value, color, sub }) {
   return (
-    <View style={styles.metric}>
+    <View style={styles.plainMetric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={[styles.metricValue, { color }]}>{value}</Text>
+      {sub ? <Text style={styles.metricSub}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+function Metric({ label, value, color, sub, highlight }) {
+  return (
+    <View
+      style={[
+        styles.metric,
+        highlight === "cyan" && styles.metricCyan,
+        highlight === "purple" && styles.metricPurple
+      ]}
+    >
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, { color }]}>{value}</Text>
       {sub ? <Text style={styles.metricSub}>{sub}</Text> : null}
@@ -433,159 +440,71 @@ function HealthRow({ label, value, positive }) {
 }
 
 function SectorModal({ sector, onClose }) {
+  if (!sector) return null;
 
-if (!sector) return null;
-
-return (
-
-<Modal
-visible
-transparent
-animationType="fade"
->
-
-<View style={styles.modalOverlay}>
-
-<View style={styles.sectorPopup}>
-
-<View style={styles.popupHeader}>
-
-<View>
-
-<Text style={styles.popupTitle}>
-{sector.sector}
-</Text>
-
-<Text style={styles.popupSub}>
-
-{sector.securities.length} securities •
- Total Value: KES {money(sector.totalValue)}
-
-</Text>
-
-</View>
-
-<Pressable
-style={styles.closeCircle}
-onPress={onClose}
->
-
-<Text style={{color:"white"}}>
-
-✕
-
-</Text>
-
-</Pressable>
-
-</View>
-
-
-<View style={styles.popupTableHeader}>
-
-<Text style={styles.popupCol1}>
-Security
-</Text>
-
-<Text style={styles.popupCol2}>
-Qty
-</Text>
-
-<Text style={styles.popupCol3}>
-Market Value
-</Text>
-
-</View>
-
-
-<ScrollView
-style={{
-maxHeight:340
-}}
-showsVerticalScrollIndicator
->
-
-{
-
-sector.securities.map(
-(item,index)=>(
-
-<View
-key={`${item.symbol}-${index}`}
-style={styles.popupRow}
->
-
-<Text
-style={styles.popupCol1Text}
->
-
-{item.symbol}
-
-</Text>
-
-<Text
-style={styles.popupCol2Text}
->
-
-{item.quantity||0}
-
-</Text>
-
-<Text
-style={styles.popupCol3Text}
->
-
-KES {money(
-item.marketValue||
-item.value
-)}
-
-</Text>
-
-</View>
-
-))
-
-}
-
-</ScrollView>
-
-
-<Pressable
-style={styles.primary}
-onPress={onClose}
->
-
-<Text style={styles.primaryText}>
-Close
-</Text>
-
-</Pressable>
-
-</View>
-
-</View>
-
-</Modal>
-
-)
-
-}
-
-function Simulator({ visible, onClose }) {
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
-          <Text style={styles.modalTitle}>Coach Simulator</Text>
-          <Text style={styles.body}>Simulation engine moved to Coach tab.</Text>
+    <Modal visible transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.sectorPopup}>
+          <View style={styles.popupHeader}>
+            <View>
+              <Text style={styles.popupTitle}>{sector.sector}</Text>
+              <Text style={styles.popupSub}>
+                {sector.securities.length} securities • KES {money(sector.totalValue)}
+              </Text>
+            </View>
 
-          <Pressable style={styles.primary} onPress={onClose}>
-            <Text style={styles.primaryText}>Close</Text>
-          </Pressable>
+            <Pressable style={styles.closeCircle} onPress={onClose}>
+              <Text style={{ color: "white" }}>✕</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+            {sector.securities.map((sec, index) => (
+              <View key={`${sec.symbol}-${index}`} style={styles.securityCard}>
+                <View style={styles.compactTop}>
+                  <Text style={styles.securitySymbol}>{sec.symbol}</Text>
+
+                  <Text style={Number(sec.profitLoss || 0) >= 0 ? styles.greenText : styles.redText}>
+                    KES {money(sec.profitLoss)}
+                  </Text>
+                </View>
+
+                <View style={styles.compactMetrics}>
+                  <InfoBox label="Qty" value={Number(sec.quantity || 0).toLocaleString()} />
+                  <InfoBox label="Price" value={`KES ${money(sec.marketPrice || sec.price)}`} />
+                  <InfoBox label="Value" value={`KES ${money(sec.marketValue || sec.value)}`} />
+                  <InfoBox
+                    label="Return"
+                    value={`${Number(sec.changePct || 0).toFixed(2)}%`}
+                    positive={Number(sec.changePct || 0) >= 0}
+                  />
+                </View>
+              </View>
+            ))}
+          </ScrollView>
         </View>
       </View>
     </Modal>
+  );
+}
+
+function InfoBox({ label, value, positive }) {
+  return (
+    <View style={styles.infoCompact}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text
+        style={
+          positive === undefined
+            ? styles.infoValue
+            : positive
+            ? styles.greenText
+            : styles.redText
+        }
+      >
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -593,23 +512,23 @@ function SectorDonut({ data, total, onSelect }) {
   return (
     <View style={{ alignItems: "center" }}>
       <Svg width={260} height={260}>
-            <G x={130} y={130}>
+        <G x={130} y={130}>
           {data.map((item, index) => {
             const start = data.slice(0, index).reduce((sum, x) => sum + x.weight, 0);
             const end = start + item.weight;
             const labelAngle = ((start + end) / 2) * 3.6;
-            const labelPos = polar(0, 0, 122, labelAngle);
+            const labelPos = polar(0, 0, 112, labelAngle);
 
             return (
               <G key={item.sector}>
                 <Path
-  d={describeArc(0, 0, 100, 58, start * 3.6, end * 3.6)}
-  fill={COLORS[index % COLORS.length]}
-  stroke="#020617"
-  strokeWidth={2}
-  onPress={() => onSelect(item)}
-  onPressIn={() => onSelect(item)}
-/>
+                  d={describeArc(0, 0, 100, 58, start * 3.6, end * 3.6)}
+                  fill={COLORS[index % COLORS.length]}
+                  stroke="#020617"
+                  strokeWidth={2}
+                  onPress={() => onSelect(item)}
+                  onPressIn={() => onSelect(item)}
+                />
 
                 {item.weight >= 3 && (
                   <SvgText
@@ -627,7 +546,7 @@ function SectorDonut({ data, total, onSelect }) {
             );
           })}
 
-          <Circle cx={0} cy={0} r={62} fill="#020617" />
+          <Circle cx={0} cy={0} r={58} fill="#020617" />
 
           <SvgText y="-14" fill="#94a3b8" textAnchor="middle" fontSize="10">
             Total Value
@@ -648,6 +567,7 @@ function SectorDonut({ data, total, onSelect }) {
 
 function money(v) {
   return Number(v || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
 }
@@ -703,21 +623,52 @@ const styles = StyleSheet.create({
   iconText: { color: "white", fontSize: 22 },
   title: { fontSize: 32, fontWeight: "900", color: "white" },
   subtitle: { marginTop: 10, color: "#94a3b8" },
-  summary: {
+  timestamp: { color: "#64748b", marginTop: 6, fontSize: 12 },
+
+  summaryOuter: {
     marginTop: 20,
+    backgroundColor: "#0f172a",
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 16
+  },
+  summaryTopPlain: {
     flexDirection: "row",
     flexWrap: "wrap",
+    rowGap: 20
+  },
+  plainMetric: { width: "50%" },
+  summaryRiskRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    gap: 10
+  },
+  summaryBottom: {
+    marginTop: 12,
+    flexDirection: "row",
     gap: 10
   },
   metric: {
     width: "47%",
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: "#0f172a"
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#020617",
+    borderColor: "#1e293b",
+    borderWidth: 1
+  },
+  metricCyan: {
+    backgroundColor: "rgba(6,182,212,.08)",
+    borderColor: "rgba(6,182,212,.35)"
+  },
+  metricPurple: {
+    backgroundColor: "rgba(147,51,234,.12)",
+    borderColor: "rgba(147,51,234,.35)"
   },
   metricLabel: { color: "#94a3b8" },
   metricValue: { marginTop: 8, fontWeight: "900" },
   metricSub: { color: "#94a3b8", marginTop: 4, fontSize: 11 },
+
   coachSummary: {
     marginTop: 16,
     backgroundColor: "rgba(147,51,234,.13)",
@@ -746,82 +697,37 @@ const styles = StyleSheet.create({
   highlight: { color: "#c084fc", fontWeight: "900" },
   greenText: { color: "#86efac", fontWeight: "900" },
   redText: { color: "#fca5a5", fontWeight: "900" },
-  primary: {
-    marginTop: 20,
-    backgroundColor: "#9333ea",
+
+  sectorContainer: {
+    marginTop: 16,
+    flexDirection: "column",
+    gap: 18
+  },
+  chartPanel: {
+    backgroundColor: "#0f172a",
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    borderRadius: 20,
     padding: 18,
-    borderRadius: 16
-  },
-  primaryText: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "900"
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,.75)",
     justifyContent: "center",
+    alignItems: "center"
+  },
+  tablePanel: {
+    backgroundColor: "#0f172a",
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    borderRadius: 20,
     padding: 18
   },
-  modal: {
-    backgroundColor: "#020617",
-    padding: 18,
-    borderRadius: 24
-  },
-  modalTitle: { fontSize: 24, fontWeight: "900", color: "white" },
-  modalRow: {
-    paddingVertical: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderBottomColor: "#1e293b",
-    borderBottomWidth: 1
-  },
-  sectorContainer: {
-  marginTop: 16,
-  flexDirection: "column",
-  gap: 18
-},
-
-chartPanel: {
-  backgroundColor: "#0f172a",
-  borderColor: "#1e293b",
-  borderWidth: 1,
-  borderRadius: 20,
-  padding: 18,
-  justifyContent: "center",
-  alignItems: "center"
-},
-
-tablePanel: {
-  backgroundColor: "#0f172a",
-  borderColor: "#1e293b",
-  borderWidth: 1,
-  borderRadius: 20,
-  padding: 18
-},
   tableHeader: {
     flexDirection: "row",
     borderBottomColor: "#1e293b",
     borderBottomWidth: 1,
     paddingBottom: 10
   },
-  sectorHeader: {
-    flex: 1.4,
-    color: "#94a3b8",
-    fontSize: 12
-  },
-  valueHeader: {
-    flex: 1,
-    color: "#94a3b8",
-    fontSize: 12,
-    textAlign: "right"
-  },
-  weightHeader: {
-    flex: 0.7,
-    color: "#94a3b8",
-    fontSize: 12,
-    textAlign: "right"
-  },
+  sectorHeader: { flex: 1.4, color: "#94a3b8", fontSize: 12 },
+  valueHeader: { flex: 1, color: "#94a3b8", fontSize: 12, textAlign: "right" },
+  weightHeader: { flex: 0.7, color: "#94a3b8", fontSize: 12, textAlign: "right" },
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -830,28 +736,11 @@ tablePanel: {
     paddingVertical: 12
   },
   sectorCol: { flex: 1.4 },
-  valueCol: {
-    flex: 1,
-    color: "white",
-    fontWeight: "900",
-    textAlign: "right"
-  },
-  weightCol: {
-    flex: 0.7,
-    color: "white",
-    fontWeight: "900",
-    textAlign: "right"
-  },
-  sectorNameWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 8
-  },
+  valueCol: { flex: 1, color: "white", fontWeight: "900", textAlign: "right" },
+  weightCol: { flex: 0.7, color: "white", fontWeight: "900", textAlign: "right" },
+  sectorNameWrap: { flexDirection: "row", alignItems: "center", gap: 10 },
+  legendDot: { width: 12, height: 12, borderRadius: 8 },
+
   healthCard: {
     marginTop: 18,
     backgroundColor: "#0f172a",
@@ -862,192 +751,75 @@ tablePanel: {
     flexDirection: "row",
     gap: 24
   },
-  health: {
-    color: "#67e8f9",
-    fontSize: 32,
-    fontWeight: "900",
-    marginTop: 6
-  },
-
-smallHint: {
-  color: "#94a3b8",
-  fontSize: 11,
-  marginTop: 6
-},
-
-miniOverlay: {
-  flex: 1,
-  backgroundColor: "rgba(0,0,0,.45)",
-  justifyContent: "center",
-  alignItems: "center",
-  padding: 20
-},
-
-miniModal: {
-  width: "92%",
-  maxWidth: 560,
-  backgroundColor: "#0f172a",
-  borderColor: "#334155",
-  borderWidth: 1,
-  borderRadius: 24,
-  padding: 18,
-  shadowColor: "#000",
-  shadowOpacity: 0.35,
-  shadowRadius: 20,
-  elevation: 8
-},
-
-modalHeader: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center"
-},
-
-closeCircle: {
-  width: 34,
-  height: 34,
-  borderRadius: 17,
-  backgroundColor: "#1e293b",
-  alignItems: "center",
-  justifyContent: "center"
-},
-
-closeText: {
-  color: "white",
-  fontSize: 22,
-  fontWeight: "900",
-  lineHeight: 24
-},
-
-modalSub: {
-  color: "#94a3b8",
-  marginTop: 6
-},
-
-miniRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  paddingVertical: 12,
-  borderBottomColor: "#1e293b",
-  borderBottomWidth: 1
-},
-
-whiteBold: {
-  color: "white",
-  fontWeight: "900"
-},
-
-mutedSmall: {
-  color: "#94a3b8",
-  fontSize: 12,
-  marginTop: 3
-},
-
-timestamp:{
- color:"#64748b",
- marginTop:6,
- fontSize:12
-},
-
-modalOverlay:{
-flex:1,
-backgroundColor:"rgba(0,0,0,.55)",
-justifyContent:"center",
-alignItems:"center",
-padding:20
-},
-
-sectorPopup:{
-width:"92%",
-maxWidth:760,
-backgroundColor:"#0f172a",
-borderRadius:28,
-padding:22,
-borderColor:"#334155",
-borderWidth:1
-},
-
-popupHeader:{
-flexDirection:"row",
-justifyContent:"space-between",
-alignItems:"center",
-marginBottom:20
-},
-
-popupTitle:{
-fontSize:24,
-fontWeight:"900",
-color:"white"
-},
-
-popupSub:{
-color:"#94a3b8",
-marginTop:6
-},
-
-closeCircle:{
-width:40,
-height:40,
-borderRadius:20,
-backgroundColor:"#1e293b",
-justifyContent:"center",
-alignItems:"center"
-},
-
-popupTableHeader:{
-flexDirection:"row",
-paddingBottom:12,
-borderBottomColor:"#334155",
-borderBottomWidth:1
-},
-
-popupRow:{
-flexDirection:"row",
-paddingVertical:14,
-borderBottomColor:"#1e293b",
-borderBottomWidth:1
-},
-
-popupCol1: {
-  flex: 1.2,
-  color: "#cbd5e1"
-},
-
-popupCol2: {
-  flex: 0.6,
-  textAlign: "center",
-  color: "#cbd5e1"
-},
-
-popupCol3: {
-  flex: 1.2,
-  textAlign: "right",
-  color: "#cbd5e1"
-},
-
-popupCol1Text: {
-  flex: 1.2,
-  color: "white",
-  fontWeight: "800"
-},
-
-popupCol2Text: {
-  flex: 0.6,
-  textAlign: "center",
-  color: "#cbd5e1"
-},
-
-popupCol3Text: {
-  flex: 1.2,
-  textAlign: "right",
-  fontWeight: "900",
-  color: "white"
-},
-
+  health: { color: "#67e8f9", fontSize: 32, fontWeight: "900", marginTop: 6 },
+  smallHint: { color: "#94a3b8", fontSize: 11, marginTop: 6 },
   healthRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 4
-  }
+  },
+
+  primary: {
+    marginTop: 20,
+    backgroundColor: "#9333ea",
+    padding: 18,
+    borderRadius: 16
+  },
+  primaryText: { color: "white", textAlign: "center", fontWeight: "900" },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20
+  },
+  sectorPopup: {
+    width: "92%",
+    maxWidth: 760,
+    backgroundColor: "#0f172a",
+    borderRadius: 28,
+    padding: 20,
+    borderColor: "#334155",
+    borderWidth: 1
+  },
+  popupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12
+  },
+  popupTitle: { fontSize: 24, fontWeight: "900", color: "white" },
+  popupSub: { color: "#94a3b8", marginTop: 6 },
+  closeCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#1e293b",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  securityCard: {
+    backgroundColor: "#111827",
+    borderColor: "#1f2937",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 10
+  },
+  compactTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+  compactMetrics: {
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  securitySymbol: { color: "white", fontSize: 17, fontWeight: "900" },
+  infoCompact: { flex: 1 },
+  infoLabel: { color: "#94a3b8", fontSize: 10 },
+  infoValue: { color: "white", fontWeight: "900", marginTop: 4, fontSize: 12 }
 });

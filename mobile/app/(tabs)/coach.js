@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,9 +16,18 @@ const amounts = [5000, 10000, 25000, 50000, 100000];
 export default function Coach() {
   const [portfolio, setPortfolio] = useState([]);
   const [dashboardContext, setDashboardContext] = useState(null);
+
   const [amount, setAmount] = useState(10000);
   const [sectorPlan, setSectorPlan] = useState([]);
   const [selectedSector, setSelectedSector] = useState(null);
+
+  const [showSimulator, setShowSimulator] = useState(false);
+  const [goal, setGoal] = useState("Dividend Income");
+  const [scenario, setScenario] = useState("Balanced");
+  const [intensity, setIntensity] = useState(50);
+  const [goalOpen, setGoalOpen] = useState(false);
+  const [scenarioOpen, setScenarioOpen] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     load();
@@ -27,13 +37,8 @@ export default function Coach() {
     const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
     const contextRaw = await AsyncStorage.getItem("gatecepCoachContext");
 
-    if (portfolioRaw) {
-      setPortfolio(JSON.parse(portfolioRaw));
-    }
-
-    if (contextRaw) {
-      setDashboardContext(JSON.parse(contextRaw));
-    }
+    if (portfolioRaw) setPortfolio(JSON.parse(portfolioRaw));
+    if (contextRaw) setDashboardContext(JSON.parse(contextRaw));
   }
 
   const value = useMemo(() => {
@@ -69,7 +74,7 @@ export default function Coach() {
   function simulate() {
     const plan = recommendation().map((x) => ({
       ...x,
-      amount: (amount * x.weight) / 100
+      amount: (Number(amount || 0) * x.weight) / 100
     }));
 
     setSectorPlan(plan);
@@ -84,6 +89,9 @@ export default function Coach() {
       portfolioValue: value,
       largestSector,
       amount,
+      goal,
+      scenario,
+      intensity,
       sectorPlan,
       status: "SAVED_NOT_EXECUTED"
     });
@@ -130,15 +138,17 @@ export default function Coach() {
     const stocks = stocksBySector[sector.sector] || [];
     const actionable = stocks.filter(([, price]) => allocation >= price);
 
-    const holdings = actionable.map(([symbol, price, reason, name, dividendYield = 0]) => ({
-      symbol,
-      name,
-      price,
-      reason,
-      dividendYield,
-      qty: 0,
-      invested: 0
-    }));
+    const holdings = actionable.map(
+      ([symbol, price, reason, name, dividendYield = 0]) => ({
+        symbol,
+        name,
+        price,
+        reason,
+        dividendYield,
+        qty: 0,
+        invested: 0
+      })
+    );
 
     if (!holdings.length) {
       return {
@@ -171,6 +181,7 @@ export default function Coach() {
       if (!affordable.length) break;
 
       const buy = affordable[0];
+
       buy.qty += 1;
       buy.invested += buy.price;
       investedTotal += buy.price;
@@ -206,7 +217,6 @@ export default function Coach() {
 
       <View style={styles.card}>
         <Text style={styles.section}>Coach G Analysis Context</Text>
-
         <Text style={styles.body}>Largest Sector: {largestSector}</Text>
         <Text style={styles.body}>Risk: {dashboardContext?.risk || "N/A"}</Text>
         <Text style={styles.body}>
@@ -215,26 +225,7 @@ export default function Coach() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.section}>Scenario Amount</Text>
-
-        <View style={styles.amountRow}>
-          {amounts.map((a) => (
-            <Pressable
-              key={a}
-              style={[styles.chip, amount === a && styles.chipActive]}
-              onPress={() => setAmount(a)}
-            >
-              <Text style={amount === a ? styles.white : styles.gray}>
-                KES {money(a)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.card}>
         <Text style={styles.section}>Coach G Sector Plan</Text>
-
         <Text style={styles.body}>
           Coach G will avoid adding more {largestSector} exposure and redirect
           new money toward underweight sectors using the same sector language as
@@ -242,42 +233,39 @@ export default function Coach() {
         </Text>
       </View>
 
-      <Pressable style={styles.primary} onPress={simulate}>
-        <Text style={styles.primaryText}>Run Simulation</Text>
+      <Pressable
+        style={styles.primary}
+        onPress={() => {
+          simulate();
+          setShowSimulator(true);
+        }}
+      >
+        <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
       </Pressable>
 
-      {sectorPlan.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.section}>Recommended Sectors</Text>
-
-          {sectorPlan.map((sector) => (
-            <Pressable
-              key={sector.sector}
-              style={[styles.planRow, sector.reserve && styles.reserveRow]}
-              onPress={() => {
-                if (!sector.reserve) {
-                  setSelectedSector(sector);
-                }
-              }}
-            >
-              <View style={styles.planLeft}>
-                <Text style={styles.planTitle}>{sector.sector}</Text>
-                <Text style={styles.body}>
-                  {sector.weight}% • KES {money(sector.amount)}
-                </Text>
-              </View>
-
-              <Text style={sector.reserve ? styles.reserveLink : styles.link}>
-                {sector.reserve ? "Held as Cash" : "Sector Details"}
-              </Text>
-            </Pressable>
-          ))}
-
-          <Pressable style={styles.secondary} onPress={saveRecommendation}>
-            <Text style={styles.primaryText}>Save Strategy To Profile</Text>
-          </Pressable>
-        </View>
-      )}
+      <SimulatorModal
+        visible={showSimulator}
+        onClose={() => setShowSimulator(false)}
+        goal={goal}
+        setGoal={setGoal}
+        scenario={scenario}
+        setScenario={setScenario}
+        amount={amount}
+        setAmount={setAmount}
+        intensity={intensity}
+        setIntensity={setIntensity}
+        goalOpen={goalOpen}
+        setGoalOpen={setGoalOpen}
+        scenarioOpen={scenarioOpen}
+        setScenarioOpen={setScenarioOpen}
+        simulate={simulate}
+        sectorPlan={sectorPlan}
+        projectedValue={value + Number(amount || 0)}
+        saveRecommendation={saveRecommendation}
+        setSelectedSector={setSelectedSector}
+        showResults={showResults}
+        setShowResults={setShowResults}
+      />
 
       <SectorDetailsModal
         sector={selectedSector}
@@ -285,6 +273,197 @@ export default function Coach() {
         buildSectorDetails={buildSectorDetails}
       />
     </ScrollView>
+  );
+}
+
+function SimulatorModal({
+  visible,
+  onClose,
+  goal,
+  setGoal,
+  scenario,
+  setScenario,
+  amount,
+  setAmount,
+  intensity,
+  setIntensity,
+  goalOpen,
+  setGoalOpen,
+  scenarioOpen,
+  setScenarioOpen,
+  simulate,
+  sectorPlan,
+  showResults,
+  setShowResults,
+  projectedValue,
+  saveRecommendation,
+  setSelectedSector
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={styles.simulatorModal}>
+          <View style={styles.popupHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.popupTitle}>Coach G Investment Simulator</Text>
+              <Text style={styles.body}>
+                Test how new money could improve your portfolio.
+              </Text>
+            </View>
+
+            <Pressable onPress={onClose}>
+              <Text style={styles.gray}>Close</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.dropdownRow}>
+  <View style={styles.dropdownHalf}>
+    <Dropdown
+      label="Investment Goal"
+      value={goal}
+      open={goalOpen}
+      setOpen={setGoalOpen}
+      options={[
+        "Dividend Income",
+        "Balanced Growth",
+        "Capital Growth",
+        "Risk Reduction"
+      ]}
+      onSelect={setGoal}
+    />
+  </View>
+
+  <View style={styles.dropdownHalf}>
+    <Dropdown
+      label="Scenario"
+      value={scenario}
+      open={scenarioOpen}
+      setOpen={setScenarioOpen}
+      options={["Conservative", "Balanced", "Aggressive"]}
+      onSelect={setScenario}
+    />
+  </View>
+</View>
+
+          <Text style={styles.inputLabel}>Amount to Invest</Text>
+          <TextInput
+            value={String(amount)}
+            onChangeText={(v) => setAmount(Number(v || 0))}
+            keyboardType="numeric"
+            style={styles.input}
+          />
+
+          <Text style={styles.inputLabel}>Rebalance Intensity: {intensity}%</Text>
+
+          <View style={styles.sliderRow}>
+            {[25, 50, 75, 100].map((level) => (
+              <Pressable
+                key={level}
+                style={[
+                  styles.sliderChip,
+                  intensity === level && styles.sliderChipActive
+                ]}
+                onPress={() => setIntensity(level)}
+              >
+                <Text
+                  style={
+                    intensity === level
+                      ? styles.sliderTextActive
+                      : styles.sliderText
+                  }
+                >
+                  {level}%
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Pressable
+  style={styles.primary}
+  onPress={() => {
+    simulate();
+    setShowResults(true);
+  }}
+>
+            <Text style={styles.primaryText}>View Simulation Results</Text>
+          </Pressable>
+
+                <Modal visible={showResults} transparent animationType="fade">
+  <View style={styles.resultOverlay}>
+    <View style={styles.resultModal}>
+      <View style={styles.popupHeader}>
+        <Text style={styles.popupTitle}>Simulation Results</Text>
+
+        <Pressable onPress={() => setShowResults(false)}>
+          <Text style={styles.gray}>Close</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.resultCard}>
+        <Text style={styles.section}>Projected Value</Text>
+        <Text style={styles.metric2}>KES {money(projectedValue)}</Text>
+        <Text style={styles.body}>Risk Direction: IMPROVING</Text>
+      </View>
+
+      <View style={styles.buyCard}>
+        <Text style={styles.section}>Buy Recommendations</Text>
+
+        {sectorPlan
+          .filter((s) => !s.reserve)
+          .slice(0, 3)
+          .map((s) => (
+            <Pressable
+              key={s.sector}
+              style={styles.recommendationRow}
+              onPress={() => setSelectedSector(s)}
+            >
+              <Text style={styles.planTitle}>{s.sector}</Text>
+              <Text style={styles.body}>Allocate KES {money(s.amount)}</Text>
+              <Text style={styles.link}>Sector Details</Text>
+            </Pressable>
+          ))}
+      </View>
+
+      <Pressable style={styles.secondary} onPress={saveRecommendation}>
+                  <Text style={styles.primaryText}>Save Strategy To Profile</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
+
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function Dropdown({ label, value, open, setOpen, options, onSelect }) {
+  return (
+    <View style={{ marginTop: 16 }}>
+      <Text style={styles.inputLabel}>{label}</Text>
+
+      <Pressable style={styles.dropdown} onPress={() => setOpen(!open)}>
+        <Text style={styles.dropdownText}>{value}</Text>
+        <Text style={styles.dropdownArrow}>⌄</Text>
+      </Pressable>
+
+      {open && (
+        <View style={styles.dropdownList}>
+          {options.map((item) => (
+            <Pressable
+              key={item}
+              style={styles.dropdownItem}
+              onPress={() => {
+                onSelect(item);
+                setOpen(false);
+              }}
+            >
+              <Text style={styles.dropdownText}>{item}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -311,7 +490,7 @@ function SectorDetailsModal({ sector, onClose, buildSectorDetails }) {
             </Pressable>
           </View>
 
-          <ScrollView style={{ maxHeight: 340 }}>
+          <ScrollView style={{ maxHeight: 320 }}>
             {details.holdings.map((h) => (
               <View key={h.symbol} style={styles.stockRow}>
                 <View style={styles.stockLeft}>
@@ -330,20 +509,9 @@ function SectorDetailsModal({ sector, onClose, buildSectorDetails }) {
           </ScrollView>
 
           <View style={styles.summaryStrip}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Invested</Text>
-              <Text style={styles.summaryValue}>KES {money(details.investedTotal)}</Text>
-            </View>
-
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Unused</Text>
-              <Text style={styles.summaryValueYellow}>KES {money(details.unused)}</Text>
-            </View>
-
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Allocation</Text>
-              <Text style={styles.summaryValue}>KES {money(sector.amount)}</Text>
-            </View>
+            <SummaryItem label="Invested" value={`KES ${money(details.investedTotal)}`} />
+            <SummaryItem label="Unused" value={`KES ${money(details.unused)}`} yellow />
+            <SummaryItem label="Allocation" value={`KES ${money(sector.amount)}`} />
           </View>
 
           <View style={styles.dividendBox}>
@@ -363,22 +531,20 @@ function SectorDetailsModal({ sector, onClose, buildSectorDetails }) {
               </Text>
             </View>
           )}
-
-          <View style={styles.reasonBox}>
-            <Text style={styles.body}>
-              Coach G selected these securities because they fit the recommended
-              sector and can be purchased with the available allocation.
-            </Text>
-          </View>
-
-          <View style={styles.compare}>
-            <Text style={styles.section}>Before vs After</Text>
-            <Text style={styles.body}>Largest Sector: 35%</Text>
-            <Text style={styles.body}>Projected: 26%</Text>
-          </View>
         </View>
       </View>
     </Modal>
+  );
+}
+
+function SummaryItem({ label, value, yellow }) {
+  return (
+    <View style={styles.summaryItem}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={yellow ? styles.summaryValueYellow : styles.summaryValue}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -393,61 +559,56 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
   content: { padding: 20, paddingTop: 60, paddingBottom: 120 },
   title: { fontSize: 34, fontWeight: "900", color: "white" },
+
   card: {
     marginTop: 18,
     padding: 18,
     backgroundColor: "#0f172a",
     borderRadius: 20
   },
+
   label: { color: "#94a3b8" },
   metric: { fontSize: 30, fontWeight: "900", color: "#67e8f9" },
   metric2: { fontSize: 24, fontWeight: "900", color: "white" },
   section: { color: "#67e8f9", fontWeight: "900", marginTop: 8 },
   body: { marginTop: 8, color: "#cbd5e1", lineHeight: 20 },
-  amountRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
-  chip: { padding: 12, borderRadius: 999, backgroundColor: "#1e293b" },
-  chipActive: { backgroundColor: "#9333ea" },
   white: { color: "white" },
   gray: { color: "#94a3b8" },
+
   primary: {
     marginTop: 20,
     backgroundColor: "#9333ea",
     padding: 18,
     borderRadius: 16
   },
+
   secondary: {
     marginTop: 14,
     backgroundColor: "#1e293b",
     padding: 18,
     borderRadius: 16
   },
+
   primaryText: { color: "white", fontWeight: "900", textAlign: "center" },
-  planRow: {
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1e293b",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center"
-  },
-  reserveRow: {
-    backgroundColor: "rgba(251,191,36,.08)",
-    borderColor: "rgba(251,191,36,.35)",
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    marginTop: 12
-  },
-  planLeft: { flex: 1, paddingRight: 12 },
-  planTitle: { color: "white", fontWeight: "900" },
-  link: { color: "#67e8f9", fontWeight: "900" },
-  reserveLink: { color: "#fbbf24", fontWeight: "900" },
+
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,.65)",
-    justifyContent: "center",
-    padding: 16
+    backgroundColor: "rgba(0,0,0,.72)",
+    justifyContent: "flex-start",
+    padding: 16,
+    paddingTop: 35
   },
+
+  simulatorModal: {
+    width: "100%",
+    maxHeight: "92%",
+    backgroundColor: "#020617",
+    padding: 20,
+    borderRadius: 24,
+    borderColor: "#9333ea",
+    borderWidth: 1
+  },
+
   popup: {
     width: "100%",
     maxHeight: "92%",
@@ -457,12 +618,139 @@ const styles = StyleSheet.create({
     borderColor: "#0891b2",
     borderWidth: 1
   },
+
   popupHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start"
   },
-  popupTitle: { fontSize: 26, fontWeight: "900", color: "#67e8f9" },
+
+  popupTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#67e8f9"
+  },
+
+  inputLabel: {
+    color: "#94a3b8",
+    marginTop: 16
+  },
+
+  input: {
+    marginTop: 8,
+    backgroundColor: "#111827",
+    borderColor: "#9333ea",
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    color: "white"
+  },
+
+  dropdown: {
+    marginTop: 8,
+    backgroundColor: "#111827",
+    borderColor: "#9333ea",
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+
+  dropdownText: {
+    color: "white",
+    fontWeight: "800"
+  },
+
+  dropdownArrow: {
+    color: "white",
+    fontSize: 18
+  },
+
+  dropdownList: {
+    marginTop: 6,
+    backgroundColor: "#111827",
+    borderColor: "#9333ea",
+    borderWidth: 1,
+    borderRadius: 14,
+    overflow: "hidden"
+  },
+
+  dropdownItem: {
+    padding: 14,
+    borderBottomColor: "#1e293b",
+    borderBottomWidth: 1
+  },
+
+  sliderRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    gap: 8
+  },
+
+  sliderChip: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: "#111827",
+    borderColor: "#334155",
+    borderWidth: 1
+  },
+
+  sliderChipActive: {
+    backgroundColor: "#9333ea",
+    borderColor: "#c084fc"
+  },
+
+  sliderText: {
+    color: "#94a3b8",
+    textAlign: "center",
+    fontWeight: "800"
+  },
+
+  sliderTextActive: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "900"
+  },
+
+  resultCard: {
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(147,51,234,.14)",
+    borderColor: "rgba(147,51,234,.35)",
+    borderWidth: 1
+  },
+
+  buyCard: {
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(16,185,129,.10)",
+    borderColor: "rgba(16,185,129,.35)",
+    borderWidth: 1
+  },
+
+  recommendationRow: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#111827"
+  },
+
+  planTitle: {
+    color: "white",
+    fontWeight: "900"
+  },
+
+  link: {
+    color: "#67e8f9",
+    fontWeight: "900",
+    marginTop: 6
+  },
+
   stockRow: {
     marginTop: 12,
     padding: 14,
@@ -474,6 +762,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12
   },
+
   stockLeft: { flex: 1 },
   stockSymbol: { color: "white", fontSize: 16, fontWeight: "900" },
   stockName: { color: "#94a3b8", marginTop: 4 },
@@ -482,6 +771,7 @@ const styles = StyleSheet.create({
   stockShares: { color: "#67e8f9", fontWeight: "900" },
   marketPrice: { color: "#94a3b8", fontSize: 12, marginTop: 2 },
   stockValue: { color: "#cbd5e1", marginTop: 4 },
+
   summaryStrip: {
     marginTop: 18,
     backgroundColor: "#111827",
@@ -490,10 +780,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
+
   summaryItem: { flex: 1, alignItems: "center" },
   summaryLabel: { color: "#94a3b8", fontSize: 11 },
   summaryValue: { color: "#67e8f9", fontWeight: "900", marginTop: 5 },
   summaryValueYellow: { color: "#fde047", fontWeight: "900", marginTop: 5 },
+
   dividendBox: {
     marginTop: 14,
     backgroundColor: "rgba(16,185,129,.10)",
@@ -502,12 +794,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16
   },
+
   dividendValue: {
     color: "#86efac",
     fontSize: 24,
     fontWeight: "900",
     marginTop: 6
   },
+
   unused: {
     marginTop: 16,
     padding: 16,
@@ -516,13 +810,30 @@ const styles = StyleSheet.create({
     borderColor: "#854d0e",
     borderWidth: 1
   },
-  reasonBox: {
-    marginTop: 16,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: "#082f49",
-    borderColor: "#075985",
-    borderWidth: 1
-  },
-  compare: { marginTop: 20 }
+
+dropdownRow: {
+  flexDirection: "row",
+  gap: 10
+},
+
+dropdownHalf: {
+  flex: 1
+},
+
+resultOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,.75)",
+  justifyContent: "center",
+  padding: 16
+},
+
+resultModal: {
+  backgroundColor: "#020617",
+  padding: 20,
+  borderRadius: 24,
+  borderColor: "#9333ea",
+  borderWidth: 1,
+  maxHeight: "88%"
+}
+
 });
