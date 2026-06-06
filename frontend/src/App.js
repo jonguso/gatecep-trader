@@ -5,7 +5,7 @@ import {
   Navigate
 } from "react-router-dom";
 
-import MobileInvestorHome from "./mobile/MobileInvestorHome";
+import Dashboard from "./mobile/MobileBrokerMirrorRebalance";
 import MobileNewInvestorWizard from "./mobile/MobileNewInvestorWizard";
 import MobileBrokerLink from "./mobile/MobileBrokerLink";
 import MobileBrokerUpload from "./mobile/MobileBrokerUpload";
@@ -16,55 +16,18 @@ import MobileHoldingDetails from "./mobile/MobileHoldingDetails";
 function AppRoutes() {
   return (
     <Routes>
-      <Route
-        path="/"
-        element={<MobileInvestorHome />}
-      />
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/mobile" element={<Dashboard />} />
+      <Route path="/mobile/investor-home" element={<Dashboard />} />
 
-      <Route
-        path="/mobile"
-        element={<MobileInvestorHome />}
-      />
+      <Route path="/mobile/new-investor" element={<MobileNewInvestorWizard />} />
+      <Route path="/mobile/broker-link" element={<MobileBrokerLink />} />
+      <Route path="/mobile/broker-home" element={<MobileBrokerMirrorHome />} />
+      <Route path="/mobile/broker-upload" element={<MobileBrokerUpload />} />
+      <Route path="/mobile/broker-rebalance" element={<MobileBrokerMirrorRebalance />} />
+      <Route path="/mobile/holding-details" element={<MobileHoldingDetails />} />
 
-      <Route
-        path="/mobile/investor-home"
-        element={<MobileInvestorHome />}
-      />
-
-      <Route
-        path="/mobile/new-investor"
-        element={<MobileNewInvestorWizard />}
-      />
-
-      <Route
-        path="/mobile/broker-link"
-        element={<MobileBrokerLink />}
-      />
-
-      <Route
-        path="/mobile/broker-home"
-        element={<MobileBrokerMirrorHome />}
-      />
-
-      <Route
-        path="/mobile/broker-upload"
-        element={<MobileBrokerUpload />}
-      />
-
-      <Route
-        path="/mobile/broker-rebalance"
-        element={<MobileBrokerMirrorRebalance />}
-      />
-
-      <Route
-        path="/mobile/holding-details"
-        element={<MobileHoldingDetails />}
-      />
-
-      <Route
-        path="*"
-        element={<Navigate to="/mobile/investor-home" replace />}
-      />
+      <Route path="*" element={<Navigate to="/Dashboard" replace />} />
     </Routes>
   );
 }
