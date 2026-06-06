@@ -31,6 +31,9 @@ export default function Dashboard() {
   const [showHealth, setShowHealth] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("");
 
+  const [transactionsUploaded, setTransactionsUploaded] = useState(false);
+  const [transactions, setTransactions] = useState([]);
+
   useEffect(() => {
     load();
   }, []);
@@ -43,6 +46,15 @@ export default function Dashboard() {
       (await AsyncStorage.getItem("gatecepAvailableCash")) ||
       (await AsyncStorage.getItem("gatecepTradingSpace"));
     const statementRaw = await AsyncStorage.getItem("gatecepStatementUploaded");
+
+    const txUploadedRaw = await AsyncStorage.getItem("gatecepTransactionsUploaded");
+const txRaw = await AsyncStorage.getItem("gatecepTransactionHistory");
+
+setTransactionsUploaded(txUploadedRaw === "true");
+
+if (txRaw) {
+  setTransactions(JSON.parse(txRaw));
+}
 
     if (raw) setHoldings(JSON.parse(raw));
 
@@ -235,6 +247,159 @@ export default function Dashboard() {
     );
   }
 
+function buildBehaviorInsights() {
+  if (!transactionsUploaded || !transactions.length) {
+    return [
+      "Upload transaction history so Coach G can analyze buying and selling behavior."
+    ];
+  }
+
+  const buys = transactions.filter((t) => String(t.side || "").toUpperCase() === "BUY");
+  const sells = transactions.filter((t) => String(t.side || "").toUpperCase() === "SELL");
+
+  const totalValue = transactions.reduce(
+    (sum, t) => sum + Number(t.value || 0),
+    0
+  );
+
+  const avgTrade =
+    transactions.length > 0
+      ? totalValue / transactions.length
+      : 0;
+
+  const buyPct =
+    transactions.length > 0
+      ? (buys.length / transactions.length) * 100
+      : 0;
+
+  const sellPct =
+    transactions.length > 0
+      ? (sells.length / transactions.length) * 100
+      : 0;
+
+  const symbolCount = {};
+
+  buys.forEach((t) => {
+    const symbol = String(t.symbol || "").toUpperCase();
+
+    if (symbol) {
+      symbolCount[symbol] = (symbolCount[symbol] || 0) + 1;
+    }
+  });
+
+  const repeatedBuys = Object.entries(symbolCount)
+    .filter(([, count]) => count >= 2)
+    .map(([symbol]) => symbol);
+
+  const buyFrequency = {};
+
+buys.forEach((t) => {
+  const symbol = String(t.symbol || "").toUpperCase();
+
+  if (!buyFrequency[symbol]) {
+    buyFrequency[symbol] = [];
+  }
+
+  buyFrequency[symbol].push(t);
+});
+
+const averagingDown = [];
+
+Object.entries(buyFrequency).forEach(([symbol, trades]) => {
+  if (trades.length < 2) return;
+
+  const prices = trades
+    .map((x) => Number(x.price || 0))
+    .filter((x) => x > 0);
+
+  for (let i = 1; i < prices.length; i++) {
+    if (prices[i] < prices[i - 1]) {
+      averagingDown.push(symbol);
+      break;
+    }
+  }
+});
+
+const concentrationRiskSymbols =
+  repeatedBuys.filter((x) => symbolCount[x] >= 3);
+
+const overTrading =
+  transactions.length >= 15;
+    
+  const insights = [];
+
+  insights.push(
+    `Coach G reviewed ${transactions.length} transactions (${buys.length} buys / ${sells.length} sells).`
+  );
+
+  insights.push(
+    `Average trade size: KES ${money(avgTrade)}.`
+  );
+
+  if (repeatedBuys.length > 0) {
+    insights.push(
+      `Repeated accumulation detected in ${repeatedBuys.join(", ")}. Coach G will monitor whether this is disciplined accumulation or concentration risk.`
+    );
+  }
+
+  if (sellPct > buyPct) {
+    insights.push(
+      "Selling activity exceeds buying activity. Coach G will watch for emotional exits or short holding periods."
+    );
+  }
+
+  if (transactions.length >= 10) {
+    insights.push(
+      "Sufficient transaction history exists for stronger behavior-based coaching."
+    );
+  } else {
+    insights.push(
+      "More transaction history will improve Coach G accuracy."
+    );
+  }
+
+  if (avgTrade > 0 && avgTrade < 3000) {
+    insights.push(
+      "Average trade size is relatively small. Frequent small trades may increase costs and behavioral risk."
+    );
+  }
+
+  if (avgTrade >= 10000) {
+    insights.push(
+      "Average trade size is meaningful. Coach G will prioritize allocation discipline and sector concentration control."
+    );
+  }
+
+if (averagingDown.length > 0) {
+  insights.push(
+    `Possible averaging down behavior detected in ${averagingDown.join(", ")}. Coach G will monitor whether lower prices are creating opportunity or concentration risk.`
+  );
+}
+
+if (concentrationRiskSymbols.length > 0) {
+  insights.push(
+    `Heavy repeat buying detected in ${concentrationRiskSymbols.join(", ")} which may increase sector concentration risk.`
+  );
+}
+
+if (overTrading) {
+  insights.push(
+    "Trading frequency appears elevated. Coach G will monitor for overtrading behavior."
+  );
+}
+
+if (
+  risk === "HIGH_RISK" &&
+  concentrationRiskSymbols.length > 0
+) {
+  insights.push(
+    "Transaction behavior is reinforcing an already concentrated portfolio structure."
+  );
+}
+
+  return insights;
+}
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.topBar}>
@@ -373,6 +538,16 @@ export default function Dashboard() {
           ))}
         </View>
       </View>
+
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>Coach G Behavior Insights</Text>
+
+  {buildBehaviorInsights().map((item, index) => (
+    <Text key={index} style={styles.body}>
+      • {item}
+    </Text>
+  ))}
+</View>
 
       <Pressable style={styles.healthCard} onPress={() => setShowHealth(!showHealth)}>
         <View>

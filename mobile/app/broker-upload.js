@@ -47,13 +47,16 @@ export default function BrokerUpload() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Optional Uploads</Text>
 
-        <Pressable style={styles.disabledOption}>
-          <Text style={styles.docTitle}>Transaction / Order History</Text>
-          <Text style={styles.optional}>Coming Soon</Text>
-          <Text style={styles.docDesc}>
-            Helps Coach G understand buying behavior, selling discipline, and goal alignment.
-          </Text>
-        </Pressable>
+        <Pressable
+  style={styles.docOption}
+  onPress={() => router.push("/transaction-import")}
+>
+  <Text style={styles.docTitle}>Transaction / Order History</Text>
+  <Text style={styles.optional}>Optional</Text>
+  <Text style={styles.docDesc}>
+    Helps Coach G understand buying behavior, selling discipline, and goal alignment.
+  </Text>
+</Pressable>
 
         <Pressable style={styles.disabledOption}>
           <Text style={styles.docTitle}>Holdings Report</Text>
