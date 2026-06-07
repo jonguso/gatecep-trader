@@ -8,8 +8,11 @@ import {
   TextInput,
   View
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import XLSX from "xlsx";
 
 export default function TransactionImport() {
   const [form, setForm] = useState({
@@ -21,6 +24,173 @@ export default function TransactionImport() {
   });
 
   const [transactions, setTransactions] = useState([]);
+  const [status, setStatus] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  async function pickTransactionFile() {
+    try {
+      setStatus("Selecting transaction file...");
+
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+        type: [
+          "text/csv",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ]
+      });
+
+      if (result.canceled) {
+        setStatus("");
+        return;
+      }
+
+      const file = result.assets?.[0];
+
+      if (!file) {
+        throw new Error("No file selected.");
+      }
+
+      setSelectedFile(file);
+      setStatus(`Selected ${file.name}. Reading transactions...`);
+
+      const rows = await parseTransactionFile(file);
+      const normalized = rows.map(normalizeTransaction).filter(Boolean);
+
+      if (!normalized.length) {
+        throw new Error(
+  `No valid transactions found. File columns detected: ${Object.keys(rows[0] || {}).join(", ")}`
+);
+      }
+
+      setTransactions(normalized);
+      setStatus(`${file.name} imported. ${normalized.length} transactions ready.`);
+    } catch (error) {
+      setStatus(`Import failed: ${error.message}`);
+      Alert.alert("Transaction Import Failed", error.message);
+    }
+  }
+
+  async function parseTransactionFile(file) {
+    const base64 = await FileSystem.readAsStringAsync(file.uri, {
+      encoding: "base64"
+    });
+
+    const workbook = XLSX.read(base64, {
+      type: "base64"
+    });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    return XLSX.utils.sheet_to_json(sheet, {
+      defval: ""
+    });
+  }
+
+  function normalizeTransaction(row) {
+  const keys = Object.keys(row);
+
+  const findValue = (names) => {
+    for (const name of names) {
+      const foundKey = keys.find(
+        (k) =>
+          String(k).trim().toLowerCase() ===
+          String(name).trim().toLowerCase()
+      );
+
+      if (foundKey) return row[foundKey];
+    }
+
+    return "";
+  };
+
+  const symbol = findValue([
+  "Symbol",
+  "Security",
+  "Security Code",
+  "Security Name",
+  "Counter",
+  "Share",
+  "Stock",
+  "Instrument"
+]);
+
+  const sideRaw = findValue([
+  "Side",
+  "Type",
+  "Action",
+  "Buy/Sell",
+  "Buy or Sell",
+  "Transaction Type",
+  "Order Type"
+]);
+
+  const quantity = cleanNumber(
+  findValue([
+    "Quantity",
+    "Qty",
+    "Shares",
+    "Units",
+    "Volume",
+    "Original Order Quantity",
+    "Total Traded Quantity",
+    "Pending Order Quantity",
+    "Order Quantity"
+  ])
+);
+
+  const price = cleanNumber(
+  findValue([
+    "Price",
+    "Rate",
+    "Trade Price",
+    "Market Price",
+    "Unit Price",
+    "Order Price"
+  ])
+);
+
+  const amount = cleanNumber(
+    findValue(["Amount", "Value", "Consideration", "Gross Amount", "Net Amount"])
+  );
+
+  const date =
+  findValue([
+    "Date",
+    "Trade Date",
+    "Transaction Date",
+    "Order Date",
+    "Last Modified Date & Time"
+  ]) || new Date().toISOString().slice(0, 10);
+
+  const sideText = String(sideRaw).toUpperCase();
+
+  const side =
+    sideText.includes("SELL") ||
+    sideText.includes("SALE") ||
+    sideText.includes("DISPOSAL")
+      ? "SELL"
+      : "BUY";
+
+  if (!symbol) return null;
+
+  const finalQuantity = quantity || 0;
+  const finalPrice =
+    price || (amount > 0 && finalQuantity > 0 ? amount / finalQuantity : 0);
+
+  if (!finalQuantity || !finalPrice) return null;
+
+  return {
+    symbol: String(symbol).trim().toUpperCase(),
+    side,
+    quantity: finalQuantity,
+    price: finalPrice,
+    date: String(date),
+    value: amount || finalQuantity * finalPrice,
+    source: selectedFile?.name || "MANUAL_OR_FILE"
+  };
+}
 
   function addTransaction() {
     if (!form.symbol || !form.quantity || !form.price) {
@@ -31,10 +201,11 @@ export default function TransactionImport() {
     const item = {
       symbol: form.symbol.trim().toUpperCase(),
       side: form.side,
-      quantity: Number(form.quantity || 0),
-      price: Number(form.price || 0),
+      quantity: cleanNumber(form.quantity),
+      price: cleanNumber(form.price),
       date: form.date || new Date().toISOString().slice(0, 10),
-      value: Number(form.quantity || 0) * Number(form.price || 0)
+      value: cleanNumber(form.quantity) * cleanNumber(form.price),
+      source: "MANUAL_ENTRY"
     };
 
     setTransactions([item, ...transactions]);
@@ -50,14 +221,25 @@ export default function TransactionImport() {
 
   async function saveTransactions() {
     if (!transactions.length) {
-      Alert.alert("No Transactions", "Add at least one transaction.");
+      Alert.alert("No Transactions", "Add or upload at least one transaction.");
       return;
     }
 
     await AsyncStorage.setItem("gatecepTransactionsUploaded", "true");
+
     await AsyncStorage.setItem(
       "gatecepTransactionHistory",
       JSON.stringify(transactions)
+    );
+
+    await AsyncStorage.setItem(
+      "gatecepTransactionSummary",
+      JSON.stringify({
+        count: transactions.length,
+        uploadedAt: new Date().toISOString(),
+        source: selectedFile ? "MOBILE_TRANSACTION_UPLOAD" : "MANUAL_ENTRY",
+        fileName: selectedFile?.name || null
+      })
     );
 
     Alert.alert("Saved", "Transaction history saved for Coach G.");
@@ -70,11 +252,32 @@ export default function TransactionImport() {
       <Text style={styles.title}>Transaction History</Text>
 
       <Text style={styles.subtitle}>
-        Add buy and sell activity so Coach G can understand your investing behavior.
+        Upload or enter buy and sell activity so Coach G can understand your investing behavior.
       </Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Transaction Entry</Text>
+        <Text style={styles.cardTitle}>Upload Transaction File</Text>
+
+        <Text style={styles.help}>
+          Select CSV or Excel order history from your phone. Expected columns may include Symbol,
+          Buy/Sell, Quantity, Price, and Date.
+        </Text>
+
+        <Pressable style={styles.secondary} onPress={pickTransactionFile}>
+          <Text style={styles.secondaryText}>
+            {selectedFile ? `Selected: ${selectedFile.name}` : "Upload Transaction File"}
+          </Text>
+        </Pressable>
+
+        {status ? (
+          <View style={styles.statusBox}>
+            <Text style={styles.statusText}>{status}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Manual Transaction Entry</Text>
 
         <TextInput
           placeholder="Symbol e.g. SCOM"
@@ -132,15 +335,16 @@ export default function TransactionImport() {
 
       {transactions.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Transactions Added</Text>
+          <Text style={styles.cardTitle}>Transactions Ready</Text>
 
           {transactions.map((t, index) => (
             <View key={`${t.symbol}-${index}`} style={styles.txRow}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.symbol}>{t.symbol}</Text>
                 <Text style={styles.small}>
                   {t.side} • {t.quantity} shares @ KES {money(t.price)}
                 </Text>
+                <Text style={styles.tiny}>{t.date}</Text>
               </View>
 
               <Text style={t.side === "BUY" ? styles.green : styles.red}>
@@ -160,6 +364,18 @@ export default function TransactionImport() {
       </Pressable>
     </ScrollView>
   );
+}
+
+function cleanNumber(value) {
+  const cleaned = String(value ?? "")
+    .replaceAll(",", "")
+    .replace(/KES/gi, "")
+    .replace(/[^\d.-]/g, "")
+    .trim();
+
+  const number = Number(cleaned);
+
+  return Number.isFinite(number) ? number : 0;
 }
 
 function money(v) {
@@ -188,6 +404,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginBottom: 14
   },
+  help: {
+    color: "#94a3b8",
+    lineHeight: 20,
+    marginBottom: 14
+  },
   input: {
     backgroundColor: "#1e293b",
     color: "white",
@@ -213,15 +434,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#9333ea",
     borderColor: "#c084fc"
   },
-  sideText: { color: "#94a3b8", textAlign: "center", fontWeight: "900" },
-  sideTextActive: { color: "white", textAlign: "center", fontWeight: "900" },
+  sideText: {
+    color: "#94a3b8",
+    textAlign: "center",
+    fontWeight: "900"
+  },
+  sideTextActive: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "900"
+  },
   secondary: {
-    marginTop: 16,
+    marginTop: 12,
     backgroundColor: "#1e293b",
     padding: 16,
     borderRadius: 16
   },
-  secondaryText: { color: "#67e8f9", textAlign: "center", fontWeight: "900" },
+  secondaryText: {
+    color: "#67e8f9",
+    textAlign: "center",
+    fontWeight: "900"
+  },
   txRow: {
     paddingVertical: 14,
     borderBottomColor: "#1e293b",
@@ -230,22 +463,60 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10
   },
-  symbol: { color: "white", fontSize: 16, fontWeight: "900" },
-  small: { color: "#94a3b8", marginTop: 4 },
-  green: { color: "#86efac", fontWeight: "900" },
-  red: { color: "#fca5a5", fontWeight: "900" },
+  symbol: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  small: {
+    color: "#94a3b8",
+    marginTop: 4
+  },
+  tiny: {
+    color: "#64748b",
+    marginTop: 4,
+    fontSize: 12
+  },
+  green: {
+    color: "#86efac",
+    fontWeight: "900"
+  },
+  red: {
+    color: "#fca5a5",
+    fontWeight: "900"
+  },
   primary: {
     marginTop: 22,
     backgroundColor: "#9333ea",
     padding: 18,
     borderRadius: 18
   },
-  primaryText: { color: "white", textAlign: "center", fontWeight: "900" },
+  primaryText: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "900"
+  },
   backButton: {
     marginTop: 14,
     backgroundColor: "#1e293b",
     padding: 16,
     borderRadius: 18
   },
-  backText: { color: "#cbd5e1", textAlign: "center", fontWeight: "900" }
+  backText: {
+    color: "#cbd5e1",
+    textAlign: "center",
+    fontWeight: "900"
+  },
+  statusBox: {
+    marginTop: 14,
+    backgroundColor: "rgba(6,182,212,.12)",
+    borderColor: "rgba(6,182,212,.35)",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14
+  },
+  statusText: {
+    color: "#cbd5e1",
+    lineHeight: 20
+  }
 });

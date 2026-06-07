@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import {
-  ScrollView,
-  Text,
-  View,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
-  TextInput
+  Text,
+  TextInput,
+  View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
@@ -73,6 +74,7 @@ export default function NewInvestor() {
   const [step, setStep] = useState(0);
   const [amount, setAmount] = useState("10000");
   const [result, setResult] = useState(null);
+  const [selectedAllocation, setSelectedAllocation] = useState(null);
 
   const [answers, setAnswers] = useState({
     goal: null,
@@ -92,7 +94,7 @@ export default function NewInvestor() {
 
     setAnswers(updated);
 
-    if (step < questions.length - 1) {
+    if (step < questions.length) {
       setStep(step + 1);
     }
   }
@@ -133,45 +135,87 @@ export default function NewInvestor() {
   }
 
   function recommendedBroker(risk, experience, goal) {
-    if (experience === "beginner") {
+    if (experience === "none" || experience === "beginner") {
       return {
         name: "AIB-AXYS",
-        score: 88,
-        bestFor: "Beginners and long-term investors",
-        reason: "Best fit for beginners and long-term portfolio building."
+        beginnerScore: 91,
+        feeScore: 85,
+        researchScore: 88,
+        supportScore: 90,
+        onboardingScore: 92,
+        reason:
+          "Best fit for first-time investors who need simple onboarding, guidance, and long-term portfolio support.",
+        reasons: [
+          "Beginner friendly onboarding",
+          "Good fit for long-term investing",
+          "Strong starter investor support",
+          "Suitable for first CDS and broker setup"
+        ]
       };
     }
 
     if (risk === "aggressive") {
       return {
-        name: "ABC",
-        score: 86,
-        bestFor: "Active and growth-oriented investors",
-        reason: "Better fit for active and growth-oriented investors."
+        name: "ABC Capital",
+        beginnerScore: 82,
+        feeScore: 86,
+        researchScore: 84,
+        supportScore: 82,
+        onboardingScore: 80,
+        reason: "Better fit for investors who may want a more active trading style.",
+        reasons: [
+          "Good for active investors",
+          "Suitable for growth-oriented users",
+          "Useful for investors comfortable comparing opportunities",
+          "Better once the user understands market risk"
+        ]
       };
     }
 
     if (goal === "dividend") {
       return {
         name: "Dyer & Blair",
-        score: 84,
-        bestFor: "Income and research-focused investors",
-        reason: "Good fit for research-focused income investors."
+        beginnerScore: 84,
+        feeScore: 82,
+        researchScore: 90,
+        supportScore: 84,
+        onboardingScore: 82,
+        reason: "Good fit for users who care about dividend income and research support.",
+        reasons: [
+          "Strong research orientation",
+          "Good for income-focused investors",
+          "Useful for dividend stock selection",
+          "Suitable for patient long-term investors"
+        ]
       };
     }
 
     return {
       name: "AIB-AXYS",
-      score: 82,
-      bestFor: "Balanced investors",
-      reason: "Good fit for a balanced first investing journey."
+      beginnerScore: 88,
+      feeScore: 84,
+      researchScore: 86,
+      supportScore: 88,
+      onboardingScore: 90,
+      reason: "Good default fit for a balanced investor starting their first portfolio.",
+      reasons: [
+        "Balanced beginner support",
+        "Simple first-investor journey",
+        "Suitable for steady investing",
+        "Good long-term portfolio fit"
+      ]
     };
   }
 
   function buildStarterPlan(profile) {
     const startingAmount = Number(profile.amount || 0);
+    const cashPct =
+      profile.risk === "conservative"
+        ? 20
+        : profile.risk === "aggressive"
+        ? 10
+        : 15;
 
-    const cashPct = profile.risk === "conservative" ? 20 : profile.risk === "aggressive" ? 10 : 15;
     const investPct = 100 - cashPct;
 
     const allocations =
@@ -229,12 +273,7 @@ export default function NewInvestor() {
       createdAt: new Date().toISOString()
     };
 
-    const broker = recommendedBroker(
-      risk,
-      answers.experience,
-      answers.goal
-    );
-
+    const broker = recommendedBroker(risk, answers.experience, answers.goal);
     const starterPlan = buildStarterPlan(profile);
 
     const saved = {
@@ -243,11 +282,7 @@ export default function NewInvestor() {
       starterPlan
     };
 
-    await AsyncStorage.setItem(
-      "gatecepInvestorProfile",
-      JSON.stringify(saved)
-    );
-
+    await AsyncStorage.setItem("gatecepInvestorProfile", JSON.stringify(saved));
     setResult(saved);
   }
 
@@ -257,36 +292,45 @@ export default function NewInvestor() {
         <Text style={styles.title}>Coach G Profile Ready</Text>
 
         <Text style={styles.subtitle}>
-          Your starter profile is complete. Coach G will use this going forward
-          and will not ask these questions again unless your profile becomes
-          outdated.
+          Your starter profile is complete. Coach G will use this going forward.
         </Text>
 
         <View style={styles.profileCard}>
           <Text style={styles.cardTitle}>Investor Profile</Text>
-
           <Info label="Investor Type" value={result.profile.investorType} />
           <Info label="Risk" value={result.profile.risk} />
-          <Info
-            label="Starting Amount"
-            value={`KES ${money(result.profile.amount)}`}
-          />
+          <Info label="Starting Amount" value={`KES ${money(result.profile.amount)}`} />
           <Info label="Contribution" value={result.profile.contribution} />
           <Info label="Review Frequency" value={result.starterPlan.reviewFrequency} />
         </View>
 
         <View style={styles.brokerCard}>
-          <Text style={styles.cardTitle}>Broker Option</Text>
-
+          <Text style={styles.cardTitle}>Recommended Broker</Text>
           <Text style={styles.brokerName}>{result.broker.name}</Text>
+          <Text style={styles.brokerScore}>
+            Beginner Fit: {result.broker.beginnerScore}/100
+          </Text>
 
           <Text style={styles.bodyText}>{result.broker.reason}</Text>
 
-          <Text style={styles.score}>Score: {result.broker.score}/100</Text>
+          <View style={styles.scoreGrid}>
+            <ScoreBox label="Fees" value={result.broker.feeScore} />
+            <ScoreBox label="Research" value={result.broker.researchScore} />
+            <ScoreBox label="Support" value={result.broker.supportScore} />
+            <ScoreBox label="Onboarding" value={result.broker.onboardingScore} />
+          </View>
+
+          <Text style={styles.whyTitle}>Why Coach G recommends this:</Text>
+
+          {result.broker.reasons.map((item) => (
+            <Text key={item} style={styles.checkLine}>
+              ✓ {item}
+            </Text>
+          ))}
 
           <Text style={styles.cautionText}>
-            Broker enrollment is optional for now. After enrollment, add your
-            broker profile so Gatecep can match future statements correctly.
+            Broker enrollment is optional for now. You can complete your starter
+            plan first, then open a broker account when ready.
           </Text>
         </View>
 
@@ -303,29 +347,63 @@ export default function NewInvestor() {
             value={`KES ${money(result.starterPlan.cashReserve)}`}
           />
 
-          <Text style={styles.bodyText}>
-            Suggested starting allocation:
-          </Text>
+          <Text style={styles.bodyText}>Suggested starting allocation:</Text>
 
           {result.starterPlan.allocations.map((item) => (
-            <View key={item.name} style={styles.allocationRow}>
+            <Pressable
+              key={item.name}
+              style={styles.allocationRow}
+              onPress={() => setSelectedAllocation(item)}
+            >
               <Text style={styles.allocationName}>{item.name}</Text>
 
-              <Text style={styles.allocationValue}>
-                {item.weight}% • KES {money(item.amount)}
-              </Text>
-            </View>
+              <View>
+                <Text style={styles.allocationValue}>
+                  {item.weight}% • KES {money(item.amount)}
+                </Text>
+                <Text style={styles.tapHint}>Tap details</Text>
+              </View>
+            </Pressable>
           ))}
         </View>
 
-        <View style={styles.notice}>
-          <Text style={styles.noticeTitle}>Next Login Checklist</Text>
+        <View style={styles.profileCard}>
+          <Text style={styles.cardTitle}>What Happens Next</Text>
 
-          <Text style={styles.noticeText}>
-            Your checklist will now show questionnaire complete. Broker profile
-            can be skipped until you enroll with a broker. Upload is not required
-            yet for new investors.
-          </Text>
+          {[
+            "Open or confirm your CDS account",
+            "Choose a broker that fits your profile",
+            "Fund your broker account",
+            "Start with the recommended allocation",
+            "Review your progress after 30 days"
+          ].map((item) => (
+            <Text key={item} style={styles.checkLine}>
+              ✓ {item}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.safetyCard}>
+          <Text style={styles.cardTitle}>Coach G Beginner Safety</Text>
+
+          {[
+            "Do not invest emergency money",
+            "Start small while learning",
+            "Diversification matters more than perfect stock picking",
+            "Avoid chasing hot stocks",
+            "Invest consistently instead of emotionally"
+          ].map((item) => (
+            <Text key={item} style={styles.safetyLine}>
+              • {item}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.confidenceCard}>
+          <Text style={styles.cardTitle}>Coach G Confidence</Text>
+          <Info label="Portfolio Fit" value="89%" />
+          <Info label="Risk Alignment" value="High" />
+          <Info label="Beginner Match" value="Good" />
         </View>
 
         <Pressable
@@ -339,8 +417,13 @@ export default function NewInvestor() {
           style={styles.secondary}
           onPress={() => router.replace("/dashboard")}
         >
-          <Text style={styles.secondaryText}>Return to Checklist</Text>
+          <Text style={styles.secondaryText}>Start My Investing Journey</Text>
         </Pressable>
+
+        <AllocationModal
+          allocation={selectedAllocation}
+          onClose={() => setSelectedAllocation(null)}
+        />
       </ScrollView>
     );
   }
@@ -355,18 +438,14 @@ export default function NewInvestor() {
 
       <View style={styles.progressCard}>
         <Text style={styles.progressText}>
-          Step {Math.min(step + 1, questions.length + 1)} of{" "}
-          {questions.length + 1}
+          Step {Math.min(step + 1, questions.length + 1)} of {questions.length + 1}
         </Text>
       </View>
 
       {step < questions.length && (
         <View style={styles.questionBlock}>
           <Text style={styles.questionTitle}>{currentQuestion.title}</Text>
-
-          <Text style={styles.questionSubtitle}>
-            {currentQuestion.subtitle}
-          </Text>
+          <Text style={styles.questionSubtitle}>{currentQuestion.subtitle}</Text>
 
           <View style={styles.options}>
             {currentQuestion.options.map(([value, label]) => (
@@ -391,11 +470,9 @@ export default function NewInvestor() {
         </View>
       )}
 
-      {step === questions.length - 1 && answers.experience && (
+      {step >= questions.length && (
         <View style={styles.amountCard}>
-          <Text style={styles.questionTitle}>
-            How much are you starting with?
-          </Text>
+          <Text style={styles.questionTitle}>How much are you starting with?</Text>
 
           <Text style={styles.questionSubtitle}>
             Enter the amount Coach G should use for your starter profile.
@@ -433,6 +510,102 @@ export default function NewInvestor() {
   );
 }
 
+function AllocationModal({ allocation, onClose }) {
+  if (!allocation) return null;
+
+  const ideas = buildAllocationIdeas(allocation.name, allocation.amount);
+
+  return (
+    <Modal visible transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.detailCard}>
+          <Text style={styles.cardTitle}>{allocation.name}</Text>
+
+          <Text style={styles.bodyText}>
+            Suggested amount: KES {money(allocation.amount)}
+          </Text>
+
+          {ideas.map((idea) => (
+            <View key={idea.symbol} style={styles.ideaRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ideaSymbol}>{idea.symbol}</Text>
+                <Text style={styles.bodyText}>{idea.reason}</Text>
+              </View>
+
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.ideaQty}>{idea.qty} shares</Text>
+                <Text style={styles.ideaValue}>KES {money(idea.invested)}</Text>
+              </View>
+            </View>
+          ))}
+
+          <Pressable style={styles.secondary} onPress={onClose}>
+            <Text style={styles.secondaryText}>Close Details</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function buildAllocationIdeas(name, amount) {
+  const ideasByType = {
+    "Dividend Stocks": [
+      { symbol: "SCOM", price: 30.6, reason: "Beginner-friendly dividend and telecom exposure." },
+      { symbol: "EABL", price: 248, reason: "Defensive consumer income exposure." },
+      { symbol: "BAT", price: 520, reason: "High dividend defensive stock." }
+    ],
+    Banking: [
+      { symbol: "KCB", price: 45, reason: "Large banking exposure with regional presence." },
+      { symbol: "EQTY", price: 48, reason: "Strong retail and regional banking franchise." },
+      { symbol: "COOP", price: 16, reason: "Lower-priced banking exposure for starter portfolios." }
+    ],
+    "ETF / Diversifier": [
+      { symbol: "GLD", price: 5690, reason: "Gold ETF diversification." },
+      { symbol: "SMWF", price: 950, reason: "Broad-market ETF-style diversification." }
+    ],
+    "Growth Stocks": [
+      { symbol: "SCOM", price: 30.6, reason: "Growth and mobile money exposure." },
+      { symbol: "KQ", price: 3.8, reason: "Speculative turnaround exposure; higher risk." },
+      { symbol: "KEGN", price: 45.5, reason: "Energy growth and infrastructure exposure." }
+    ]
+  };
+
+  if (name === "Cash Reserve") {
+    return [
+      {
+        symbol: "CASH",
+        reason: "Held as cash reserve for flexibility and safety.",
+        qty: Math.floor(amount),
+        invested: amount
+      }
+    ];
+  }
+
+  const ideas = ideasByType[name] || [];
+  const perIdea = ideas.length ? amount / ideas.length : 0;
+
+  return ideas.map((idea) => {
+    const qty = Math.floor(perIdea / idea.price);
+    const invested = qty * idea.price;
+
+    return {
+      ...idea,
+      qty,
+      invested
+    };
+  });
+}
+
+function ScoreBox({ label, value }) {
+  return (
+    <View style={styles.scoreBox}>
+      <Text style={styles.scoreLabel}>{label}</Text>
+      <Text style={styles.scoreValue}>{value}/100</Text>
+    </View>
+  );
+}
+
 function Info({ label, value }) {
   return (
     <View style={styles.infoRow}>
@@ -451,7 +624,7 @@ function money(value) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
-  content: { padding: 22, paddingTop: 70, paddingBottom: 40 },
+  content: { padding: 22, paddingTop: 70, paddingBottom: 60 },
   title: { color: "white", fontSize: 32, fontWeight: "900" },
   subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
   progressCard: {
@@ -515,8 +688,24 @@ const styles = StyleSheet.create({
   },
   brokerCard: {
     marginTop: 22,
-    backgroundColor: "rgba(147, 51, 234, 0.12)",
-    borderColor: "rgba(147, 51, 234, 0.35)",
+    backgroundColor: "rgba(147,51,234,.12)",
+    borderColor: "rgba(147,51,234,.35)",
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 18
+  },
+  safetyCard: {
+    marginTop: 22,
+    backgroundColor: "rgba(245,158,11,.10)",
+    borderColor: "rgba(245,158,11,.35)",
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 18
+  },
+  confidenceCard: {
+    marginTop: 22,
+    backgroundColor: "rgba(6,182,212,.10)",
+    borderColor: "rgba(6,182,212,.35)",
     borderWidth: 1,
     borderRadius: 20,
     padding: 18
@@ -528,34 +717,49 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   brokerName: { color: "white", fontSize: 22, fontWeight: "900" },
+  brokerScore: { color: "#c084fc", fontWeight: "900", marginTop: 8 },
   bodyText: { color: "#cbd5e1", marginTop: 10, lineHeight: 21 },
-  score: { color: "#c084fc", fontWeight: "900", marginTop: 12 },
   cautionText: {
     color: "#fde68a",
     marginTop: 12,
     lineHeight: 20,
     fontSize: 13
   },
-  notice: {
-    marginTop: 22,
-    backgroundColor: "rgba(245, 158, 11, 0.10)",
-    borderColor: "rgba(245, 158, 11, 0.35)",
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 18
+  scoreGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 16
   },
-  noticeTitle: { color: "#fde68a", fontWeight: "900" },
-  noticeText: { color: "#cbd5e1", marginTop: 8, lineHeight: 20 },
+  scoreBox: {
+    width: "47%",
+    backgroundColor: "#020617",
+    borderColor: "#334155",
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12
+  },
+  scoreLabel: { color: "#94a3b8", fontSize: 12 },
+  scoreValue: { color: "white", fontWeight: "900", marginTop: 4 },
+  whyTitle: { color: "#67e8f9", fontWeight: "900", marginTop: 16 },
+  checkLine: { color: "#cbd5e1", marginTop: 8, lineHeight: 20 },
+  safetyLine: { color: "#fde68a", marginTop: 8, lineHeight: 20 },
   allocationRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderBottomColor: "#1e293b",
     borderBottomWidth: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 10
   },
   allocationName: { color: "#cbd5e1", flex: 1 },
   allocationValue: { color: "white", fontWeight: "900", textAlign: "right" },
+  tapHint: {
+    color: "#67e8f9",
+    fontSize: 11,
+    textAlign: "right",
+    marginTop: 4
+  },
   infoRow: {
     paddingVertical: 10,
     borderBottomColor: "#1e293b",
@@ -568,6 +772,31 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textTransform: "capitalize"
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,.72)",
+    justifyContent: "center",
+    padding: 18
+  },
+  detailCard: {
+    backgroundColor: "#020617",
+    borderColor: "rgba(6,182,212,.45)",
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 18,
+    maxHeight: "85%"
+  },
+  ideaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+    borderBottomColor: "#1e293b",
+    borderBottomWidth: 1,
+    paddingVertical: 12
+  },
+  ideaSymbol: { color: "white", fontSize: 16, fontWeight: "900" },
+  ideaQty: { color: "#67e8f9", fontWeight: "900" },
+  ideaValue: { color: "white", fontWeight: "900", marginTop: 4 },
   primary: {
     backgroundColor: "#9333ea",
     padding: 18,

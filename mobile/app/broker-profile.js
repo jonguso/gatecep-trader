@@ -73,6 +73,31 @@ export default function BrokerProfile() {
         JSON.stringify(profile)
       );
 
+const brokerProfile = {
+  id: profile.id,
+  broker: profile.broker,
+  nickname: profile.broker,
+  clientNumber: profile.clientNumber,
+  cdsNumber: profile.cdsNumber,
+  brokerEmail: profile.brokerEmail,
+  defaultBroker: true,
+  linked: false,
+  connectionMode: "MANUAL_PROFILE",
+  verificationMode: profile.verificationMode,
+  source: profile.source,
+  updatedAt: profile.updatedAt
+};
+
+await AsyncStorage.setItem(
+  "gatecepDefaultBrokerProfile",
+  JSON.stringify(brokerProfile)
+);
+
+await AsyncStorage.setItem(
+  "gatecepBrokerProfiles",
+  JSON.stringify([brokerProfile])
+);
+
       const verify = await AsyncStorage.getItem("gatecepBrokerProfile");
 
       if (!verify) {
@@ -98,7 +123,7 @@ export default function BrokerProfile() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Add Broker Profile</Text>
+      <Text style={styles.title}>Broker Profile</Text>
 
       <Text style={styles.subtitle}>
         This does not connect to your broker yet. It helps Gatecep match your

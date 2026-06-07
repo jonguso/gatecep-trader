@@ -56,13 +56,17 @@ export default function ImportPortfolio() {
 
       const formData = new FormData();
 
-      if (file.file) {
+      const fileType =
+  file.mimeType ||
+  guessMimeType(file.name);
+
+if (file.file) {
   formData.append("file", file.file, file.name);
 } else {
   formData.append("file", {
     uri: file.uri,
-    name: file.name,
-    type: file.mimeType || "text/csv"
+    name: file.name || "portfolio-upload.xlsx",
+    type: fileType
   });
 }
 
@@ -127,7 +131,7 @@ export default function ImportPortfolio() {
       </View>
 
       <Pressable style={styles.primary} onPress={pickFile}>
-        <Text style={styles.primaryText}>Upload CSV and Review</Text>
+        <Text style={styles.primaryText}>Upload CSV / Excel and Review</Text>
       </Pressable>
 
       <Pressable
@@ -144,6 +148,24 @@ export default function ImportPortfolio() {
       ) : null}
     </ScrollView>
   );
+}
+
+function guessMimeType(name = "") {
+  const lower = String(name).toLowerCase();
+
+  if (lower.endsWith(".csv")) {
+    return "text/csv";
+  }
+
+  if (lower.endsWith(".xls")) {
+    return "application/vnd.ms-excel";
+  }
+
+  if (lower.endsWith(".xlsx")) {
+    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  }
+
+  return "application/octet-stream";
 }
 
 const styles = StyleSheet.create({

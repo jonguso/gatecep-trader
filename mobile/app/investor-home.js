@@ -11,10 +11,10 @@ import { router } from "expo-router";
 export default function InvestorHome() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Welcome to Gatecep</Text>
+      <Text style={styles.title}>Home</Text>
 
       <Text style={styles.subtitle}>
-        Choose how you want to use Coach G today.
+        Choose your investing journey and continue where you left off.
       </Text>
 
       <View style={styles.card}>
@@ -23,12 +23,13 @@ export default function InvestorHome() {
           For subscribed customers with broker valuation, cash, or transaction reports.
         </Text>
 
-        <Pressable
-          style={styles.primary}
-          onPress={() => router.push("/existing-portal")}
-        >
-          <Text style={styles.primaryText}>Enter Secure Investor Portal</Text>
-        </Pressable>
+       <Pressable
+  style={styles.primary}
+  onPress={() => router.push("/broker-upload")}
+>
+  <Text style={styles.primaryText}>Start Existing Investor Setup</Text>
+</Pressable>
+
       </View>
 
       <View style={styles.card}>
@@ -38,11 +39,12 @@ export default function InvestorHome() {
         </Text>
 
         <Pressable
-          style={styles.secondary}
-          onPress={() => router.push("/demo")}
-        >
-          <Text style={styles.secondaryText}>Explore Coach G Demo</Text>
-        </Pressable>
+  style={styles.secondary}
+  onPress={() => router.push("/new-investor")}
+>
+  <Text style={styles.secondaryText}>Start New Investor Profile</Text>
+</Pressable>
+
       </View>
 
       <View style={styles.card}>
@@ -50,6 +52,48 @@ export default function InvestorHome() {
         <Text style={styles.cardText}>
           Learn about broker enrollment before starting serious investment analysis.
         </Text>
+
+        <View style={styles.card}>
+  <Text style={styles.cardTitle}>
+    Quick Access
+  </Text>
+
+  <Pressable
+    style={styles.quickButton}
+    onPress={() => router.push("/dashboard")}
+  >
+    <Text style={styles.quickText}>
+      Dashboard
+    </Text>
+  </Pressable>
+
+  <Pressable
+    style={styles.quickButton}
+    onPress={() => router.push("/portfolio")}
+  >
+    <Text style={styles.quickText}>
+      Holdings
+    </Text>
+  </Pressable>
+
+  <Pressable
+    style={styles.quickButton}
+    onPress={() => router.push("/order-book")}
+  >
+    <Text style={styles.quickText}>
+      Order Book
+    </Text>
+  </Pressable>
+
+  <Pressable
+    style={styles.quickButton}
+    onPress={() => router.push("/trade-history")}
+  >
+    <Text style={styles.quickText}>
+      Trade History
+    </Text>
+  </Pressable>
+</View>
 
         <Pressable
           style={styles.secondary}
@@ -134,6 +178,19 @@ const styles = StyleSheet.create({
     marginTop: 24,
     padding: 14
   },
+
+quickButton:{
+marginTop:12,
+backgroundColor:"#1e293b",
+padding:16,
+borderRadius:16
+},
+
+quickText:{
+color:"#67e8f9",
+fontWeight:"900",
+textAlign:"center"
+},
   linkText: {
     color: "#c084fc",
     textAlign: "center",

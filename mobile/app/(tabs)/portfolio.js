@@ -113,7 +113,11 @@ styles.content
 >
 
 <Text style={styles.title}>
-Portfolio
+Holdings
+</Text>
+
+<Text style={styles.subtitle}>
+ Current holdings grouped by security and sector.
 </Text>
 
 <View style={styles.summary}>

@@ -30,6 +30,12 @@ export default function Dashboard() {
   const [selectedSector, setSelectedSector] = useState(null);
   const [showHealth, setShowHealth] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("");
+  const [setupReady, setSetupReady] = useState(false);
+  const [setupChecks, setSetupChecks] = useState({
+  profile: false,
+  broker: false,
+  portfolio: false
+});
 
   const [transactionsUploaded, setTransactionsUploaded] = useState(false);
   const [transactions, setTransactions] = useState([]);
@@ -40,6 +46,49 @@ export default function Dashboard() {
 
   async function load() {
     setLoading(true);
+
+
+    const profileRaw = await AsyncStorage.getItem("gatecepInvestorProfile");
+    const brokerRaw = await AsyncStorage.getItem("gatecepBrokerProfile");
+    const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
+
+setSetupChecks({
+  profile: !!profileRaw,
+  broker: !!brokerRaw,
+  portfolio: !!portfolioRaw
+});
+
+if (
+  setupReady &&
+  (!setupChecks.profile || !setupChecks.broker || !setupChecks.portfolio)
+) {
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Dashboard</Text>
+
+      <Text style={styles.subtitle}>
+        Complete setup before portfolio analysis becomes available.
+      </Text>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Setup Checklist</Text>
+
+        <ChecklistItem done={setupChecks.profile} label="Investor Profile" />
+        <ChecklistItem done={setupChecks.broker} label="Broker Profile" />
+        <ChecklistItem done={setupChecks.portfolio} label="Portfolio Setup" />
+      </View>
+
+      <Pressable
+        style={styles.primary}
+        onPress={() => router.replace("/investor-home")}
+      >
+        <Text style={styles.primaryText}>Return Home</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+setSetupReady(true);
 
     const raw = await AsyncStorage.getItem("gatecepManualPortfolio");
     const cashRaw =
@@ -174,6 +223,17 @@ if (txRaw) {
       lowSectors
     };
   }
+
+function ChecklistItem({ done, label }) {
+  return (
+    <View style={styles.checkRow}>
+      <Text style={styles.checkLabel}>{label}</Text>
+      <Text style={done ? styles.checkDone : styles.checkMissing}>
+        {done ? "COMPLETE" : "MISSING"}
+      </Text>
+    </View>
+  );
+}
 
   function buildRecommendations() {
     const recs = [];
@@ -406,6 +466,15 @@ if (
         <Pressable style={styles.icon} onPress={() => router.push("/menu")}>
           <Text style={styles.iconText}>☰</Text>
         </Pressable>
+
+        <Pressable
+ style={styles.secondary}
+ onPress={() => router.push("/investor-home")}
+>
+ <Text style={styles.secondaryText}>
+   Home
+ </Text>
+</Pressable>
 
         <Text style={styles.title}>Dashboard</Text>
 
@@ -987,6 +1056,30 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center"
   },
+
+checkRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  paddingVertical: 14,
+  borderBottomColor: "#1e293b",
+  borderBottomWidth: 1
+},
+
+checkLabel: {
+  color: "white",
+  fontWeight: "800"
+},
+
+checkDone: {
+  color: "#86efac",
+  fontWeight: "900"
+},
+
+checkMissing: {
+  color: "#fca5a5",
+  fontWeight: "900"
+},
+
   compactMetrics: {
     marginTop: 12,
     flexDirection: "row",

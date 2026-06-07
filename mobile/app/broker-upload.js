@@ -57,14 +57,7 @@ export default function BrokerUpload() {
     Helps Coach G understand buying behavior, selling discipline, and goal alignment.
   </Text>
 </Pressable>
-
-        <Pressable style={styles.disabledOption}>
-          <Text style={styles.docTitle}>Holdings Report</Text>
-          <Text style={styles.optional}>Coming Soon</Text>
-          <Text style={styles.docDesc}>
-            Fallback report if full valuation is unavailable.
-          </Text>
-        </Pressable>
+        
       </View>
 
       <Pressable
@@ -148,6 +141,13 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 6
   },
+
+fallback: {
+  color: "#c084fc",
+  fontWeight: "900",
+  marginTop: 6
+},
+
   dashboardButton: {
     marginTop: 22,
     backgroundColor: "#1e293b",
