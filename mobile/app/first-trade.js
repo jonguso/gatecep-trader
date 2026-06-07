@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { validateOrder } from "../src/utils/orderValidator";
 
 const STOCKS = [
   {
@@ -61,7 +62,7 @@ export default function FirstTrade() {
   const [cash, setCash] = useState(0);
   const [selectedStock, setSelectedStock] = useState(STOCKS[0]);
   const [side, setSide] = useState("BUY");
-  const [quantity, setQuantity] = useState("100");
+  const [quantity, setQuantity] = useState("1");
   const [limitPrice, setLimitPrice] = useState(String(STOCKS[0].price));
   const [confirmedTrade, setConfirmedTrade] = useState(null);
 
@@ -137,6 +138,35 @@ export default function FirstTrade() {
       );
       return;
     }
+
+const brokerRaw = await AsyncStorage.getItem("gatecepDefaultBrokerProfile");
+
+const brokerProfile = brokerRaw
+  ? JSON.parse(brokerRaw)
+  : {
+      broker: "AIB-AXYS",
+      nickname: "Demo Broker",
+      clientNumber: "DEMO",
+      cdsNumber: "DEMO",
+      defaultBroker: true,
+      connectionMode: "SIMULATION"
+    };
+
+const validation = validateOrder({
+  side,
+  symbol: selectedStock.symbol,
+  quantity: estimate.qty,
+  price: estimate.price,
+  cash,
+  totalCost: estimate.totalCost,
+  portfolio,
+  brokerProfile
+});
+
+if (!validation.ok) {
+  Alert.alert("Order Blocked", validation.errors.join("\n"));
+  return;
+}
 
     let nextPortfolio = [...portfolio];
 
@@ -243,16 +273,17 @@ settlementStatus: "SETTLED"
 );
 
 await AsyncStorage.setItem(
-"gatecepBrokerReadiness",
-JSON.stringify({
-  brokerSelected: true,
-  cdsCreated: false,
-  brokerOpened: false,
-  funded: true,
-  starterPortfolioReady: true,
-  firstTradeReady: true
-})
-);    
+  "gatecepBrokerReadiness",
+  JSON.stringify({
+    brokerSelected: true,
+    cdsCreated: false,
+    brokerOpened: false,
+    brokerFunded: true,
+    starterPortfolioReady: true,
+    readyToInvest: true,
+    firstTradeCompleted: true
+  })
+);
 
     setPortfolio(nextPortfolio);
     setCash(estimate.remainingCash);
