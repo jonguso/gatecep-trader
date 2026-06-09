@@ -20,24 +20,14 @@ const items = [
     route: "/broker-upload"
   },
   {
+    title: "Broker Profile",
+    detail: "Update Broker profile",
+    route: "/broker-profile"
+  },
+  {
     title: "Manual Portfolio Entry",
     detail: "Enter holdings manually",
     route: "/manual-portfolio-entry"
-  },
-  {
-    title: "Risk Questionnaire",
-    detail: "Update investor profile",
-    route: "/questionnaire"
-  },
-  {
-    title: "Recommendation History",
-    detail: "Saved Coach G recommendations",
-    route: "/recommendation-history"
-  },
-  {
-    title: "Broker Education",
-    detail: "Learn about broker registration",
-    route: "/brokers"
   }
 ];
 
