@@ -10,16 +10,16 @@ import { saveProfile } from "../../src/utils/onboardingStorage";
 
 export default function BrokerQuestion() {
   async function choose(hasBroker) {
-    await saveProfile({
-      hasBroker
-    });
+  await saveProfile({
+    hasBroker
+  });
 
-    if (hasBroker) {
-      router.push("/onboarding/upload-portfolio");
-    } else {
-      router.push("/onboarding/smart-portfolio");
-    }
+  if (hasBroker) {
+    router.push("/onboarding/connect-broker");
+  } else {
+    router.push("/onboarding/smart-portfolio");
   }
+}
 
   return (
     <View style={styles.screen}>
@@ -30,18 +30,18 @@ export default function BrokerQuestion() {
       </Text>
 
       <Pressable style={styles.card} onPress={() => choose(true)}>
-        <Text style={styles.cardTitle}>Yes, I have a broker</Text>
-        <Text style={styles.cardText}>
-          Upload a valuation report later for more accurate recommendations.
-        </Text>
-      </Pressable>
+  <Text style={styles.cardTitle}>Yes, I have a broker</Text>
+  <Text style={styles.cardText}>
+    Create your broker profile, then upload a valuation report for more accurate recommendations.
+  </Text>
+</Pressable>
 
-      <Pressable style={styles.card} onPress={() => choose(false)}>
-        <Text style={styles.cardTitle}>No, recommend brokers</Text>
-        <Text style={styles.cardText}>
-          Coach G will suggest beginner-friendly broker options.
-        </Text>
-      </Pressable>
+<Pressable style={styles.card} onPress={() => choose(false)}>
+  <Text style={styles.cardTitle}>No, recommend brokers</Text>
+  <Text style={styles.cardText}>
+    Coach G will suggest beginner-friendly broker options and still create a starter smart portfolio.
+  </Text>
+</Pressable>
 
       <Pressable
         style={styles.skip}

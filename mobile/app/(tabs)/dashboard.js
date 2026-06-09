@@ -30,7 +30,14 @@ generatePortfolioAlerts
 import {
 calculatePortfolioScore
 } from "../../src/utils/portfolioScore";
+import {
+generateCoachRecommendation
+} from "../../src/utils/coachRecommendation";
 
+import {
+generateCoachActions
+} from "../../src/utils/coachActions";
+import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
   "#06b6d4",
@@ -59,6 +66,15 @@ export default function Dashboard() {
 
   const [transactionsUploaded, setTransactionsUploaded] = useState(false);
   const [transactions, setTransactions] = useState([]);
+const [
+coachDecision,
+setCoachDecision
+] = useState(null);
+
+const [
+coachActions,
+setCoachActions
+] = useState([]);
 
   useEffect(() => {
     load();
@@ -71,6 +87,15 @@ export default function Dashboard() {
     const profileRaw = await AsyncStorage.getItem("gatecepInvestorProfile");
     const brokerRaw = await AsyncStorage.getItem("gatecepBrokerProfile");
     const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
+    const watchlistRaw=
+await AsyncStorage.getItem(
+"gatecepWatchlist"
+);
+
+const watchlist=
+watchlistRaw
+?JSON.parse(watchlistRaw)
+:[];
 
 setSetupChecks({
   profile: !!profileRaw,
@@ -602,6 +627,71 @@ Score: {health}/100
         )}
       </View>
 
+{coachDecision && (
+
+<View style={styles.card}>
+
+<Text style={styles.cardTitle}>
+Coach G Recommendation
+</Text>
+
+<Text style={{
+fontSize:34,
+fontWeight:"900",
+color:
+coachDecision.recommendation==="BUY"
+?"#86efac"
+:
+coachDecision.recommendation==="REDUCE"
+?"#fca5a5"
+:"#67e8f9"
+}}>
+
+{coachDecision.recommendation}
+
+</Text>
+
+<Text style={styles.body}>
+Confidence:
+ {coachDecision.confidence}%
+</Text>
+
+<Text style={styles.body}>
+Suggested Amount:
+ KES {money(
+ coachDecision.suggestedAmount
+ )}
+</Text>
+
+{coachDecision.reason.map(
+(r,i)=>(
+<Text
+key={i}
+style={styles.body}
+>
+
+• {r}
+
+</Text>
+))
+}
+
+</View>
+
+)}
+
+<View style={{ marginTop: 20 }}>
+  {coachActions.map((a) => (
+    <Pressable
+      key={a.label}
+      style={styles.quickCard}
+      onPress={() => router.push(a.route)}
+    >
+      <Text style={styles.quickTitle}>{a.label}</Text>
+    </Pressable>
+  ))}
+</View>
+
 <View style={styles.card}>
 
 <Text style={styles.cardTitle}>
@@ -741,8 +831,6 @@ Coach G Alerts
 </View>
 
 <SectorModal sector={selectedSector} onClose={() => setSelectedSector(null)} />
-
-<SectorModal sector={selectedSector} onClose={() => setSelectedSector(null)} />
 </ScrollView>
 );
 }
@@ -841,7 +929,9 @@ function SectorModal({ sector, onClose }) {
                   />
                 </View>
               </View>
+
             ))}
+<FloatingCoachG />
           </ScrollView>
         </View>
       </View>

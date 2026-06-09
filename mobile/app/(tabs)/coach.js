@@ -28,6 +28,7 @@ export default function Coach() {
   const [goalOpen, setGoalOpen] = useState(false);
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  
 
   useEffect(() => {
     load();
@@ -50,7 +51,7 @@ export default function Coach() {
 
   const largestSector = dashboardContext?.largestSector || "N/A";
 
-  function recommendation() {
+  function buildSectorRecommendation() {
     if (largestSector === "Banking") {
       return [
         { sector: "Mfg. and Allied", weight: 30 },
@@ -72,7 +73,7 @@ export default function Coach() {
   }
 
   function simulate() {
-    const plan = recommendation().map((x) => ({
+    const plan = buildSectorRecommendation().map((x) => ({
       ...x,
       amount: (Number(amount || 0) * x.weight) / 100
     }));
@@ -205,7 +206,7 @@ export default function Coach() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Coach G</Text>
+      <Text style={styles.title}>Coach G Insights</Text>
 
       <View style={styles.card}>
         <Text style={styles.label}>Portfolio Value</Text>
@@ -233,17 +234,17 @@ export default function Coach() {
         </Text>
       </View>
 
-      <Pressable
-        style={styles.primary}
-        onPress={() => {
-          simulate();
-          setShowSimulator(true);
-        }}
-      >
-        <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
-      </Pressable>
+       <Pressable
+  style={styles.primary}
+  onPress={() => {
+    simulate();
+    setShowSimulator(true);
+  }}
+>
+  <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
+</Pressable>
 
-      <SimulatorModal
+       <SimulatorModal
         visible={showSimulator}
         onClose={() => setShowSimulator(false)}
         goal={goal}
