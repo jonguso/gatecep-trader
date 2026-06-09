@@ -22,14 +22,20 @@ export default function Login() {
   }, []);
 
   async function checkSession() {
-    const session = await AsyncStorage.getItem("gatecepSession");
+  const session = await AsyncStorage.getItem("gatecepSession");
 
-    if (session) {
-      router.replace("/dashboard");
-    }
+  if (session) {
+    await AsyncStorage.setItem("gatecepIsLoggedIn", "true");
+
+    const completed = await AsyncStorage.getItem("gatecepOnboardingCompleted");
+
+    router.replace(
+      completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
+    );
   }
+}
 
- async function login() {
+async function login() {
   try {
     const enteredUser = String(form.username || "").trim();
     const enteredPass = String(form.password || "").trim();
@@ -43,18 +49,34 @@ export default function Login() {
 
     // Demo login
     if (normalizedUser === "gatecep" && enteredPass === "demo") {
-      await AsyncStorage.setItem(
-        "gatecepSession",
-        JSON.stringify({
-          username: "Gatecep",
-          loggedIn: true,
-          demo: true
-        })
-      );
 
-      router.replace("/dashboard");
-      return;
-    }
+  await AsyncStorage.setItem(
+    "gatecepSession",
+    JSON.stringify({
+      username: "Gatecep",
+      loggedIn: true,
+      demo: true
+    })
+  );
+
+  await AsyncStorage.setItem(
+    "gatecepIsLoggedIn",
+    "true"
+  );
+
+  const completed =
+    await AsyncStorage.getItem(
+      "gatecepOnboardingCompleted"
+    );
+
+  router.replace(
+    completed === "true"
+      ? "/(tabs)/dashboard"
+      : "/onboarding/name"
+  );
+
+  return;
+}
 
     // Saved signup users
     const usersRaw = await AsyncStorage.getItem("gatecepUsers");
@@ -67,16 +89,26 @@ export default function Login() {
     );
 
     if (user) {
-      await AsyncStorage.setItem(
-        "gatecepSession",
-        JSON.stringify({
-          username: user.username,
-          email: user.email,
-          loggedIn: true
-        })
-      );
+     await AsyncStorage.setItem(
+  "gatecepSession",
+  JSON.stringify({
+    username: user.username,
+    email: user.email,
+    loggedIn: true
+  })
+);
 
-      router.replace("/dashboard");
+await AsyncStorage.setItem(
+  "gatecepIsLoggedIn",
+  "true"
+);
+
+      const completed = await AsyncStorage.getItem("gatecepOnboardingCompleted");
+
+router.replace(
+  completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
+);
+
       return;
     }
 
