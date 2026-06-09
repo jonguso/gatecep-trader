@@ -69,7 +69,7 @@ export default function InvestorHome() {
 
   <Pressable
     style={styles.quickButton}
-    onPress={() => router.push("/portfolio")}
+    onPress={() => router.push("/holding-details")}
   >
     <Text style={styles.quickText}>
       Holdings
