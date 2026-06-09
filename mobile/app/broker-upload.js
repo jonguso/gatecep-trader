@@ -96,11 +96,11 @@ export default function BrokerUpload() {
           !canContinue && styles.disabledButton
         ]}
         disabled={!canContinue}
-        onPress={() => router.replace("/onboarding/smart-portfolio")}
+        onPress={() => router.replace("/dashboard")}
       >
         <Text style={styles.continueText}>
           {canContinue
-            ? "Continue to Smart Portfolio"
+            ? "Continue to Dashboard"
             : "Upload Required Reports to Continue"}
         </Text>
       </Pressable>

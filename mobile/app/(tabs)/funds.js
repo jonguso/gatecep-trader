@@ -12,7 +12,7 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 import * as FileSystem from "expo-file-system/legacy";
 
 export default function Funds() {

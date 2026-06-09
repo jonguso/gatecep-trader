@@ -316,6 +316,16 @@ export default function Coach() {
         </Text>
       </View>
 
+<Pressable
+        style={styles.primary}
+        onPress={() => {
+          simulate();
+          setShowSimulator(true);
+        }}
+      >
+        <Text style={styles.primaryText}>Click to Simulate Coach G Recommendations</Text>
+      </Pressable>
+
       <View style={styles.card}>
         <Text style={styles.section}>Analysis Center</Text>
 
@@ -382,17 +392,7 @@ export default function Coach() {
           Avoid adding more exposure to {largestSector} unless it supports your goal and risk level.
         </Text>
       </View>
-
-      <Pressable
-        style={styles.primary}
-        onPress={() => {
-          simulate();
-          setShowSimulator(true);
-        }}
-      >
-        <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
-      </Pressable>
-
+      
       <SimulatorModal
         visible={showSimulator}
         onClose={() => setShowSimulator(false)}

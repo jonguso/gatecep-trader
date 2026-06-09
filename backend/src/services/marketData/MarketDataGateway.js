@@ -14,7 +14,6 @@ function round2(value) {
 const MARKET_BASE_PRICES = {
   ABSA: 29.00,
   AMAC: 102.00,
-  BAMB: 32.00,
   BAT: 520.00,
   BKG: 52.50,
   BOC: 178.25,

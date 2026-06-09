@@ -13,6 +13,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import * as FileSystem from "expo-file-system/legacy";
 import * as XLSX from "xlsx";
+import { applySecurityMaster } from "../src/utils/nseSecurityMaster";
 
 export default function ImportPortfolio() {
   const [status, setStatus] = useState("");
@@ -181,11 +182,7 @@ export default function ImportPortfolio() {
       "Description"
     ]);
 
-    const sector = findValue([
-      "Sector",
-      "Industry",
-      "Category"
-    ]);
+    const sector = findValue(["Sector", "Industry", "Category"]);
 
     const quantity = cleanNumber(
       findValue([
@@ -252,18 +249,19 @@ export default function ImportPortfolio() {
       marketValue ||
       (quantity > 0 && finalMarketPrice > 0 ? quantity * finalMarketPrice : 0);
 
-    return {
+    return applySecurityMaster({
       symbol: String(symbol).trim().toUpperCase(),
       name: String(name || symbol).trim(),
       sector: String(sector || "Unknown").trim(),
       quantity: String(quantity),
       averagePrice: String(averagePrice || ""),
       marketPrice: String(finalMarketPrice || ""),
+      price: Number(finalMarketPrice || 0),
       marketValue: finalMarketValue,
       value: finalMarketValue,
       profitLoss: Number.isFinite(profitLoss) ? profitLoss : 0,
       source: "PORTFOLIO_VALUATION_UPLOAD"
-    };
+    });
   }
 
   return (
@@ -287,13 +285,6 @@ export default function ImportPortfolio() {
 
       <Pressable style={styles.primary} onPress={pickFile}>
         <Text style={styles.primaryText}>Upload CSV / Excel and Review</Text>
-      </Pressable>
-
-      <Pressable
-        style={styles.secondary}
-        onPress={() => router.push("/manual-portfolio-entry")}
-      >
-        <Text style={styles.secondaryText}>Enter Holdings Manually</Text>
       </Pressable>
 
       {status ? (
@@ -354,17 +345,6 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: "white",
-    textAlign: "center",
-    fontWeight: "900"
-  },
-  secondary: {
-    marginTop: 14,
-    backgroundColor: "#1e293b",
-    padding: 16,
-    borderRadius: 18
-  },
-  secondaryText: {
-    color: "#67e8f9",
     textAlign: "center",
     fontWeight: "900"
   },

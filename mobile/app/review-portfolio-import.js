@@ -11,34 +11,16 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-
-const SECTOR_MAP = {
-  ABSA: "Banking",
-  BAT: "Mfg. and Allied",
-  COOP: "Banking",
-  DTK: "Banking",
-  EABL: "Mfg. and Allied",
-  EQT: "Banking",
-  GLD: "ETF",
-  IMH: "Banking",
-  KCB: "Banking",
-  KEGN: "Energy and Petroleum",
-  KNRE: "Insurance",
-  KPC: "Energy and Petroleum",
-  KPLC: "Energy and Petroleum",
-  KQ: "Comm. and Services",
-  SBIC: "Banking",
-  SCBK: "Banking",
-  SCOM: "Telecom",
-  SMWF: "ETF"
-};
+import {
+  savePortfolio,
+  normalizePortfolioHolding
+} from "../src/utils/portfolioStore";
 
 export default function ReviewPortfolioImport() {
   const [fileInfo, setFileInfo] = useState(null);
   const [rows, setRows] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
   const [editingRow, setEditingRow] = useState(null);
-
 
   useEffect(() => {
     loadDraft();
@@ -48,20 +30,27 @@ export default function ReviewPortfolioImport() {
     const pendingRaw = await AsyncStorage.getItem("gatecepPendingPortfolioImport");
     const draftRaw = await AsyncStorage.getItem("gatecepImportedPortfolioDraft");
 
-    if (pendingRaw) setFileInfo(JSON.parse(pendingRaw));
-
-    if (draftRaw) {
-      setRows(JSON.parse(draftRaw));
-      return;
+    if (pendingRaw) {
+      setFileInfo(JSON.parse(pendingRaw));
     }
 
-    const starter = [
-      { symbol: "SCOM", sector: "Telecom", quantity: "900", averagePrice: "29.85", marketPrice: "30.60" },
-      { symbol: "KCB", sector: "Banking", quantity: "200", averagePrice: "70", marketPrice: "67.75" }
-    ];
+    if (draftRaw) {
+      const parsed = JSON.parse(draftRaw);
 
-    setRows(starter);
-    await AsyncStorage.setItem("gatecepImportedPortfolioDraft", JSON.stringify(starter));
+      const normalized = parsed.map((row) =>
+        normalizePortfolioHolding({
+          ...row,
+          averagePrice:
+            Number(row.averagePrice || row.averageCost || 0) ||
+            inferAveragePrice(row),
+          marketPrice:
+            Number(row.marketPrice || row.price || 0) ||
+            inferMarketPrice(row)
+        })
+      );
+
+      setRows(normalized);
+    }
   }
 
   function openEdit(index) {
@@ -70,11 +59,25 @@ export default function ReviewPortfolioImport() {
   }
 
   async function saveEdit() {
+    const nextRow = normalizePortfolioHolding({
+      ...editingRow,
+      averagePrice:
+        Number(editingRow.averagePrice || editingRow.averageCost || 0) ||
+        inferAveragePrice(editingRow),
+      marketPrice:
+        Number(editingRow.marketPrice || editingRow.price || 0) ||
+        inferMarketPrice(editingRow)
+    });
+
     const copy = [...rows];
-    copy[editingIndex] = editingRow;
+    copy[editingIndex] = nextRow;
 
     setRows(copy);
-    await AsyncStorage.setItem("gatecepImportedPortfolioDraft", JSON.stringify(copy));
+
+    await AsyncStorage.setItem(
+      "gatecepImportedPortfolioDraft",
+      JSON.stringify(copy)
+    );
 
     setEditingIndex(null);
     setEditingRow(null);
@@ -83,11 +86,25 @@ export default function ReviewPortfolioImport() {
   async function addHolding() {
     const next = [
       ...rows,
-      { symbol: "", sector: "", quantity: "", averagePrice: "", marketPrice: "" }
+      {
+        symbol: "",
+        name: "",
+        sector: "",
+        quantity: "",
+        averagePrice: "",
+        marketPrice: "",
+        marketValue: "",
+        profitLoss: ""
+      }
     ];
 
     setRows(next);
-    await AsyncStorage.setItem("gatecepImportedPortfolioDraft", JSON.stringify(next));
+
+    await AsyncStorage.setItem(
+      "gatecepImportedPortfolioDraft",
+      JSON.stringify(next)
+    );
+
     openEdit(next.length - 1);
   }
 
@@ -95,7 +112,11 @@ export default function ReviewPortfolioImport() {
     const copy = rows.filter((_, index) => index !== editingIndex);
 
     setRows(copy);
-    await AsyncStorage.setItem("gatecepImportedPortfolioDraft", JSON.stringify(copy));
+
+    await AsyncStorage.setItem(
+      "gatecepImportedPortfolioDraft",
+      JSON.stringify(copy)
+    );
 
     setEditingIndex(null);
     setEditingRow(null);
@@ -106,39 +127,58 @@ export default function ReviewPortfolioImport() {
       .filter((row) => row.symbol && Number(row.quantity || 0) > 0)
       .map((row) => {
         const qty = Number(row.quantity || 0);
-        const marketPrice = Number(row.marketPrice || 0);
-        const averagePrice = Number(row.averagePrice || 0);
-        const marketValue = qty * marketPrice;
-        const profitLoss = marketValue - qty * averagePrice;
-        const profitLossPct =
-          qty * averagePrice > 0
-            ? (profitLoss / (qty * averagePrice)) * 100
+
+        const rowMarketValue = Number(row.marketValue || row.value || 0);
+        const rowMarketPrice = Number(row.marketPrice || row.price || 0);
+        const rowProfitLoss = Number(
+          row.profitLoss || row.unrealizedPnL || row.gainLoss || 0
+        );
+
+        const impliedCostValue =
+          rowMarketValue > 0 && rowProfitLoss !== 0
+            ? rowMarketValue - rowProfitLoss
             : 0;
 
-        return {
+        const fallbackAvgPrice =
+          Number(row.averagePrice || row.averageCost || row.costPrice || 0) ||
+          (impliedCostValue > 0 && qty > 0
+            ? impliedCostValue / qty
+            : 0) ||
+          (rowMarketValue > 0 && qty > 0 ? rowMarketValue / qty : 0) ||
+          rowMarketPrice;
+
+        const fallbackMarketPrice =
+          rowMarketPrice ||
+          (rowMarketValue > 0 && qty > 0 ? rowMarketValue / qty : 0) ||
+          fallbackAvgPrice;
+
+        return normalizePortfolioHolding({
           broker: "IMPORT_REVIEW",
           symbol: String(row.symbol || "").toUpperCase().trim(),
-          sector:
-  row.sector && row.sector !== "Unknown"
-    ? row.sector
-    : SECTOR_MAP[String(row.symbol || "").toUpperCase()] || "Unknown",
-quantity: qty,
-          averagePrice,
-          marketPrice,
-          marketValue,
-          value: marketValue,
-          profitLoss,
-          profitLossPct,
-          changePct: profitLossPct
-        };
+          name: row.name || row.symbol,
+          sector: row.sector || "Unknown",
+          quantity: qty,
+          averagePrice: fallbackAvgPrice,
+          averageCost: fallbackAvgPrice,
+          marketPrice: fallbackMarketPrice,
+          price: fallbackMarketPrice,
+          marketValue:
+            rowMarketValue || qty * fallbackMarketPrice,
+          value:
+            rowMarketValue || qty * fallbackMarketPrice,
+          profitLoss: rowProfitLoss,
+          source: "CONFIRMED_VALUATION_IMPORT"
+        });
       });
 
-    if (portfolio.length === 0) {
+    if (!portfolio.length) {
       Alert.alert("No holdings", "Confirm at least one valid holding.");
       return;
     }
 
-    await AsyncStorage.setItem("gatecepManualPortfolio", JSON.stringify(portfolio));
+    await savePortfolio(portfolio);
+
+    await AsyncStorage.setItem("gatecepStatementUploaded", "true");
 
     await AsyncStorage.setItem(
       "gatecepLatestUpload",
@@ -157,7 +197,9 @@ quantity: qty,
 
     await AsyncStorage.removeItem("gatecepImportedPortfolioDraft");
 
-    router.replace("/dashboard");
+    Alert.alert("Portfolio Saved", "Your holdings have been saved.");
+
+    router.replace("/broker-upload");
   }
 
   return (
@@ -170,44 +212,68 @@ quantity: qty,
 
       <View style={styles.fileCard}>
         <Text style={styles.cardTitle}>Imported File</Text>
-        <Text style={styles.fileName}>{fileInfo?.fileName || "Unknown File"}</Text>
+        <Text style={styles.fileName}>
+          {fileInfo?.fileName || "Unknown File"}
+        </Text>
       </View>
 
       <View style={styles.table}>
         <View style={styles.tableHeader}>
           <Text style={[styles.th, { flex: 1.2 }]}>Security</Text>
           <Text style={[styles.th, { flex: 1 }]}>Sector</Text>
-          <Text style={[styles.th, { flex: 0.7, textAlign: "right" }]}>Qty</Text>
-          <Text style={[styles.th, { flex: 0.9, textAlign: "right" }]}>Value</Text>
-          <Text style={[styles.th, { flex: 0.8, textAlign: "right" }]}>P/L</Text>
+          <Text style={[styles.th, { flex: 0.7, textAlign: "right" }]}>
+            Qty
+          </Text>
+          <Text style={[styles.th, { flex: 0.9, textAlign: "right" }]}>
+            Value
+          </Text>
+          <Text style={[styles.th, { flex: 0.8, textAlign: "right" }]}>
+            P/L
+          </Text>
         </View>
 
         {rows.map((row, index) => {
-          const qty = Number(row.quantity || 0);
-          const marketPrice = Number(row.marketPrice || 0);
-          const avg = Number(row.averagePrice || 0);
-          const value = qty * marketPrice;
-          const pnl = value - qty * avg;
+          const normalized = normalizePortfolioHolding({
+            ...row,
+            averagePrice:
+              Number(row.averagePrice || row.averageCost || 0) ||
+              inferAveragePrice(row),
+            marketPrice:
+              Number(row.marketPrice || row.price || 0) ||
+              inferMarketPrice(row)
+          });
 
           return (
-            <Pressable key={`${row.symbol}-${index}`} style={styles.tr} onPress={() => openEdit(index)}>
-              <Text style={[styles.tdStrong, { flex: 1.2 }]}>{row.symbol || "N/A"}</Text>
-              <Text style={[styles.td, { flex: 1 }]}>
-  {row.sector && row.sector !== "Unknown"
-    ? row.sector
-    : SECTOR_MAP[String(row.symbol || "").toUpperCase()] || "Unknown"}
-</Text>
-              <Text style={[styles.td, { flex: 0.7, textAlign: "right" }]}>{qty}</Text>
-              <Text style={[styles.tdStrong, { flex: 0.9, textAlign: "right" }]}>
-                {money(value)}
+            <Pressable
+              key={`${normalized.symbol}-${index}`}
+              style={styles.tr}
+              onPress={() => openEdit(index)}
+            >
+              <Text style={[styles.tdStrong, { flex: 1.2 }]}>
+                {normalized.symbol || "N/A"}
               </Text>
+
+              <Text style={[styles.td, { flex: 1 }]}>
+                {normalized.sector || "Unknown"}
+              </Text>
+
+              <Text style={[styles.td, { flex: 0.7, textAlign: "right" }]}>
+                {Number(normalized.quantity || 0).toLocaleString()}
+              </Text>
+
+              <Text style={[styles.tdStrong, { flex: 0.9, textAlign: "right" }]}>
+                {money(normalized.marketValue)}
+              </Text>
+
               <Text
                 style={[
-                  pnl >= 0 ? styles.green : styles.red,
+                  Number(normalized.profitLoss || 0) >= 0
+                    ? styles.green
+                    : styles.red,
                   { flex: 0.8, textAlign: "right" }
                 ]}
               >
-                {money(pnl)}
+                {money(normalized.profitLoss)}
               </Text>
             </Pressable>
           );
@@ -229,11 +295,83 @@ quantity: qty,
 
             {editingRow ? (
               <>
-                <Field label="Symbol" value={editingRow.symbol} onChange={(v) => setEditingRow({ ...editingRow, symbol: v })} />
-                <Field label="Sector" value={editingRow.sector} onChange={(v) => setEditingRow({ ...editingRow, sector: v })} />
-                <Field label="Quantity" value={editingRow.quantity} onChange={(v) => setEditingRow({ ...editingRow, quantity: v })} />
-                <Field label="Avg Price" value={editingRow.averagePrice} onChange={(v) => setEditingRow({ ...editingRow, averagePrice: v })} />
-                <Field label="Market Price" value={editingRow.marketPrice} onChange={(v) => setEditingRow({ ...editingRow, marketPrice: v })} />
+                <Field
+                  label="Symbol"
+                  value={editingRow.symbol}
+                  onChange={(v) =>
+                    setEditingRow({
+                      ...editingRow,
+                      symbol: v
+                    })
+                  }
+                />
+
+                <Field
+                  label="Sector"
+                  value={editingRow.sector}
+                  onChange={(v) =>
+                    setEditingRow({
+                      ...editingRow,
+                      sector: v
+                    })
+                  }
+                />
+
+                <Field
+                  label="Quantity"
+                  value={editingRow.quantity}
+                  onChange={(v) =>
+                    setEditingRow({
+                      ...editingRow,
+                      quantity: v
+                    })
+                  }
+                />
+
+                <Field
+                  label="Avg Price / Cost"
+                  value={editingRow.averagePrice}
+                  onChange={(v) =>
+                    setEditingRow({
+                      ...editingRow,
+                      averagePrice: v
+                    })
+                  }
+                />
+
+                <Field
+                  label="Market Price"
+                  value={editingRow.marketPrice}
+                  onChange={(v) =>
+                    setEditingRow({
+                      ...editingRow,
+                      marketPrice: v
+                    })
+                  }
+                />
+
+                <Field
+                  label="Market Value"
+                  value={editingRow.marketValue || editingRow.value}
+                  onChange={(v) =>
+                    setEditingRow({
+                      ...editingRow,
+                      marketValue: v,
+                      value: v
+                    })
+                  }
+                />
+
+                <Field
+                  label="Profit / Loss"
+                  value={editingRow.profitLoss}
+                  onChange={(v) =>
+                    setEditingRow({
+                      ...editingRow,
+                      profitLoss: v
+                    })
+                  }
+                />
 
                 <Pressable style={styles.primary} onPress={saveEdit}>
                   <Text style={styles.primaryText}>Save Changes</Text>
@@ -243,7 +381,13 @@ quantity: qty,
                   <Text style={styles.dangerText}>Remove Holding</Text>
                 </Pressable>
 
-                <Pressable style={styles.secondary} onPress={() => setEditingRow(null)}>
+                <Pressable
+                  style={styles.secondary}
+                  onPress={() => {
+                    setEditingIndex(null);
+                    setEditingRow(null);
+                  }}
+                >
                   <Text style={styles.secondaryText}>Cancel</Text>
                 </Pressable>
               </>
@@ -253,6 +397,46 @@ quantity: qty,
       </Modal>
     </ScrollView>
   );
+}
+
+function inferAveragePrice(row = {}) {
+  const qty = Number(row.quantity || 0);
+  const marketValue = Number(row.marketValue || row.value || 0);
+  const marketPrice = Number(row.marketPrice || row.price || 0);
+  const profitLoss = Number(row.profitLoss || row.unrealizedPnL || 0);
+
+  const impliedCostValue =
+    marketValue > 0 && profitLoss !== 0
+      ? marketValue - profitLoss
+      : 0;
+
+  if (Number(row.averagePrice || row.averageCost || 0) > 0) {
+    return Number(row.averagePrice || row.averageCost || 0);
+  }
+
+  if (impliedCostValue > 0 && qty > 0) {
+    return impliedCostValue / qty;
+  }
+
+  if (marketValue > 0 && qty > 0) {
+    return marketValue / qty;
+  }
+
+  return marketPrice;
+}
+
+function inferMarketPrice(row = {}) {
+  const qty = Number(row.quantity || 0);
+  const marketValue = Number(row.marketValue || row.value || 0);
+  const marketPrice = Number(row.marketPrice || row.price || 0);
+
+  if (marketPrice > 0) return marketPrice;
+
+  if (marketValue > 0 && qty > 0) {
+    return marketValue / qty;
+  }
+
+  return inferAveragePrice(row);
 }
 
 function Field({ label, value, onChange }) {
@@ -325,14 +509,22 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 16
   },
-  primaryText: { color: "white", fontWeight: "900", textAlign: "center" },
+  primaryText: {
+    color: "white",
+    fontWeight: "900",
+    textAlign: "center"
+  },
   secondary: {
     marginTop: 14,
     backgroundColor: "#1e293b",
     padding: 16,
     borderRadius: 16
   },
-  secondaryText: { color: "#67e8f9", fontWeight: "900", textAlign: "center" },
+  secondaryText: {
+    color: "#67e8f9",
+    fontWeight: "900",
+    textAlign: "center"
+  },
   danger: {
     marginTop: 14,
     backgroundColor: "rgba(239,68,68,.12)",
@@ -341,7 +533,11 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 16
   },
-  dangerText: { color: "#fca5a5", textAlign: "center", fontWeight: "900" },
+  dangerText: {
+    color: "#fca5a5",
+    textAlign: "center",
+    fontWeight: "900"
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,.75)",
@@ -356,8 +552,15 @@ const styles = StyleSheet.create({
     padding: 18,
     maxHeight: "90%"
   },
-  modalTitle: { color: "white", fontSize: 24, fontWeight: "900" },
-  label: { color: "#94a3b8", fontSize: 12 },
+  modalTitle: {
+    color: "white",
+    fontSize: 24,
+    fontWeight: "900"
+  },
+  label: {
+    color: "#94a3b8",
+    fontSize: 12
+  },
   input: {
     marginTop: 8,
     backgroundColor: "#020617",

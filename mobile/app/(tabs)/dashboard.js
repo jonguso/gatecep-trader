@@ -11,6 +11,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router } from "expo-router";
+import { loadPortfolio } from "../../src/utils/portfolioStore";
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
@@ -51,7 +52,6 @@ export default function Dashboard() {
       (await AsyncStorage.getItem("gatecepBrokerProfile")) ||
       (await AsyncStorage.getItem("gatecepDefaultBrokerProfile"));
 
-    const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
     const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
 
     const portfolioUploadRaw = await AsyncStorage.getItem(
@@ -64,9 +64,9 @@ export default function Dashboard() {
       "gatecepTransactionsUploaded"
     );
 
-    const parsedHoldings = portfolioRaw ? JSON.parse(portfolioRaw) : [];
+    const parsedHoldings = await loadPortfolio({ revalue: true });
 
-    setHoldings(Array.isArray(parsedHoldings) ? parsedHoldings : []);
+    setHoldings(parsedHoldings);
 
     const parsedCash = Number(cashRaw || 0);
     setCash(Number.isFinite(parsedCash) ? parsedCash : 0);
@@ -74,7 +74,7 @@ export default function Dashboard() {
     setSetupChecks({
       profile: !!profileRaw,
       broker: !!brokerRaw,
-      portfolio: Array.isArray(parsedHoldings) && parsedHoldings.length > 0,
+      portfolio: parsedHoldings.length > 0,
       portfolioUpload: portfolioUploadRaw === "true",
       cashUpload: cashUploadRaw === "true",
       transactionsUpload: transactionUploadRaw === "true"
@@ -84,6 +84,16 @@ export default function Dashboard() {
     setLoading(false);
   }
 
+  const investedValue = useMemo(() => {
+    return holdings.reduce(
+      (sum, h) =>
+        sum +
+        Number(h.quantity || 0) *
+          Number(h.averagePrice || h.averageCost || 0),
+      0
+    );
+  }, [holdings]);
+
   const currentValue = useMemo(() => {
     return holdings.reduce(
       (sum, h) => sum + Number(h.marketValue || h.value || 0),
@@ -91,14 +101,7 @@ export default function Dashboard() {
     );
   }, [holdings]);
 
-  const netGainLoss = useMemo(() => {
-    return holdings.reduce(
-      (sum, h) => sum + Number(h.profitLoss || 0),
-      0
-    );
-  }, [holdings]);
-
-  const investedValue = currentValue - netGainLoss;
+  const netGainLoss = currentValue - investedValue;
 
   const gainLossPct =
     investedValue > 0 ? (netGainLoss / investedValue) * 100 : 0;
@@ -133,6 +136,8 @@ export default function Dashboard() {
       .sort((a, b) => b.totalValue - a.totalValue);
   }, [holdings, currentValue]);
 
+  const sectorCount = sectorRows.length;
+
   const topHoldings = useMemo(() => {
     return [...holdings]
       .sort(
@@ -159,16 +164,13 @@ export default function Dashboard() {
       ? "MODERATE"
       : "CONCENTRATED";
 
-  const healthScore = Math.max(
-    0,
-    Math.min(
-      100,
-      45 +
-        sectorRows.length * 6 +
-        (netGainLoss >= 0 ? 15 : -10) -
-        (risk === "HIGH_RISK" ? 15 : 0)
-    )
-  );
+  const missingSetupItems = [
+    { label: "Investor Profile", done: setupChecks.profile },
+    { label: "Broker Profile", done: setupChecks.broker },
+    { label: "Portfolio Valuation", done: setupChecks.portfolioUpload },
+    { label: "Cash Statement", done: setupChecks.cashUpload },
+    { label: "Transaction History", done: setupChecks.transactionsUpload }
+  ].filter((item) => !item.done);
 
   async function openCoach() {
     await AsyncStorage.setItem(
@@ -177,11 +179,12 @@ export default function Dashboard() {
         largestSector: largestSector?.sector || "N/A",
         risk,
         cash,
-        health: healthScore,
         currentValue,
+        investedValue,
         netGainLoss,
         gainLossPct,
         diversification,
+        sectorCount,
         timestamp: new Date().toISOString()
       })
     );
@@ -218,37 +221,39 @@ export default function Dashboard() {
       <View style={styles.summaryOuter}>
         <View style={styles.summaryTopPlain}>
           <PlainMetric
-            label="Portfolio Value"
-            value={`KES ${money(currentValue + cash)}`}
-            color="#67e8f9"
-          />
-
-          <PlainMetric
-            label="Holdings Value"
-            value={`KES ${money(currentValue)}`}
+            label="Invested Value"
+            value={`KES ${money(investedValue)}`}
             color="white"
           />
 
           <PlainMetric
-            label="Cash Available"
-            value={`KES ${money(cash)}`}
-            color="#86efac"
+            label="Current Value"
+            value={`KES ${money(currentValue)}`}
+            color="#67e8f9"
           />
 
           <PlainMetric
-            label="Total Return"
+            label="Net Gain/Loss"
             value={`KES ${money(netGainLoss)} (${gainLossPct.toFixed(2)}%)`}
             color={netGainLoss >= 0 ? "#86efac" : "#fca5a5"}
+          />
+
+          <PlainMetric
+            label="Available Cash"
+            value={`KES ${money(cash)}`}
+            color="#86efac"
+            sub="Broker trading space"
           />
         </View>
 
         <View style={styles.summaryRiskRow}>
-          <Metric label="Health Score" value={`${healthScore}/100`} color="#67e8f9" />
           <Metric
             label="Risk"
             value={risk}
             color={risk === "HIGH_RISK" ? "#fca5a5" : "#86efac"}
           />
+
+          <Metric label="Sectors" value={String(sectorCount)} color="#67e8f9" />
         </View>
       </View>
 
@@ -259,41 +264,82 @@ export default function Dashboard() {
           label="Largest Sector"
           value={
             largestSector
-              ? `${largestSector.sector} (${Number(largestSector.weight || 0).toFixed(2)}%)`
+              ? `${largestSector.sector} (${Number(
+                  largestSector.weight || 0
+                ).toFixed(2)}%)`
               : "N/A"
           }
           color="#c084fc"
         />
       </View>
 
-      {[
-  { label: "Investor Profile", done: setupChecks.profile },
-  { label: "Broker Profile", done: setupChecks.broker },
-  { label: "Portfolio Valuation", done: setupChecks.portfolioUpload },
-  { label: "Cash Statement", done: setupChecks.cashUpload },
-  { label: "Transaction History", done: setupChecks.transactionsUpload }
-].filter(x => !x.done).length > 0 && (
-  <View style={styles.card}>
-    <Text style={styles.cardTitle}>Setup Remaining</Text>
+      {missingSetupItems.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Setup Remaining</Text>
 
-    {[
-      { label: "Investor Profile", done: setupChecks.profile },
-      { label: "Broker Profile", done: setupChecks.broker },
-      { label: "Portfolio Valuation", done: setupChecks.portfolioUpload },
-      { label: "Cash Statement", done: setupChecks.cashUpload },
-      { label: "Transaction History", done: setupChecks.transactionsUpload }
-    ]
-      .filter(x => !x.done)
-      .map(item => (
-        <StatusRow
-          key={item.label}
-          label={item.label}
-          done={false}
-        />
-      ))}
-  </View>
-)}
-      
+          {missingSetupItems.map((item) => (
+            <StatusRow key={item.label} label={item.label} done={false} />
+          ))}
+        </View>
+      )}
+
+      <View style={styles.coachSummary}>
+        <Text style={styles.cardTitle}>Coach G Summary</Text>
+
+        <Text style={styles.body}>
+          Portfolio risk is <Text style={styles.highlight}>{risk}</Text>.
+          Diversification is{" "}
+          <Text style={styles.highlight}>{diversification}</Text>.
+        </Text>
+
+        <Text style={styles.body}>
+          {largestSector
+            ? `${largestSector.sector} is the largest sector at ${Number(
+                largestSector.weight || 0
+              ).toFixed(2)}%.`
+            : "No sector exposure available yet."}
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Top Holdings</Text>
+
+        {topHoldings.length === 0 ? (
+          <Text style={styles.body}>
+            No holdings found yet. Upload portfolio valuation or create a starter
+            portfolio.
+          </Text>
+        ) : (
+          topHoldings.map((h, index) => (
+            <View key={`${h.symbol}-${index}`} style={styles.holdingRow}>
+              <View>
+                <Text style={styles.holdingSymbol}>{h.symbol || "N/A"}</Text>
+                <Text style={styles.small}>
+                  {h.sector || "Unknown"} • Qty{" "}
+                  {Number(h.quantity || 0).toLocaleString()}
+                </Text>
+              </View>
+
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={styles.valueText}>
+                  KES {money(h.marketValue || h.value)}
+                </Text>
+
+                <Text
+                  style={
+                    Number(h.profitLoss || 0) >= 0
+                      ? styles.greenText
+                      : styles.redText
+                  }
+                >
+                  KES {money(h.profitLoss)}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+
       <Text style={styles.section}>Sector Allocation</Text>
 
       <View style={styles.sectorContainer}>
@@ -341,64 +387,7 @@ export default function Dashboard() {
               </Pressable>
             ))
           )}
-         </View>
-      </View>
-
-      <View style={styles.coachSummary}>
-        <Text style={styles.cardTitle}>Coach G Summary</Text>
-
-        <Text style={styles.body}>
-          Portfolio health is{" "}
-          <Text style={styles.highlight}>{healthScore}/100</Text>. Risk is{" "}
-          <Text style={styles.highlight}>{risk}</Text>. Diversification is{" "}
-          <Text style={styles.highlight}>{diversification}</Text>.
-        </Text>
-
-        <Text style={styles.body}>
-          {largestSector
-            ? `${largestSector.sector} is the largest sector at ${Number(
-                largestSector.weight || 0
-              ).toFixed(2)}%.`
-            : "No sector exposure available yet."}
-        </Text>
-      <FloatingCoachG />   
-      </View>
-
-<View style={styles.card}>
-        <Text style={styles.cardTitle}>Top Holdings</Text>
-
-        {topHoldings.length === 0 ? (
-          <Text style={styles.body}>
-            No holdings found yet. Upload portfolio valuation or create a starter portfolio.
-          </Text>
-        ) : (
-          topHoldings.map((h, index) => (
-            <View key={`${h.symbol}-${index}`} style={styles.holdingRow}>
-              <View>
-                <Text style={styles.holdingSymbol}>{h.symbol || "N/A"}</Text>
-                <Text style={styles.small}>
-                  {h.sector || "Unknown"} • Qty {Number(h.quantity || 0).toLocaleString()}
-                </Text>
-              </View>
-
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={styles.valueText}>
-                  KES {money(h.marketValue || h.value)}
-                </Text>
-
-                <Text
-                  style={
-                    Number(h.profitLoss || 0) >= 0
-                      ? styles.greenText
-                      : styles.redText
-                  }
-                >
-                  KES {money(h.profitLoss)}
-                </Text>
-              </View>
-            </View>
-          ))
-        )}
+        </View>
       </View>
 
       <View style={styles.card}>
@@ -406,7 +395,7 @@ export default function Dashboard() {
 
         <View style={styles.actionGrid}>
           <ActionButton title="Trade" route="/first-trade" />
-          <ActionButton title="Holding Details" route="/holding-details" />
+          <ActionButton title="My Holdings" route="/holding-details" />
           <ActionButton title="Deposit Funds" route="/funds" />
           <ActionButton title="Connect Broker" route="/broker-profile" />
         </View>
@@ -417,7 +406,8 @@ export default function Dashboard() {
       </View>
 
       <SectorModal sector={selectedSector} onClose={() => setSelectedSector(null)} />
-    
+
+      <FloatingCoachG />
     </ScrollView>
   );
 }
@@ -441,11 +431,12 @@ function ActionButton({ title, route }) {
   );
 }
 
-function PlainMetric({ label, value, color }) {
+function PlainMetric({ label, value, color, sub }) {
   return (
     <View style={styles.plainMetric}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={[styles.metricValue, { color }]}>{value}</Text>
+      {sub ? <Text style={styles.metricSub}>{sub}</Text> : null}
     </View>
   );
 }
@@ -470,7 +461,8 @@ function SectorModal({ sector, onClose }) {
             <View>
               <Text style={styles.popupTitle}>{sector.sector}</Text>
               <Text style={styles.popupSub}>
-                {sector.securities.length} securities • KES {money(sector.totalValue)}
+                {sector.securities.length} securities • KES{" "}
+                {money(sector.totalValue)}
               </Text>
             </View>
 
@@ -497,9 +489,18 @@ function SectorModal({ sector, onClose }) {
                 </View>
 
                 <View style={styles.compactMetrics}>
-                  <InfoBox label="Qty" value={Number(sec.quantity || 0).toLocaleString()} />
-                  <InfoBox label="Price" value={`KES ${money(sec.marketPrice || sec.price)}`} />
-                  <InfoBox label="Value" value={`KES ${money(sec.marketValue || sec.value)}`} />
+                  <InfoBox
+                    label="Qty"
+                    value={Number(sec.quantity || 0).toLocaleString()}
+                  />
+                  <InfoBox
+                    label="Price"
+                    value={`KES ${money(sec.marketPrice || sec.price)}`}
+                  />
+                  <InfoBox
+                    label="Value"
+                    value={`KES ${money(sec.marketValue || sec.value)}`}
+                  />
                   <InfoBox
                     label="Return"
                     value={`${Number(sec.changePct || 0).toFixed(2)}%`}
@@ -688,6 +689,11 @@ const styles = StyleSheet.create({
   },
   metricLabel: { color: "#94a3b8" },
   metricValue: { marginTop: 8, fontWeight: "900" },
+  metricSub: {
+    color: "#64748b",
+    fontSize: 11,
+    marginTop: 4
+  },
 
   card: {
     marginTop: 16,
