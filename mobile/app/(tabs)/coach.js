@@ -10,6 +10,7 @@ import {
   View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
 
 const amounts = [5000, 10000, 25000, 50000, 100000];
 
@@ -234,13 +235,27 @@ export default function Coach() {
         </Text>
       </View>
 
-       <Pressable
+  <View style={styles.card}>
+  <Text style={styles.section}>Analysis Center</Text>
+
+  <View style={styles.quickGrid}>
+    <QuickCard title="Holding Details" desc="View current positions" route="/holding-details" />
+    <QuickCard title="Performance" desc="Track portfolio growth" route="/performance" />
+    <QuickCard title="Watchlist" desc="Track stocks and Coach G signals" route="/watchlist" />
+    <QuickCard title="Order Book" desc="Review open orders" route="/order-book" />
+    <QuickCard title="Trade History" desc="Review completed trades" route="/trade-history" />
+    <QuickCard title="Simulator" desc="Test portfolio scenarios" route="/portfolio-simulator" />
+  </View>
+</View>
+
+ <Pressable
   style={styles.primary}
   onPress={() => {
     simulate();
     setShowSimulator(true);
   }}
 >
+
   <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
 </Pressable>
 
@@ -274,6 +289,15 @@ export default function Coach() {
         buildSectorDetails={buildSectorDetails}
       />
     </ScrollView>
+  );
+}
+
+function QuickCard({ title, desc, route }) {
+  return (
+    <Pressable style={styles.quickCard} onPress={() => router.push(route)}>
+      <Text style={styles.quickTitle}>{title}</Text>
+      <Text style={styles.quickDesc}>{desc}</Text>
+    </Pressable>
   );
 }
 
@@ -425,9 +449,18 @@ function SimulatorModal({
           ))}
       </View>
 
-      <Pressable style={styles.secondary} onPress={saveRecommendation}>
-                  <Text style={styles.primaryText}>Save Strategy To Profile</Text>
-                </Pressable>
+      <Pressable
+  style={styles.secondary}
+  onPress={async () => {
+    await saveRecommendation();
+    setShowResults(false);
+    onClose();
+    router.replace("/coach");
+  }}
+>
+  <Text style={styles.primaryText}>Save Strategy To Profile</Text>
+</Pressable>
+
               </View>
             </View>
           </Modal>
@@ -835,6 +868,36 @@ resultModal: {
   borderColor: "#9333ea",
   borderWidth: 1,
   maxHeight: "88%"
-}
+},
 
+quickGrid: {
+  marginTop: 12,
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 12
+},
+
+quickCard: {
+  width: "48%",
+  backgroundColor: "#020617",
+  borderColor: "#1e293b",
+  borderWidth: 1,
+  borderRadius: 16,
+  padding: 16,
+  minHeight: 96,
+  justifyContent: "center"
+},
+
+quickTitle: {
+  color: "#67e8f9",
+  fontWeight: "900",
+  fontSize: 16
+},
+
+quickDesc: {
+  color: "#94a3b8",
+  marginTop: 6,
+  lineHeight: 18,
+  fontSize: 12
+}
 });

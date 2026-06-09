@@ -93,8 +93,8 @@ export default function OrderBook() {
         <Text style={styles.secondaryText}>View Trade History</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={() => router.replace("/dashboard")}>
-        <Text style={styles.secondaryText}>Back to Dashboard</Text>
+      <Pressable style={styles.secondary} onPress={() => router.replace("/coach")}>
+        <Text style={styles.secondaryText}>Back to Coach G Insights</Text>
       </Pressable>
     </ScrollView>
   );

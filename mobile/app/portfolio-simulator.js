@@ -206,8 +206,8 @@ export default function PortfolioSimulator() {
         </View>
       )}
 
-      <Pressable style={styles.backButton} onPress={() => router.replace("/dashboard")}>
-  <Text style={styles.backText}>Back to Dashboard</Text>
+      <Pressable style={styles.backButton} onPress={() => router.replace("/coach")}>
+  <Text style={styles.backText}>Back to Coach G Insights</Text>
 </Pressable>
 
 <Pressable

@@ -110,8 +110,8 @@ export default function TradeHistory() {
         <Text style={styles.primaryText}>New Simulated Trade</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={() => router.replace("/dashboard")}>
-        <Text style={styles.secondaryText}>Back to Dashboard</Text>
+      <Pressable style={styles.secondary} onPress={() => router.replace("/coach")}>
+        <Text style={styles.secondaryText}>Back to Coach G Insights</Text>
       </Pressable>
     </ScrollView>
   );

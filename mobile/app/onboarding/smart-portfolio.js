@@ -127,15 +127,9 @@ export default function SmartPortfolio() {
         style={styles.primary}
         onPress={() => router.replace("/dashboard")}
       >
-        <Text style={styles.primaryText}>Enter Dashboard</Text>
+        <Text style={styles.primaryText}>Continue to Dashboard</Text>
       </Pressable>
-
-      <Pressable
-        style={styles.secondary}
-        onPress={() => router.push("/coach")}
-      >
-        <Text style={styles.secondaryText}>Open Coach G Insights</Text>
-      </Pressable>
+      
     </View>
   );
 }

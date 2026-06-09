@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,6 +30,7 @@ export default function Funds() {
         multiple: false,
         type: [
           "text/csv",
+          "application/csv",
           "application/vnd.ms-excel",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ]
@@ -75,20 +77,67 @@ export default function Funds() {
   }
 
   async function parseStatementFile(file) {
-  const base64 = await FileSystem.readAsStringAsync(file.uri, {
-    encoding: "base64"
-  });
+    const name = String(file.name || "").toLowerCase();
 
-  const workbook = XLSX.read(base64, {
-    type: "base64"
-  });
+    if (name.endsWith(".csv")) {
+      const text = await readFileText(file);
 
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const workbook = XLSX.read(text, {
+        type: "string"
+      });
 
-  return XLSX.utils.sheet_to_json(sheet, {
-    defval: ""
-  });
-}
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+      return XLSX.utils.sheet_to_json(sheet, {
+        defval: ""
+      });
+    }
+
+    const base64 = await readFileBase64(file);
+
+    const workbook = XLSX.read(base64, {
+      type: "base64"
+    });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    return XLSX.utils.sheet_to_json(sheet, {
+      defval: ""
+    });
+  }
+
+  async function readFileText(file) {
+    if (Platform.OS === "web") {
+      const response = await fetch(file.uri);
+      return await response.text();
+    }
+
+    return await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.UTF8
+    });
+  }
+
+  async function readFileBase64(file) {
+    if (Platform.OS === "web") {
+      const response = await fetch(file.uri);
+      const arrayBuffer = await response.arrayBuffer();
+
+      let binary = "";
+      const bytes = new Uint8Array(arrayBuffer);
+      const chunkSize = 8192;
+
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+      }
+
+      return btoa(binary);
+    }
+
+    return await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.Base64
+    });
+  }
 
   function extractAvailableCash(rows) {
     if (!rows.length) return 0;
@@ -102,6 +151,8 @@ export default function Funds() {
       "tradingSpace",
       "Ledger Balance",
       "ledgerBalance",
+      "Cash Balance",
+      "cashBalance",
       "Balance",
       "balance"
     ];
@@ -132,7 +183,8 @@ export default function Funds() {
       if (
         keyLower.includes("balance") ||
         keyLower.includes("cash") ||
-        keyLower.includes("trading")
+        keyLower.includes("trading") ||
+        keyLower.includes("ledger")
       ) {
         const value = cleanNumber(lastRow[key]);
 
@@ -153,7 +205,7 @@ export default function Funds() {
       return;
     }
 
-    await AsyncStorage.setItem("gatecepStatementUploaded", "true");
+    await AsyncStorage.setItem("gatecepCashStatementUploaded", "true");
     await AsyncStorage.setItem("gatecepAvailableCash", String(amount));
 
     await AsyncStorage.setItem(
@@ -169,7 +221,7 @@ export default function Funds() {
 
     Alert.alert("Statement Saved", "Available cash updated.");
 
-    router.replace("/dashboard");
+    router.replace("/broker-upload");
   }
 
   return (

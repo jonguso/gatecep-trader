@@ -93,8 +93,8 @@ export default function Watchlist() {
         <Text style={styles.secondaryText}>Reset Default Watchlist</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={() => router.replace("/dashboard")}>
-        <Text style={styles.secondaryText}>Back to Dashboard</Text>
+      <Pressable style={styles.secondary} onPress={() => router.replace("/coach")}>
+        <Text style={styles.secondaryText}>Back to Coach G Insights</Text>
       </Pressable>
     </ScrollView>
   );

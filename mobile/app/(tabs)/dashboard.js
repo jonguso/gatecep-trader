@@ -808,26 +808,43 @@ Coach G Alerts
   <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
 </Pressable>
 
-<View style={styles.quickGrid}>
-  <View style={styles.quickRow}>
-    <QuickCard title="Holding Details" desc="View current positions" route="/holding-details" />
-    <QuickCard title="Performance" desc="Track portfolio growth" route="/performance" />
-  </View>
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>Quick Actions</Text>
 
-  <View style={styles.quickRow}>
-    <QuickCard title="Watchlist" desc="Track stocks" route="/watchlist" />
-    <QuickCard title="First Trade" desc="Practice simulation" route="/first-trade" />
-  </View>
+  <Pressable
+    style={styles.primary}
+    onPress={() => router.push("/trade")}
+  >
+    <Text style={styles.primaryText}>Buy</Text>
+  </Pressable>
 
-  <View style={styles.quickRow}>
-    <QuickCard title="Order Book" desc="Review orders" route="/order-book" />
-    <QuickCard title="Trade History" desc="Completed trades" route="/trade-history" />
-  </View>
+  <Pressable
+    style={styles.secondary}
+    onPress={() => router.push("/trade")}
+  >
+    <Text style={styles.secondaryText}>Sell</Text>
+  </Pressable>
 
-  <View style={styles.quickRow}>
-    <QuickCard title="Simulator" desc="Test scenarios" route="/portfolio-simulator" />
-    <QuickCard title="Home" desc="Command center" route="/investor-home" />
-  </View>
+  <Pressable
+    style={styles.secondary}
+    onPress={() => router.push("/funds")}
+  >
+    <Text style={styles.secondaryText}>Deposit Funds</Text>
+  </Pressable>
+
+  <Pressable
+    style={styles.secondary}
+    onPress={() => router.push("/broker-profile")}
+  >
+    <Text style={styles.secondaryText}>Connect Broker</Text>
+  </Pressable>
+
+  <Pressable
+    style={styles.secondary}
+    onPress={() => router.push("/coach")}
+  >
+    <Text style={styles.secondaryText}>Open Coach G Insights</Text>
+  </Pressable>
 </View>
 
 <SectorModal sector={selectedSector} onClose={() => setSelectedSector(null)} />
@@ -835,22 +852,6 @@ Coach G Alerts
 );
 }
 
-function QuickCard({ title, desc, route }) {
-  return (
-    <Pressable
-      style={styles.quickCard}
-      onPress={() => router.push(route)}
-    >
-      <Text style={styles.quickTitle}>
-        {title}
-      </Text>
-
-      <Text style={styles.quickDesc}>
-        {desc}
-      </Text>
-    </Pressable>
-  );
-}
   
 function PlainMetric({ label, value, color, sub }) {
   return (
@@ -1293,40 +1294,6 @@ checkMissing: {
     gap: 8
   },
 
-quickGrid:{
-  marginTop:22,
-  gap:14
-},
-
-quickRow:{
-  flexDirection:"row",
-  gap:12,
-  marginBottom:12
-},
-
-quickCard:{
-  flex:1,
-  backgroundColor:"#0f172a",
-  borderColor:"#1e293b",
-  borderWidth:1,
-  borderRadius:20,
-  padding:18,
-  minHeight:110,
-  justifyContent:"center"
-},
-
-quickTitle:{
-  color:"#67e8f9",
-  fontWeight:"900",
-  fontSize:18
-},
-
-quickDesc:{
-  color:"#94a3b8",
-  marginTop:8,
-  lineHeight:18,
-  fontSize:12
-},
   securitySymbol: { color: "white", fontSize: 17, fontWeight: "900" },
   infoCompact: { flex: 1 },
   infoLabel: { color: "#94a3b8", fontSize: 10 },

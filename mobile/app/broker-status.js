@@ -148,7 +148,7 @@ export default function BrokerStatus() {
     }
 
     Alert.alert("Saved", "Broker readiness checklist saved.");
-    router.replace("/dashboard");
+    router.replace("/onboarding/smart-portfolio");
   }
 
   const completed = useMemo(() => {
@@ -229,10 +229,7 @@ export default function BrokerStatus() {
           {status.readyToInvest ? "Go to First Trade Simulation" : "Save Readiness Status"}
         </Text>
       </Pressable>
-
-      <Pressable style={styles.secondary} onPress={() => router.replace("/dashboard")}>
-        <Text style={styles.secondaryText}>Back to Dashboard</Text>
-      </Pressable>
+      
     </ScrollView>
   );
 }

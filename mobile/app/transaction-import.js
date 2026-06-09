@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +13,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import XLSX from "xlsx";
+import * as XLSX from "xlsx";
 
 export default function TransactionImport() {
   const [form, setForm] = useState({
@@ -36,6 +37,7 @@ export default function TransactionImport() {
         multiple: false,
         type: [
           "text/csv",
+          "application/csv",
           "application/vnd.ms-excel",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ]
@@ -60,8 +62,10 @@ export default function TransactionImport() {
 
       if (!normalized.length) {
         throw new Error(
-  `No valid transactions found. File columns detected: ${Object.keys(rows[0] || {}).join(", ")}`
-);
+          `No valid transactions found. File columns detected: ${Object.keys(
+            rows[0] || {}
+          ).join(", ")}`
+        );
       }
 
       setTransactions(normalized);
@@ -73,9 +77,17 @@ export default function TransactionImport() {
   }
 
   async function parseTransactionFile(file) {
-    const base64 = await FileSystem.readAsStringAsync(file.uri, {
-      encoding: "base64"
-    });
+    const name = String(file.name || "").toLowerCase();
+
+    if (name.endsWith(".csv")) {
+      const text = await readFileText(file);
+      const workbook = XLSX.read(text, { type: "string" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+      return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    }
+
+    const base64 = await readFileBase64(file);
 
     const workbook = XLSX.read(base64, {
       type: "base64"
@@ -88,109 +100,142 @@ export default function TransactionImport() {
     });
   }
 
-  function normalizeTransaction(row) {
-  const keys = Object.keys(row);
-
-  const findValue = (names) => {
-    for (const name of names) {
-      const foundKey = keys.find(
-        (k) =>
-          String(k).trim().toLowerCase() ===
-          String(name).trim().toLowerCase()
-      );
-
-      if (foundKey) return row[foundKey];
+  async function readFileText(file) {
+    if (Platform.OS === "web") {
+      const response = await fetch(file.uri);
+      return await response.text();
     }
 
-    return "";
-  };
+    return await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.UTF8
+    });
+  }
 
-  const symbol = findValue([
-  "Symbol",
-  "Security",
-  "Security Code",
-  "Security Name",
-  "Counter",
-  "Share",
-  "Stock",
-  "Instrument"
-]);
+  async function readFileBase64(file) {
+    if (Platform.OS === "web") {
+      const response = await fetch(file.uri);
+      const arrayBuffer = await response.arrayBuffer();
 
-  const sideRaw = findValue([
-  "Side",
-  "Type",
-  "Action",
-  "Buy/Sell",
-  "Buy or Sell",
-  "Transaction Type",
-  "Order Type"
-]);
+      let binary = "";
+      const bytes = new Uint8Array(arrayBuffer);
+      const chunkSize = 8192;
 
-  const quantity = cleanNumber(
-  findValue([
-    "Quantity",
-    "Qty",
-    "Shares",
-    "Units",
-    "Volume",
-    "Original Order Quantity",
-    "Total Traded Quantity",
-    "Pending Order Quantity",
-    "Order Quantity"
-  ])
-);
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+      }
 
-  const price = cleanNumber(
-  findValue([
-    "Price",
-    "Rate",
-    "Trade Price",
-    "Market Price",
-    "Unit Price",
-    "Order Price"
-  ])
-);
+      return btoa(binary);
+    }
 
-  const amount = cleanNumber(
-    findValue(["Amount", "Value", "Consideration", "Gross Amount", "Net Amount"])
-  );
+    return await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.Base64
+    });
+  }
 
-  const date =
-  findValue([
-    "Date",
-    "Trade Date",
-    "Transaction Date",
-    "Order Date",
-    "Last Modified Date & Time"
-  ]) || new Date().toISOString().slice(0, 10);
+  function normalizeTransaction(row) {
+    const keys = Object.keys(row);
 
-  const sideText = String(sideRaw).toUpperCase();
+    const findValue = (names) => {
+      for (const name of names) {
+        const foundKey = keys.find(
+          (k) =>
+            String(k).trim().toLowerCase() ===
+            String(name).trim().toLowerCase()
+        );
 
-  const side =
-    sideText.includes("SELL") ||
-    sideText.includes("SALE") ||
-    sideText.includes("DISPOSAL")
-      ? "SELL"
-      : "BUY";
+        if (foundKey) return row[foundKey];
+      }
 
-  if (!symbol) return null;
+      return "";
+    };
 
-  const finalQuantity = quantity || 0;
-  const finalPrice =
-    price || (amount > 0 && finalQuantity > 0 ? amount / finalQuantity : 0);
+    const symbol = findValue([
+      "Symbol",
+      "Security",
+      "Security Code",
+      "Security Name",
+      "Counter",
+      "Share",
+      "Stock",
+      "Instrument"
+    ]);
 
-  if (!finalQuantity || !finalPrice) return null;
+    const sideRaw = findValue([
+      "Side",
+      "Type",
+      "Action",
+      "Buy/Sell",
+      "Buy or Sell",
+      "Transaction Type",
+      "Order Type"
+    ]);
 
-  return {
-    symbol: String(symbol).trim().toUpperCase(),
-    side,
-    quantity: finalQuantity,
-    price: finalPrice,
-    date: String(date),
-    value: amount || finalQuantity * finalPrice,
-    source: selectedFile?.name || "MANUAL_OR_FILE"
-  };
-}
+    const quantity = cleanNumber(
+      findValue([
+        "Quantity",
+        "Qty",
+        "Shares",
+        "Units",
+        "Volume",
+        "Original Order Quantity",
+        "Total Traded Quantity",
+        "Pending Order Quantity",
+        "Order Quantity"
+      ])
+    );
+
+    const price = cleanNumber(
+      findValue([
+        "Price",
+        "Rate",
+        "Trade Price",
+        "Market Price",
+        "Unit Price",
+        "Order Price"
+      ])
+    );
+
+    const amount = cleanNumber(
+      findValue(["Amount", "Value", "Consideration", "Gross Amount", "Net Amount"])
+    );
+
+    const date =
+      findValue([
+        "Date",
+        "Trade Date",
+        "Transaction Date",
+        "Order Date",
+        "Last Modified Date & Time"
+      ]) || new Date().toISOString().slice(0, 10);
+
+    const sideText = String(sideRaw).toUpperCase();
+
+    const side =
+      sideText.includes("SELL") ||
+      sideText.includes("SALE") ||
+      sideText.includes("DISPOSAL")
+        ? "SELL"
+        : "BUY";
+
+    if (!symbol) return null;
+
+    const finalQuantity = quantity || 0;
+    const finalPrice =
+      price || (amount > 0 && finalQuantity > 0 ? amount / finalQuantity : 0);
+
+    if (!finalQuantity || !finalPrice) return null;
+
+    return {
+      symbol: String(symbol).trim().toUpperCase(),
+      side,
+      quantity: finalQuantity,
+      price: finalPrice,
+      date: String(date),
+      value: amount || finalQuantity * finalPrice,
+      source: selectedFile?.name || "MANUAL_OR_FILE"
+    };
+  }
 
   function addTransaction() {
     if (!form.symbol || !form.quantity || !form.price) {
@@ -244,7 +289,7 @@ export default function TransactionImport() {
 
     Alert.alert("Saved", "Transaction history saved for Coach G.");
 
-    router.replace("/dashboard");
+    router.replace("/broker-upload");
   }
 
   return (
@@ -252,15 +297,16 @@ export default function TransactionImport() {
       <Text style={styles.title}>Transaction History</Text>
 
       <Text style={styles.subtitle}>
-        Upload or enter buy and sell activity so Coach G can understand your investing behavior.
+        Upload or enter buy and sell activity so Coach G can understand your
+        investing behavior.
       </Text>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Upload Transaction File</Text>
 
         <Text style={styles.help}>
-          Select CSV or Excel order history from your phone. Expected columns may include Symbol,
-          Buy/Sell, Quantity, Price, and Date.
+          Select CSV or Excel order history from your phone. Expected columns may
+          include Symbol, Buy/Sell, Quantity, Price, and Date.
         </Text>
 
         <Pressable style={styles.secondary} onPress={pickTransactionFile}>

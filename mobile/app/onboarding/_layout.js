@@ -21,6 +21,7 @@ animation:"slide_from_right"
 <Stack.Screen name="upload-portfolio"/>
 <Stack.Screen name="smart-portfolio"/>
 <Stack.Screen name="connect-broker" />
+<Stack.Screen name="recommend-broker" />
 
 </Stack>
 

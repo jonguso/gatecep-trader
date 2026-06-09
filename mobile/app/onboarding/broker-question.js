@@ -17,7 +17,7 @@ export default function BrokerQuestion() {
   if (hasBroker) {
     router.push("/onboarding/connect-broker");
   } else {
-    router.push("/onboarding/smart-portfolio");
+    router.push("/onboarding/recommend-broker");
   }
 }
 

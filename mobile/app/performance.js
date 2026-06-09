@@ -187,8 +187,8 @@ withVerticalLines={false}
         </Text>
       </View>
 
-      <Pressable style={styles.primary} onPress={() => router.replace("/dashboard")}>
-        <Text style={styles.primaryText}>Back to Dashboard</Text>
+      <Pressable style={styles.primary} onPress={() => router.replace("/coach")}>
+        <Text style={styles.primaryText}>Back to Coach G Insights</Text>
       </Pressable>
     </ScrollView>
   );
