@@ -226,8 +226,8 @@ await AsyncStorage.setItem(
         <Text style={styles.secondaryText}>Save Broker Profile Only</Text>
       </Pressable>
 
-      <Pressable onPress={() => router.push("/investor-home")}>
-        <Text style={styles.backLink}>Back to Investor Home</Text>
+      <Pressable onPress={() => router.push("/onboarding/broker-question")}>
+        <Text style={styles.backLink}>Go Back</Text>
       </Pressable>
     </ScrollView>
   );
