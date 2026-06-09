@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,10 +11,8 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  "http://localhost:4000";
+import * as FileSystem from "expo-file-system/legacy";
+import * as XLSX from "xlsx";
 
 export default function ImportPortfolio() {
   const [status, setStatus] = useState("");
@@ -27,6 +26,7 @@ export default function ImportPortfolio() {
         multiple: false,
         type: [
           "text/csv",
+          "application/csv",
           "application/vnd.ms-excel",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ]
@@ -43,7 +43,7 @@ export default function ImportPortfolio() {
         throw new Error("No file selected.");
       }
 
-      setStatus("Uploading and extracting holdings...");
+      setStatus(`Reading ${file.name}...`);
 
       await AsyncStorage.setItem(
         "gatecepPendingPortfolioImport",
@@ -54,48 +54,15 @@ export default function ImportPortfolio() {
         })
       );
 
-      const formData = new FormData();
+      const rows = await parsePortfolioFile(file);
+      const draftRows = rows.map(normalizeHolding).filter(Boolean);
 
-      const fileType =
-  file.mimeType ||
-  guessMimeType(file.name);
-
-if (file.file) {
-  formData.append("file", file.file, file.name);
-} else {
-  formData.append("file", {
-    uri: file.uri,
-    name: file.name || "portfolio-upload.xlsx",
-    type: fileType
-  });
-}
-
-      formData.append("broker", "AIB");
-      formData.append("reportType", "valuation");
-      formData.append("clientNumber", "137971");
-      formData.append("cdsNumber", "52470471");
-
-      const response = await fetch(`${API_URL}/broker-reports/upload`, {
-        method: "POST",
-        body: formData
-      });
-
-      const json = await response.json();
-
-      if (!response.ok || !json.ok) {
-        throw new Error(json.error || "Upload parse failed.");
-      }
-
-      const draftRows = (json.data || []).map((row) => ({
-        symbol: row.symbol || "",
-        sector: row.sector || "Unknown",
-        quantity: String(row.quantity || ""),
-        averagePrice: String(row.averagePrice || ""),
-        marketPrice: String(row.marketPrice || row.price || "")
-      }));
-
-      if (draftRows.length === 0) {
-        throw new Error("No valuation rows extracted from file.");
+      if (!draftRows.length) {
+        throw new Error(
+          `No valuation rows detected. File columns found: ${Object.keys(
+            rows[0] || {}
+          ).join(", ")}`
+        );
       }
 
       await AsyncStorage.setItem(
@@ -103,7 +70,11 @@ if (file.file) {
         JSON.stringify(draftRows)
       );
 
-      setStatus(`${file.name} extracted. ${draftRows.length} holdings ready for review.`);
+      await AsyncStorage.setItem("gatecepStatementUploaded", "true");
+
+      setStatus(
+        `${file.name} extracted. ${draftRows.length} holdings ready for review.`
+      );
 
       router.push("/review-portfolio-import");
     } catch (error) {
@@ -112,12 +83,196 @@ if (file.file) {
     }
   }
 
+  async function parsePortfolioFile(file) {
+    const name = String(file.name || "").toLowerCase();
+
+    if (name.endsWith(".csv")) {
+      const text = await readFileText(file);
+
+      const workbook = XLSX.read(text, {
+        type: "string"
+      });
+
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+      return XLSX.utils.sheet_to_json(sheet, {
+        defval: ""
+      });
+    }
+
+    const base64 = await readFileBase64(file);
+
+    const workbook = XLSX.read(base64, {
+      type: "base64"
+    });
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    return XLSX.utils.sheet_to_json(sheet, {
+      defval: ""
+    });
+  }
+
+  async function readFileText(file) {
+    if (Platform.OS === "web") {
+      const response = await fetch(file.uri);
+      return await response.text();
+    }
+
+    return await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.UTF8
+    });
+  }
+
+  async function readFileBase64(file) {
+    if (Platform.OS === "web") {
+      const response = await fetch(file.uri);
+      const arrayBuffer = await response.arrayBuffer();
+
+      let binary = "";
+      const bytes = new Uint8Array(arrayBuffer);
+      const chunkSize = 8192;
+
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+      }
+
+      return btoa(binary);
+    }
+
+    return await FileSystem.readAsStringAsync(file.uri, {
+      encoding: FileSystem.EncodingType.Base64
+    });
+  }
+
+  function normalizeHolding(row) {
+    const keys = Object.keys(row);
+
+    const findValue = (names) => {
+      for (const name of names) {
+        const foundKey = keys.find(
+          (k) =>
+            String(k).trim().toLowerCase() ===
+            String(name).trim().toLowerCase()
+        );
+
+        if (foundKey) return row[foundKey];
+      }
+
+      return "";
+    };
+
+    const symbol = findValue([
+      "Symbol",
+      "Security",
+      "Security Code",
+      "Counter",
+      "Share",
+      "Stock",
+      "Instrument"
+    ]);
+
+    const name = findValue([
+      "Name",
+      "Security Name",
+      "Company",
+      "Company Name",
+      "Description"
+    ]);
+
+    const sector = findValue([
+      "Sector",
+      "Industry",
+      "Category"
+    ]);
+
+    const quantity = cleanNumber(
+      findValue([
+        "Quantity",
+        "Qty",
+        "Shares",
+        "Units",
+        "Balance",
+        "Holding",
+        "Holdings"
+      ])
+    );
+
+    const averagePrice = cleanNumber(
+      findValue([
+        "Average Price",
+        "Avg Price",
+        "Weighted Average Price",
+        "WAP",
+        "Cost Price",
+        "Book Price",
+        "Purchase Price"
+      ])
+    );
+
+    const marketPrice = cleanNumber(
+      findValue([
+        "Market Price",
+        "Current Price",
+        "Price",
+        "Last Price",
+        "Closing Price"
+      ])
+    );
+
+    const marketValue = cleanNumber(
+      findValue([
+        "Market Value",
+        "Current Value",
+        "Value",
+        "Valuation",
+        "Holding Value"
+      ])
+    );
+
+    const profitLoss = cleanNumber(
+      findValue([
+        "Profit Loss",
+        "Profit/Loss",
+        "P/L",
+        "Gain Loss",
+        "Unrealized P/L",
+        "Unrealized Profit Loss"
+      ])
+    );
+
+    if (!symbol || !quantity) return null;
+
+    const finalMarketPrice =
+      marketPrice ||
+      (marketValue > 0 && quantity > 0 ? marketValue / quantity : 0);
+
+    const finalMarketValue =
+      marketValue ||
+      (quantity > 0 && finalMarketPrice > 0 ? quantity * finalMarketPrice : 0);
+
+    return {
+      symbol: String(symbol).trim().toUpperCase(),
+      name: String(name || symbol).trim(),
+      sector: String(sector || "Unknown").trim(),
+      quantity: String(quantity),
+      averagePrice: String(averagePrice || ""),
+      marketPrice: String(finalMarketPrice || ""),
+      marketValue: finalMarketValue,
+      value: finalMarketValue,
+      profitLoss: Number.isFinite(profitLoss) ? profitLoss : 0,
+      source: "PORTFOLIO_VALUATION_UPLOAD"
+    };
+  }
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Import Portfolio</Text>
 
       <Text style={styles.subtitle}>
-        Upload a broker valuation CSV. Gatecep will extract holdings, then let you review and edit before analysis.
+        Upload a broker valuation CSV or Excel file. Gatecep will extract
+        holdings, then let you review and edit before analysis.
       </Text>
 
       <View style={styles.card}>
@@ -142,7 +297,12 @@ if (file.file) {
       </Pressable>
 
       {status ? (
-        <View style={styles.statusBox}>
+        <View
+          style={[
+            styles.statusBox,
+            status.toLowerCase().includes("failed") && styles.statusError
+          ]}
+        >
           <Text style={styles.statusText}>{status}</Text>
         </View>
       ) : null}
@@ -150,22 +310,16 @@ if (file.file) {
   );
 }
 
-function guessMimeType(name = "") {
-  const lower = String(name).toLowerCase();
+function cleanNumber(value) {
+  const cleaned = String(value ?? "")
+    .replaceAll(",", "")
+    .replace(/KES/gi, "")
+    .replace(/[^\d.-]/g, "")
+    .trim();
 
-  if (lower.endsWith(".csv")) {
-    return "text/csv";
-  }
+  const number = Number(cleaned);
 
-  if (lower.endsWith(".xls")) {
-    return "application/vnd.ms-excel";
-  }
-
-  if (lower.endsWith(".xlsx")) {
-    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  }
-
-  return "application/octet-stream";
+  return Number.isFinite(number) ? number : 0;
 }
 
 const styles = StyleSheet.create({
@@ -221,6 +375,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     padding: 14
+  },
+  statusError: {
+    backgroundColor: "rgba(239,68,68,.12)",
+    borderColor: "rgba(239,68,68,.35)"
   },
   statusText: {
     color: "#86efac"
