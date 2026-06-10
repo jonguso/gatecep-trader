@@ -1,4 +1,3 @@
-import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,7 +10,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { loadPortfolio } from "../../src/utils/portfolioStore";
 import FloatingCoachG from "../../components/FloatingCoachG";
 

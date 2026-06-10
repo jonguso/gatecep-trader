@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -8,15 +8,16 @@ import {
   View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
-
+import { router, useFocusEffect } from "expo-router";
 export default function PortfolioActivity() {
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
 
-  useEffect(() => {
+  useFocusEffect(
+  useCallback(() => {
     load();
-  }, []);
+  }, [])
+);
 
   async function load() {
     setLoading(true);

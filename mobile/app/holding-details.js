@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -7,7 +7,7 @@ import {
   Text,
   View
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { loadPortfolio } from "../src/utils/portfolioStore";
 
 export default function HoldingDetails() {
@@ -15,9 +15,11 @@ export default function HoldingDetails() {
   const [expandedSector, setExpandedSector] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  useFocusEffect(
+  useCallback(() => {
     load();
-  }, []);
+  }, [])
+);
 
   async function load() {
     setLoading(true);

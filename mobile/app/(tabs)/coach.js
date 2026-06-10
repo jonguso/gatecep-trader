@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
@@ -10,7 +10,7 @@ import {
   View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 export default function Coach() {
   const [portfolio, setPortfolio] = useState([]);
@@ -31,9 +31,11 @@ export default function Coach() {
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(
+  useCallback(() => {
     load();
-  }, []);
+  }, [])
+);
 
   async function load() {
     const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
