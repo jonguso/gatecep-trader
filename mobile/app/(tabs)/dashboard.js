@@ -394,7 +394,7 @@ export default function Dashboard() {
         <Text style={styles.cardTitle}>Quick Actions</Text>
 
         <View style={styles.actionGrid}>
-          <ActionButton title="Trade" route="/first-trade" />
+          <ActionButton title="Trade" route="/trade" />
           <ActionButton title="My Holdings" route="/holding-details" />
           <ActionButton title="Deposit Funds" route="/funds" />
           <ActionButton title="Connect Broker" route="/broker-profile" />
