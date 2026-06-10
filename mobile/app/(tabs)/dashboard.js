@@ -12,6 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
 import { loadPortfolio } from "../../src/utils/portfolioStore";
+import { calculatePortfolioHealth } from "../../src/utils/portfolioHealth";
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
@@ -140,6 +141,13 @@ export default function Dashboard() {
 
   const sectorCount = sectorRows.length;
 
+  const sectorTotalValue = useMemo(() => {
+  return sectorRows.reduce(
+    (sum, s) => sum + Number(s.totalValue || 0),
+    0
+  );
+}, [sectorRows]);
+
   const topHoldings = useMemo(() => {
     return [...holdings]
       .sort(
@@ -166,6 +174,15 @@ export default function Dashboard() {
       ? "MODERATE"
       : "CONCENTRATED";
 
+const health = useMemo(() => {
+  return calculatePortfolioHealth({
+    holdings,
+    cash,
+    currentValue,
+    sectorRows
+  });
+}, [holdings, cash, currentValue, sectorRows]);
+
   const missingSetupItems = [
     { label: "Investor Profile", done: setupChecks.profile },
     { label: "Broker Profile", done: setupChecks.broker },
@@ -187,6 +204,11 @@ export default function Dashboard() {
         gainLossPct,
         diversification,
         sectorCount,
+        healthScore: health.score,
+	healthRating: health.rating,
+	healthComponents: health.components,
+	healthStrengths: health.strengths,
+	healthWatchlist: health.watchlist,
         timestamp: new Date().toISOString()
       })
     );
@@ -289,10 +311,21 @@ export default function Dashboard() {
         <Text style={styles.cardTitle}>Coach G Summary</Text>
 
         <Text style={styles.body}>
-          Portfolio risk is <Text style={styles.highlight}>{risk}</Text>.
-          Diversification is{" "}
-          <Text style={styles.highlight}>{diversification}</Text>.
-        </Text>
+  Portfolio Health is{" "}
+  <Text style={styles.highlight}>
+    {health.score}/100 ({health.rating})
+  </Text>
+  . Risk is <Text style={styles.highlight}>{risk}</Text>. Diversification is{" "}
+  <Text style={styles.highlight}>{diversification}</Text>.
+</Text>
+
+{health.strengths.slice(0, 2).map((item) => (
+  <Text key={item} style={styles.body}>✓ {item}</Text>
+))}
+
+{health.watchlist.slice(0, 2).map((item) => (
+  <Text key={item} style={styles.body}>⚠ {item}</Text>
+))}
 
         <Text style={styles.body}>
           {largestSector
@@ -347,10 +380,10 @@ export default function Dashboard() {
       <View style={styles.sectorContainer}>
         <View style={styles.chartPanel}>
           <SectorDonut
-            data={sectorRows}
-            total={currentValue}
-            onSelect={setSelectedSector}
-          />
+  data={sectorRows}
+  total={sectorTotalValue}
+  onSelect={setSelectedSector}
+/>
         </View>
 
         <View style={styles.tablePanel}>
