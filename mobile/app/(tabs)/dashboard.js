@@ -13,6 +13,7 @@ import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
 import { loadPortfolio } from "../../src/utils/portfolioStore";
 import { calculatePortfolioHealth } from "../../src/utils/portfolioHealth";
+import { savePortfolioSnapshot } from "../../src/utils/portfolioSnapshot";
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
@@ -181,6 +182,23 @@ const health = useMemo(() => {
     currentValue,
     sectorRows
   });
+
+useEffect(() => {
+  if (!loading && holdings.length > 0) {
+    saveTodaySnapshot();
+  }
+}, [
+  loading,
+  holdings.length,
+  investedValue,
+  currentValue,
+  cash,
+  health.score,
+  health.rating,
+  netGainLoss,
+  gainLossPct
+]);
+
 }, [holdings, cash, currentValue, sectorRows]);
 
   const missingSetupItems = [
@@ -553,6 +571,19 @@ function SectorModal({ sector, onClose }) {
 }
 
 function InfoBox({ label, value, positive }) {
+
+async function saveTodaySnapshot() {
+  await savePortfolioSnapshot({
+    investedValue,
+    currentValue,
+    cash,
+    healthScore: health.score,
+    healthRating: health.rating,
+    netGainLoss,
+    gainLossPct
+  });
+}
+
   return (
     <View style={styles.infoCompact}>
       <Text style={styles.infoLabel}>{label}</Text>
