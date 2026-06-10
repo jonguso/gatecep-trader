@@ -536,13 +536,11 @@ export default function Dashboard() {
         <Text style={styles.cardTitle}>Quick Actions</Text>
 
         <View style={styles.actionGrid}>
-          <ActionButton title="Trade" route="/trade" />
-          <ActionButton title="My Holdings" route="/holding-details" />
-          <ActionButton title="Activity" route="/portfolio-activity" />
-          <ActionButton title="Deposit Funds" route="/funds" />
-          <ActionButton title="Connect Broker" route="/broker-profile" />
-          <ActionButton title="Performance" route="/performance" />
-        </View>
+  <ActionButton title="Trade" route="/trade" />
+  <ActionButton title="Command Center" route="/portfolio-command-center" />
+  <ActionButton title="Deposit Funds" route="/funds" />
+  <ActionButton title="Connect Broker" route="/broker-profile" />
+</View>
 
         <Pressable style={styles.primary} onPress={openCoach}>
           <Text style={styles.primaryText}>Open Coach G Insights</Text>
