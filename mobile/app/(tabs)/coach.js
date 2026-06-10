@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
+import { loadPortfolio } from "../../src/utils/portfolioStore";
+import { buildCoachPortfolioReview } from "../../src/utils/coachPortfolioReview";
 
 export default function Coach() {
   const [portfolio, setPortfolio] = useState([]);
@@ -32,25 +34,28 @@ export default function Coach() {
   const [showResults, setShowResults] = useState(false);
 
   useFocusEffect(
-  useCallback(() => {
-    load();
-  }, [])
-);
+    useCallback(() => {
+      load();
+    }, [])
+  );
 
   async function load() {
-    const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
+    const savedPortfolio = await loadPortfolio({ revalue: true });
     const contextRaw = await AsyncStorage.getItem("gatecepCoachContext");
     const txUploadedRaw = await AsyncStorage.getItem("gatecepTransactionsUploaded");
     const txRaw = await AsyncStorage.getItem("gatecepTransactionHistory");
     const historyRaw = await AsyncStorage.getItem("gatecepRecommendationHistory");
 
-    if (portfolioRaw) setPortfolio(JSON.parse(portfolioRaw));
-    if (contextRaw) setDashboardContext(JSON.parse(contextRaw));
+    setPortfolio(savedPortfolio);
+
+    if (contextRaw) {
+      setDashboardContext(JSON.parse(contextRaw));
+    }
 
     setTransactionsUploaded(txUploadedRaw === "true");
 
-    if (txRaw) setTransactions(JSON.parse(txRaw));
-    if (historyRaw) setRecommendationHistory(JSON.parse(historyRaw));
+    setTransactions(txRaw ? JSON.parse(txRaw) : []);
+    setRecommendationHistory(historyRaw ? JSON.parse(historyRaw) : []);
   }
 
   const value = useMemo(() => {
@@ -60,7 +65,67 @@ export default function Coach() {
     );
   }, [portfolio]);
 
-  const largestSector = dashboardContext?.largestSector || "N/A";
+  const sectorRows = useMemo(() => {
+    const grouped = {};
+
+    portfolio.forEach((h) => {
+      const sector = h.sector || "Unknown";
+      const marketValue = Number(h.marketValue || h.value || 0);
+      const profitLoss = Number(h.profitLoss || 0);
+
+      if (!grouped[sector]) {
+        grouped[sector] = {
+          sector,
+          totalValue: 0,
+          profitLoss: 0,
+          securities: []
+        };
+      }
+
+      grouped[sector].totalValue += marketValue;
+      grouped[sector].profitLoss += profitLoss;
+      grouped[sector].securities.push(h);
+    });
+
+    return Object.values(grouped)
+      .map((s) => ({
+        ...s,
+        weight: value > 0 ? (s.totalValue / value) * 100 : 0
+      }))
+      .sort((a, b) => b.totalValue - a.totalValue);
+  }, [portfolio, value]);
+
+  const largestSectorRow = sectorRows[0];
+
+  const largestSector =
+    largestSectorRow?.sector ||
+    dashboardContext?.largestSector ||
+    "N/A";
+
+  const risk =
+    dashboardContext?.risk ||
+    (Number(largestSectorRow?.weight || 0) >= 35
+      ? "HIGH_RISK"
+      : Number(largestSectorRow?.weight || 0) >= 30
+      ? "MODERATE"
+      : "BALANCED");
+
+  const portfolioReview = useMemo(() => {
+    return buildCoachPortfolioReview({
+      holdings: portfolio,
+      cash: dashboardContext?.cash || 0,
+      currentValue: value,
+      sectorRows,
+      health: {
+        score: dashboardContext?.healthScore,
+        rating: dashboardContext?.healthRating,
+        strengths: dashboardContext?.healthStrengths || [],
+        watchlist: dashboardContext?.healthWatchlist || []
+      }
+    });
+  }, [portfolio, dashboardContext, value, sectorRows]);
+
+  const latestStrategy = recommendationHistory[0];
 
   function buildSectorRecommendation() {
     if (largestSector === "Banking") {
@@ -167,9 +232,7 @@ export default function Coach() {
     insights.push(`Average trade size: KES ${money(avgTrade)}.`);
 
     if (repeatedBuys.length > 0) {
-      insights.push(
-        `Repeated accumulation detected in ${repeatedBuys.join(", ")}.`
-      );
+      insights.push(`Repeated accumulation detected in ${repeatedBuys.join(", ")}.`);
     }
 
     if (heavyRepeatBuys.length > 0) {
@@ -286,113 +349,84 @@ export default function Coach() {
     };
   }
 
-  const latestStrategy = recommendationHistory[0];
-
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Coach G Insights</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>Portfolio Value</Text>
-        <Text style={styles.metric}>KES {money(value)}</Text>
+        <Text style={styles.section}>Coach G Portfolio Review</Text>
 
-        <Text style={styles.label}>Largest Exposure</Text>
-        <Text style={styles.metric2}>{largestSector}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.section}>Coach G Analysis Context</Text>
-        <Text style={styles.body}>Largest Sector: {largestSector}</Text>
-        <Text style={styles.body}>Risk: {dashboardContext?.risk || "N/A"}</Text>
-        <Text style={styles.body}>
-          Cash: KES {money(dashboardContext?.cash || 0)}
+        <Text style={styles.metric2}>
+          {portfolioReview.score}/100 ({portfolioReview.rating})
         </Text>
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.section}>Coach G Sector Plan</Text>
         <Text style={styles.body}>
-          Coach G will avoid adding more {largestSector} exposure and redirect
-          new money toward underweight sectors using the same sector language as
-          your dashboard.
+          Portfolio value is KES {money(value)}. Largest exposure is{" "}
+          {portfolioReview.largestSector} ({portfolioReview.largestWeight.toFixed(2)}%).
         </Text>
-      </View>
 
-<Pressable
-        style={styles.primary}
-        onPress={() => {
-          simulate();
-          setShowSimulator(true);
-        }}
-      >
-        <Text style={styles.primaryText}>Click to Simulate Coach G Recommendations</Text>
-      </Pressable>
+        <Text style={styles.section}>Strengths</Text>
+        {portfolioReview.strengths.length ? (
+          portfolioReview.strengths.map((item) => (
+            <Text key={item} style={styles.body}>✓ {item}</Text>
+          ))
+        ) : (
+          <Text style={styles.body}>No major strengths detected yet.</Text>
+        )}
+
+        <Text style={styles.section}>Watchlist</Text>
+        {portfolioReview.watchlist.length ? (
+          portfolioReview.watchlist.map((item) => (
+            <Text key={item} style={styles.body}>⚠ {item}</Text>
+          ))
+        ) : (
+          <Text style={styles.body}>No major watchlist items detected.</Text>
+        )}
+
+        <Text style={styles.section}>Recommendations</Text>
+        {portfolioReview.recommendations.map((item) => (
+          <View key={item.title} style={styles.recommendationRow}>
+            <Text style={styles.planTitle}>{item.title}</Text>
+            <Text style={styles.body}>{item.detail}</Text>
+            {item.symbols?.length ? (
+              <Text style={styles.link}>Ideas: {item.symbols.join(", ")}</Text>
+            ) : null}
+          </View>
+        ))}
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.section}>Analysis Center</Text>
 
         <View style={styles.quickGrid}>
-          <QuickCard title="Holding Details" desc="View current positions" route="/holding-details" />
+          <QuickCard title="My Holdings" desc="View current positions" route="/holding-details" />
           <QuickCard title="Performance" desc="Track portfolio growth" route="/performance" />
+          <QuickCard title="Activity" desc="View portfolio audit trail" route="/portfolio-activity" />
           <QuickCard title="Watchlist" desc="Track stocks and Coach G signals" route="/watchlist" />
           <QuickCard title="Order Book" desc="Review open orders" route="/order-book" />
           <QuickCard title="Trade History" desc="Review completed trades" route="/trade-history" />
-          <QuickCard title="Simulator" desc="Test portfolio scenarios" route="/portfolio-simulator" />
         </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.section}>Risk & Diversification</Text>
+
+        <Text style={styles.body}>Current risk: {risk}</Text>
+        <Text style={styles.body}>
+          Largest sector: {largestSector}{" "}
+          {largestSectorRow ? `(${largestSectorRow.weight.toFixed(2)}%)` : ""}
+        </Text>
+        <Text style={styles.body}>
+          Coach G monitors sector concentration and redirects new money toward underweight sectors.
+        </Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.section}>Behavior Analysis</Text>
 
         {buildBehaviorInsights().map((item, index) => (
-          <Text key={index} style={styles.body}>
-            • {item}
-          </Text>
+          <Text key={index} style={styles.body}>• {item}</Text>
         ))}
-      </View>
-
-      <View style={styles.card}>
-  <Text style={styles.section}>Portfolio Health</Text>
-
-  <Text style={styles.metric2}>
-    {dashboardContext?.healthScore || "N/A"}/100{" "}
-    {dashboardContext?.healthRating
-      ? `(${dashboardContext.healthRating})`
-      : ""}
-  </Text>
-
-  <Text style={styles.body}>
-    Coach G measures portfolio health using diversification, concentration,
-    cash buffer, and portfolio breadth.
-  </Text>
-
-  {dashboardContext?.healthStrengths?.slice(0, 3).map((item) => (
-    <Text key={item} style={styles.body}>
-      ✓ {item}
-    </Text>
-  ))}
-
-  {dashboardContext?.healthWatchlist?.slice(0, 3).map((item) => (
-    <Text key={item} style={styles.body}>
-      ⚠ {item}
-    </Text>
-  ))}
-</View>
-
-<View style={styles.card}>
-  <Text style={styles.section}>Risk Analysis</Text>
-
-  <Text style={styles.body}>
-    Current risk is {dashboardContext?.risk || "N/A"}. Largest exposure is{" "}
-    {largestSector}.
-  </Text>
-</View>
-
-      <View style={styles.card}>
-        <Text style={styles.section}>Diversification Analysis</Text>
-        <Text style={styles.body}>
-          Coach G monitors sector concentration and redirects new money toward underweight sectors.
-        </Text>
       </View>
 
       <View style={styles.card}>
@@ -411,12 +445,15 @@ export default function Coach() {
         )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.section}>What To Buy Next</Text>
-        <Text style={styles.body}>
-          Run the simulator to generate sector-based buy recommendations based on your latest portfolio.
-        </Text>
-      </View>
+      <Pressable
+        style={styles.primary}
+        onPress={() => {
+          simulate();
+          setShowSimulator(true);
+        }}
+      >
+        <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
+      </Pressable>
 
       <View style={styles.card}>
         <Text style={styles.section}>What To Avoid</Text>
@@ -424,7 +461,7 @@ export default function Coach() {
           Avoid adding more exposure to {largestSector} unless it supports your goal and risk level.
         </Text>
       </View>
-      
+
       <SimulatorModal
         visible={showSimulator}
         onClose={() => setShowSimulator(false)}
@@ -537,6 +574,7 @@ function SimulatorModal({
           </View>
 
           <Text style={styles.inputLabel}>Amount to Invest</Text>
+
           <TextInput
             value={String(amount)}
             onChangeText={(v) => setAmount(Number(v || 0))}
@@ -623,7 +661,6 @@ function SimulatorModal({
                     await saveRecommendation();
                     setShowResults(false);
                     onClose();
-                    router.replace("/coach");
                   }}
                 >
                   <Text style={styles.primaryText}>Save Strategy To Profile</Text>
