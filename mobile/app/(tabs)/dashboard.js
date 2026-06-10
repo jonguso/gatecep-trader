@@ -395,9 +395,10 @@ export default function Dashboard() {
 
         <View style={styles.actionGrid}>
           <ActionButton title="Trade" route="/trade" />
-          <ActionButton title="My Holdings" route="/holding-details" />
-          <ActionButton title="Deposit Funds" route="/funds" />
-          <ActionButton title="Connect Broker" route="/broker-profile" />
+	  <ActionButton title="My Holdings" route="/holding-details" />
+	  <ActionButton title="Activity" route="/portfolio-activity" />
+	  <ActionButton title="Deposit Funds" route="/funds" />
+	  <ActionButton title="Connect Broker" route="/broker-profile" />
         </View>
 
         <Pressable style={styles.primary} onPress={openCoach}>
@@ -798,7 +799,7 @@ const styles = StyleSheet.create({
     marginTop: 14
   },
   actionButton: {
-    width: "48%",
+    width: "47%",
     backgroundColor: "#020617",
     borderColor: "#1e293b",
     borderWidth: 1,
