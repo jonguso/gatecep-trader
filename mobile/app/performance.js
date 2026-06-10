@@ -1,228 +1,190 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { calculatePnL } from "../src/utils/performanceHistory";
-import { LineChart } from "react-native-chart-kit";
-import { Dimensions } from "react-native";
+import { loadPortfolioSnapshots } from "../src/utils/portfolioSnapshot";
 
 export default function Performance() {
-  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [snapshots, setSnapshots] = useState([]);
 
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    const raw = await AsyncStorage.getItem("gatecepPerformanceHistory");
-    setHistory(raw ? JSON.parse(raw) : []);
+    setLoading(true);
+    const data = await loadPortfolioSnapshots();
+    setSnapshots(data);
+    setLoading(false);
   }
 
-  const summary = useMemo(() => calculatePnL(history), [history]);
+  const metrics = useMemo(() => {
+    const latest = snapshots[0];
+    const first = snapshots[snapshots.length - 1];
 
-  const latest = history.length ? history[history.length - 1] : null;
-  const first = history.length ? history[0] : null;
+    const change =
+      latest && first
+        ? Number(latest.totalValue || 0) - Number(first.totalValue || 0)
+        : 0;
 
-  const screenWidth = Dimensions.get("window").width;
+    const changePct =
+      first && Number(first.totalValue || 0) > 0
+        ? (change / Number(first.totalValue || 0)) * 100
+        : 0;
 
-const visibleHistory = history.length > 6 ? history.slice(-6) : history;
+    return {
+      latest,
+      first,
+      change,
+      changePct
+    };
+  }, [snapshots]);
 
-const chartData = {
-  labels: visibleHistory.map((x) =>
-    new Date(x.timestamp).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit"
-    })
-  ),
-  datasets: [
-    {
-      data: visibleHistory.map((x) => Number(x.totalValue || 0))
-    }
-  ]
-};
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#67e8f9" />
+        <Text style={styles.body}>Loading performance...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Performance</Text>
+      <View style={styles.headerRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Performance</Text>
+          <Text style={styles.subtitle}>
+            Portfolio value, gains, cash, and health over time.
+          </Text>
+        </View>
 
-      <Text style={styles.subtitle}>
-        Track portfolio growth from saved dashboard snapshots.
-      </Text>
-
-      <View style={styles.summaryCard}>
-        <Metric
-          label="Current Value"
-          value={`KES ${money(latest?.totalValue || 0)}`}
-        />
-
-        <Metric
-          label="Starting Value"
-          value={`KES ${money(first?.totalValue || 0)}`}
-        />
-
-        <Metric
-          label="P/L"
-          value={`KES ${money(summary.pnl)}`}
-          positive={summary.pnl >= 0}
-        />
-
-        <Metric
-          label="Return"
-          value={`${summary.pct.toFixed(2)}%`}
-          positive={summary.pct >= 0}
-        />
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardText}>Dashboard</Text>
+        </Pressable>
       </View>
 
-<View style={styles.card}>
+      {!metrics.latest ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>No Snapshot Yet</Text>
+          <Text style={styles.body}>
+            Open Dashboard after importing holdings or placing a trade to create
+            your first performance snapshot.
+          </Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.summary}>
+            <SummaryItem
+              label="Current Value"
+              value={`KES ${money(metrics.latest.currentValue)}`}
+              cyan
+            />
 
-<Text style={styles.cardTitle}>
-Coach G Score
-</Text>
+            <SummaryItem
+              label="Invested Value"
+              value={`KES ${money(metrics.latest.investedValue)}`}
+            />
 
-<Text style={{
- color:"#86efac",
- fontSize:42,
- fontWeight:"900"
-}}>
+            <SummaryItem
+              label="Cash"
+              value={`KES ${money(metrics.latest.cash)}`}
+              green
+            />
 
-{summary.pct > 10
- ? "A"
- : summary.pct > 5
- ? "B"
- : summary.pnl >=0
- ? "C"
- : "D"}
+            <SummaryItem
+              label="Net Gain/Loss"
+              value={`KES ${money(metrics.latest.netGainLoss)} (${Number(
+                metrics.latest.gainLossPct || 0
+              ).toFixed(2)}%)`}
+              positive={Number(metrics.latest.netGainLoss || 0) >= 0}
+            />
 
-</Text>
+            <SummaryItem
+              label="Change Since First Snapshot"
+              value={`KES ${money(metrics.change)} (${metrics.changePct.toFixed(
+                2
+              )}%)`}
+              positive={metrics.change >= 0}
+            />
 
-<Text style={styles.body}>
-Generated from return, growth and stability.
-</Text>
+            <SummaryItem
+              label="Health Score"
+              value={`${metrics.latest.healthScore || 0}/100 ${
+                metrics.latest.healthRating
+                  ? `(${metrics.latest.healthRating})`
+                  : ""
+              }`}
+            />
+          </View>
 
-</View>
-      
-      <View style={styles.card}>
-<View style={styles.card}>
-  <Text style={styles.cardTitle}>
-    Portfolio Growth
-  </Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Snapshot History</Text>
 
-  {history.length < 2 ? (
-
-    <Text style={styles.body}>
-      More snapshots needed.
-    </Text>
-
-  ) : (
-
-<LineChart
-  data={chartData}
-  width={screenWidth-60}
-  height={220}
-  fromZero={false}
-withInnerLines={true}
-withOuterLines={false}
-withVerticalLines={false}
-  yAxisSuffix=""
-  chartConfig={{
-    backgroundGradientFrom:"#0f172a",
-    backgroundGradientTo:"#0f172a",
-    decimalPlaces:0,
-    color:(opacity=1)=>`rgba(103,232,249,${opacity})`,
-    labelColor:(opacity=1)=>`rgba(255,255,255,${opacity})`
-  }}
-  bezier
-  style={{
-    borderRadius:16,
-    marginTop:16
-  }}
-/>
-
-  )}
-</View>
-
-        <Text style={styles.cardTitle}>History</Text>
-
-        {history.length === 0 ? (
-          <Text style={styles.body}>No performance history yet.</Text>
-        ) : (
-          history
-            .slice()
-            .reverse()
-            .map((item, index) => (
-              <View key={`${item.timestamp}-${index}`} style={styles.row}>
-                <View>
-                  <Text style={styles.date}>{formatDate(item.timestamp)}</Text>
+            {snapshots.map((s) => (
+              <View key={s.date} style={styles.snapshotRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.snapshotDate}>{s.date}</Text>
                   <Text style={styles.small}>
-                    Holdings: KES {money(item.holdingsValue)}
+                    Health {s.healthScore || 0}/100 • Cash KES {money(s.cash)}
                   </Text>
-                  <Text style={styles.small}>Cash: KES {money(item.cash)}</Text>
                 </View>
 
-                <Text style={styles.value}>
-                  KES {money(item.totalValue)}
-                </Text>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.white}>KES {money(s.totalValue)}</Text>
+                  <Text
+                    style={
+                      Number(s.netGainLoss || 0) >= 0
+                        ? styles.green
+                        : styles.red
+                    }
+                  >
+                    KES {money(s.netGainLoss)}
+                  </Text>
+                </View>
               </View>
-            ))
-        )}
-      </View>
+            ))}
+          </View>
+        </>
+      )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Coach G Performance Notes</Text>
-
-        <Text style={styles.body}>
-          • This history is based on dashboard snapshots.
-        </Text>
-        <Text style={styles.body}>
-          • Demo market movement may change values every refresh.
-        </Text>
-        <Text style={styles.body}>
-          • Later this will use live broker and NSE market data.
-        </Text>
-      </View>
-
-      <Pressable style={styles.primary} onPress={() => router.replace("/coach")}>
-        <Text style={styles.primaryText}>Back to Coach G Insights</Text>
+      <Pressable
+        style={styles.backButton}
+        onPress={() => router.replace("/(tabs)/dashboard")}
+      >
+        <Text style={styles.backText}>Back to Dashboard</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-function Metric({ label, value, positive }) {
+function SummaryItem({ label, value, cyan, green, positive }) {
+  let valueStyle = styles.white;
+
+  if (cyan) valueStyle = styles.cyan;
+  if (green) valueStyle = styles.green;
+  if (positive !== undefined) valueStyle = positive ? styles.green : styles.red;
+
   return (
-    <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.metricValue,
-          positive === true && styles.green,
-          positive === false && styles.red
-        ]}
-      >
-        {value}
-      </Text>
+    <View style={styles.summaryItem}>
+      <Text style={styles.small}>{label}</Text>
+      <Text style={valueStyle}>{value}</Text>
     </View>
   );
 }
 
-function formatDate(value) {
-  if (!value) return "N/A";
-
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return String(value);
-  }
-}
-
-function money(value) {
-  return Number(value || 0).toLocaleString(undefined, {
+function money(v) {
+  return Number(v || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -230,77 +192,78 @@ function money(value) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
-  content: { padding: 22, paddingTop: 70, paddingBottom: 100 },
-  title: { color: "white", fontSize: 34, fontWeight: "900" },
-  subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
-
-  summaryCard: {
-    marginTop: 22,
-    backgroundColor: "#0f172a",
-    borderColor: "#1e293b",
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: 18,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10
-  },
-
-  metric: {
-    width: "47%",
+  content: { padding: 20, paddingTop: 60, paddingBottom: 120 },
+  center: {
+    flex: 1,
     backgroundColor: "#020617",
-    borderColor: "#334155",
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14
+    justifyContent: "center",
+    alignItems: "center"
   },
-
-  metricLabel: { color: "#94a3b8", fontSize: 12 },
-  metricValue: { color: "white", fontWeight: "900", marginTop: 6 },
-
-  card: {
-    marginTop: 22,
-    backgroundColor: "#0f172a",
-    borderColor: "#1e293b",
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: 18
-  },
-
-  cardTitle: {
-    color: "#67e8f9",
-    fontSize: 18,
-    fontWeight: "900",
-    marginBottom: 12
-  },
-
-  row: {
+  headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 14,
+    alignItems: "flex-start"
+  },
+  title: { color: "white", fontSize: 32, fontWeight: "900" },
+  subtitle: { color: "#94a3b8", marginTop: 8, lineHeight: 21 },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardText: { color: "#67e8f9", fontWeight: "900" },
+  summary: {
+    marginTop: 20,
+    backgroundColor: "#0f172a",
+    padding: 18,
+    borderRadius: 20,
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    gap: 12
+  },
+  summaryItem: {
+    backgroundColor: "#020617",
+    padding: 14,
+    borderRadius: 14,
+    borderColor: "#1e293b",
+    borderWidth: 1
+  },
+  card: {
+    marginTop: 16,
+    backgroundColor: "#0f172a",
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    padding: 18,
+    borderRadius: 20
+  },
+  cardTitle: { color: "#67e8f9", fontSize: 18, fontWeight: "900" },
+  body: { color: "#cbd5e1", marginTop: 10, lineHeight: 21 },
+  small: { color: "#94a3b8", marginTop: 4 },
+  white: { color: "white", fontWeight: "900", marginTop: 6 },
+  cyan: { color: "#67e8f9", fontWeight: "900", marginTop: 6 },
+  green: { color: "#86efac", fontWeight: "900", marginTop: 6 },
+  red: { color: "#fca5a5", fontWeight: "900", marginTop: 6 },
+  snapshotRow: {
+    marginTop: 12,
+    paddingVertical: 14,
     borderBottomColor: "#1e293b",
     borderBottomWidth: 1,
-    paddingVertical: 14
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12
   },
-
-  date: { color: "white", fontWeight: "900" },
-  small: { color: "#94a3b8", marginTop: 4, fontSize: 12 },
-  value: { color: "#67e8f9", fontWeight: "900", textAlign: "right" },
-  body: { color: "#cbd5e1", marginTop: 8, lineHeight: 21 },
-
-  primary: {
-    marginTop: 22,
-    backgroundColor: "#9333ea",
-    padding: 18,
-    borderRadius: 18
+  snapshotDate: { color: "white", fontWeight: "900" },
+  backButton: {
+    marginTop: 20,
+    backgroundColor: "#1e293b",
+    padding: 16,
+    borderRadius: 18,
+    borderColor: "#334155",
+    borderWidth: 1
   },
-
-  primaryText: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "900"
-  },
-
-  green: { color: "#86efac" },
-  red: { color: "#fca5a5" }
+  backText: { color: "#67e8f9", textAlign: "center", fontWeight: "900" }
 });

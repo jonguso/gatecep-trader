@@ -17,6 +17,7 @@ import {
   loadPortfolioSnapshots,
   savePortfolioSnapshot
 } from "../../src/utils/portfolioSnapshot";
+import { buildCoachPortfolioReview } from "../../src/utils/coachPortfolioReview";
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
@@ -273,6 +274,7 @@ export default function Dashboard() {
         gainLossPct,
         diversification,
         sectorCount,
+        sectorRows,
         healthScore: health.score,
         healthRating: health.rating,
         healthComponents: health.components,
@@ -282,7 +284,7 @@ export default function Dashboard() {
       })
     );
 
-    router.push("/coach");
+    router.push("/coach-insights")
   }
 
   if (loading) {

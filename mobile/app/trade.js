@@ -181,36 +181,76 @@ if (!validation.ok) {
       if (existingIndex >= 0) {
         const existing = nextPortfolio[existingIndex];
 
-        const existingQty = Number(existing.quantity || 0);
-        const existingValue = Number(existing.marketValue || 0);
+       const existingQty = Number(existing.quantity || 0);
 
-        const newQty = existingQty + estimate.qty;
-        const newValue = existingValue + estimate.gross;
+const existingAvgPrice = Number(
+  existing.averagePrice ||
+  existing.averageCost ||
+  0
+);
 
-        nextPortfolio[existingIndex] = {
-          ...existing,
-          quantity: String(newQty),
-          averagePrice: newValue / newQty,
-          averageCost: newValue / newQty,
-          marketPrice: String(estimate.price),
-          marketValue: newValue,
-          source: "FIRST_TRADE_SIMULATION"
-        };
+const existingCostValue = existingQty * existingAvgPrice;
+
+const buyCostIncludingFees = Number(estimate.totalCost || 0);
+
+const newQty = existingQty + estimate.qty;
+
+const newCostValue = existingCostValue + buyCostIncludingFees;
+
+const newAveragePrice =
+  newQty > 0 ? newCostValue / newQty : 0;
+
+const newMarketValue =
+  newQty * estimate.price;
+
+nextPortfolio[existingIndex] = {
+  ...existing,
+  quantity: newQty,
+  averagePrice: newAveragePrice,
+  averageCost: newAveragePrice,
+  costValue: newCostValue,
+  investedValue: newCostValue,
+  marketPrice: estimate.price,
+  price: estimate.price,
+  marketValue: newMarketValue,
+  value: newMarketValue,
+  profitLoss: newMarketValue - newCostValue,
+  profitLossPct:
+    newCostValue > 0
+      ? ((newMarketValue - newCostValue) / newCostValue) * 100
+      : 0,
+  source: "TRADE_SIMULATION"
+};
       } else {
-        nextPortfolio.push({
-          symbol: selectedStock.symbol,
-          sector: selectedStock.sector,
-          quantity: String(estimate.qty),
-          averagePrice: estimate.price,
-          averageCost: estimate.price,
-          marketPrice: estimate.price,
-          price: estimate.price,
-          marketValue: estimate.gross,
-          profitLoss: 0,
-          source: "FIRST_TRADE_SIMULATION"
-        });
-      }
-    }
+        const buyCostIncludingFees = Number(estimate.totalCost || 0);
+
+const averagePrice =
+  estimate.qty > 0
+    ? buyCostIncludingFees / estimate.qty
+    : estimate.price;
+
+nextPortfolio.push({
+  symbol: selectedStock.symbol,
+  name: selectedStock.name,
+  sector: selectedStock.sector,
+  quantity: estimate.qty,
+  averagePrice,
+  averageCost: averagePrice,
+  costValue: buyCostIncludingFees,
+  investedValue: buyCostIncludingFees,
+  marketPrice: estimate.price,
+  price: estimate.price,
+  marketValue: estimate.gross,
+  value: estimate.gross,
+  profitLoss: estimate.gross - buyCostIncludingFees,
+  profitLossPct:
+    buyCostIncludingFees > 0
+      ? ((estimate.gross - buyCostIncludingFees) / buyCostIncludingFees) * 100
+      : 0,
+  source: "TRADE_SIMULATION"
+  });
+ }
+}
 
     if (side === "SELL") {
       if (existingIndex < 0) {

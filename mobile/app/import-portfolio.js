@@ -197,16 +197,17 @@ export default function ImportPortfolio() {
     );
 
     const averagePrice = cleanNumber(
-      findValue([
-        "Average Price",
-        "Avg Price",
-        "Weighted Average Price",
-        "WAP",
-        "Cost Price",
-        "Book Price",
-        "Purchase Price"
-      ])
-    );
+  findValue([
+    "Average Price",
+    "Avg Price",
+    "Avg.Price",
+    "Weighted Average Price",
+    "WAP",
+    "Cost Price",
+    "Book Price",
+    "Purchase Price"
+  ])
+);
 
     const marketPrice = cleanNumber(
       findValue([
@@ -229,15 +230,16 @@ export default function ImportPortfolio() {
     );
 
     const profitLoss = cleanNumber(
-      findValue([
-        "Profit Loss",
-        "Profit/Loss",
-        "P/L",
-        "Gain Loss",
-        "Unrealized P/L",
-        "Unrealized Profit Loss"
-      ])
-    );
+  findValue([
+    "Profit Loss",
+    "Profit/Loss",
+    "Profit / Loss",
+    "P/L",
+    "Gain Loss",
+    "Unrealized P/L",
+    "Unrealized Profit Loss"
+  ])
+);
 
     if (!symbol || !quantity) return null;
 
