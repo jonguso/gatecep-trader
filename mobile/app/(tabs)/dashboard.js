@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -40,9 +41,11 @@ export default function Dashboard() {
     transactionsUpload: false
   });
 
-  useEffect(() => {
+ useFocusEffect(
+  useCallback(() => {
     load();
-  }, []);
+  }, [])
+);
 
   async function load() {
     setLoading(true);
