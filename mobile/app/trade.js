@@ -11,6 +11,11 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { validateOrder } from "../src/utils/orderValidator";
+import {
+  loadPortfolio,
+  savePortfolio
+} from "../src/utils/portfolioStore";
+
 
 const STOCKS = [
   {
@@ -71,12 +76,10 @@ export default function FirstTrade() {
   }, []);
 
   async function load() {
-    const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
-    const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
+    const savedPortfolio = await loadPortfolio({ revalue: false });
+setPortfolio(savedPortfolio);
 
-    if (portfolioRaw) {
-      setPortfolio(JSON.parse(portfolioRaw));
-    }
+const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
 
     if (cashRaw) {
       setCash(Number(cashRaw || 0));
@@ -187,7 +190,8 @@ if (!validation.ok) {
         nextPortfolio[existingIndex] = {
           ...existing,
           quantity: String(newQty),
-          averagePrice: String(newValue / newQty),
+          averagePrice: newValue / newQty,
+          averageCost: newValue / newQty,
           marketPrice: String(estimate.price),
           marketValue: newValue,
           source: "FIRST_TRADE_SIMULATION"
@@ -197,8 +201,10 @@ if (!validation.ok) {
           symbol: selectedStock.symbol,
           sector: selectedStock.sector,
           quantity: String(estimate.qty),
-          averagePrice: String(estimate.price),
-          marketPrice: String(estimate.price),
+          averagePrice: estimate.price,
+          averageCost: estimate.price,
+          marketPrice: estimate.price,
+          price: estimate.price,
           marketValue: estimate.gross,
           profitLoss: 0,
           source: "FIRST_TRADE_SIMULATION"
@@ -263,7 +269,7 @@ settlementStatus: "SETTLED"
 
     trades.unshift(trade);
 
-    await AsyncStorage.setItem("gatecepManualPortfolio", JSON.stringify(nextPortfolio));
+    await savePortfolio(nextPortfolio);
     await AsyncStorage.setItem("gatecepAvailableCash", String(estimate.remainingCash));
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
     await AsyncStorage.setItem("gatecepSimulatedTrades", JSON.stringify(trades));
@@ -294,11 +300,11 @@ await AsyncStorage.setItem(
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>First Trade Simulation</Text>
+      <Text style={styles.title}>Trade</Text>
 
       <Text style={styles.subtitle}>
-        Practice your first buy or sell before real broker execution is connected.
-      </Text>
+  Buy or sell securities using your available cash and portfolio holdings.
+</Text>
 
       <View style={styles.summaryCard}>
         <Metric label="Available Cash" value={`KES ${money(cash)}`} />
