@@ -352,11 +352,41 @@ export default function Coach() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.section}>Risk Analysis</Text>
-        <Text style={styles.body}>
-          Current risk is {dashboardContext?.risk || "N/A"}. Largest exposure is {largestSector}.
-        </Text>
-      </View>
+  <Text style={styles.section}>Portfolio Health</Text>
+
+  <Text style={styles.metric2}>
+    {dashboardContext?.healthScore || "N/A"}/100{" "}
+    {dashboardContext?.healthRating
+      ? `(${dashboardContext.healthRating})`
+      : ""}
+  </Text>
+
+  <Text style={styles.body}>
+    Coach G measures portfolio health using diversification, concentration,
+    cash buffer, and portfolio breadth.
+  </Text>
+
+  {dashboardContext?.healthStrengths?.slice(0, 3).map((item) => (
+    <Text key={item} style={styles.body}>
+      ✓ {item}
+    </Text>
+  ))}
+
+  {dashboardContext?.healthWatchlist?.slice(0, 3).map((item) => (
+    <Text key={item} style={styles.body}>
+      ⚠ {item}
+    </Text>
+  ))}
+</View>
+
+<View style={styles.card}>
+  <Text style={styles.section}>Risk Analysis</Text>
+
+  <Text style={styles.body}>
+    Current risk is {dashboardContext?.risk || "N/A"}. Largest exposure is{" "}
+    {largestSector}.
+  </Text>
+</View>
 
       <View style={styles.card}>
         <Text style={styles.section}>Diversification Analysis</Text>
