@@ -13,7 +13,10 @@ import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
 import { loadPortfolio } from "../../src/utils/portfolioStore";
 import { calculatePortfolioHealth } from "../../src/utils/portfolioHealth";
-import { savePortfolioSnapshot } from "../../src/utils/portfolioSnapshot";
+import {
+  loadPortfolioSnapshots,
+  savePortfolioSnapshot
+} from "../../src/utils/portfolioSnapshot";
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
@@ -32,6 +35,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState("");
   const [selectedSector, setSelectedSector] = useState(null);
+  const [snapshots, setSnapshots] = useState([]);
 
   const [setupChecks, setSetupChecks] = useState({
     profile: false,
@@ -42,16 +46,17 @@ export default function Dashboard() {
     transactionsUpload: false
   });
 
- useFocusEffect(
-  useCallback(() => {
-    load();
-  }, [])
-);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
 
   async function load() {
     setLoading(true);
 
     const profileRaw = await AsyncStorage.getItem("gatecepInvestorProfile");
+
     const brokerRaw =
       (await AsyncStorage.getItem("gatecepBrokerProfile")) ||
       (await AsyncStorage.getItem("gatecepDefaultBrokerProfile"));
@@ -61,18 +66,26 @@ export default function Dashboard() {
     const portfolioUploadRaw = await AsyncStorage.getItem(
       "gatecepStatementUploaded"
     );
+
     const cashUploadRaw = await AsyncStorage.getItem(
       "gatecepCashStatementUploaded"
     );
+
     const transactionUploadRaw = await AsyncStorage.getItem(
       "gatecepTransactionsUploaded"
     );
 
-    const parsedHoldings = await loadPortfolio({ revalue: true });
+    const parsedHoldings = await loadPortfolio({
+      revalue: true
+    });
+
+    const snapshotData = await loadPortfolioSnapshots();
 
     setHoldings(parsedHoldings);
+    setSnapshots(snapshotData);
 
     const parsedCash = Number(cashRaw || 0);
+
     setCash(Number.isFinite(parsedCash) ? parsedCash : 0);
 
     setSetupChecks({
@@ -143,11 +156,11 @@ export default function Dashboard() {
   const sectorCount = sectorRows.length;
 
   const sectorTotalValue = useMemo(() => {
-  return sectorRows.reduce(
-    (sum, s) => sum + Number(s.totalValue || 0),
-    0
-  );
-}, [sectorRows]);
+    return sectorRows.reduce(
+      (sum, s) => sum + Number(s.totalValue || 0),
+      0
+    );
+  }, [sectorRows]);
 
   const topHoldings = useMemo(() => {
     return [...holdings]
@@ -175,31 +188,69 @@ export default function Dashboard() {
       ? "MODERATE"
       : "CONCENTRATED";
 
-const health = useMemo(() => {
-  return calculatePortfolioHealth({
-    holdings,
-    cash,
+  const health = useMemo(() => {
+    return calculatePortfolioHealth({
+      holdings,
+      cash,
+      currentValue,
+      sectorRows
+    });
+  }, [holdings, cash, currentValue, sectorRows]);
+
+  const trend = useMemo(() => {
+    const latest = snapshots[0];
+    const first = snapshots[snapshots.length - 1];
+
+    if (!latest || !first) {
+      return null;
+    }
+
+    const change =
+      Number(latest.totalValue || 0) - Number(first.totalValue || 0);
+
+    const changePct =
+      Number(first.totalValue || 0) > 0
+        ? (change / Number(first.totalValue || 0)) * 100
+        : 0;
+
+    return {
+      latest,
+      first,
+      change,
+      changePct
+    };
+  }, [snapshots]);
+
+  useEffect(() => {
+    if (!loading && holdings.length > 0) {
+      saveTodaySnapshot();
+    }
+  }, [
+    loading,
+    holdings.length,
+    investedValue,
     currentValue,
-    sectorRows
-  });
+    cash,
+    health.score,
+    health.rating,
+    netGainLoss,
+    gainLossPct
+  ]);
 
-useEffect(() => {
-  if (!loading && holdings.length > 0) {
-    saveTodaySnapshot();
+  async function saveTodaySnapshot() {
+    await savePortfolioSnapshot({
+      investedValue,
+      currentValue,
+      cash,
+      healthScore: health.score,
+      healthRating: health.rating,
+      netGainLoss,
+      gainLossPct
+    });
+
+    const refreshed = await loadPortfolioSnapshots();
+    setSnapshots(refreshed);
   }
-}, [
-  loading,
-  holdings.length,
-  investedValue,
-  currentValue,
-  cash,
-  health.score,
-  health.rating,
-  netGainLoss,
-  gainLossPct
-]);
-
-}, [holdings, cash, currentValue, sectorRows]);
 
   const missingSetupItems = [
     { label: "Investor Profile", done: setupChecks.profile },
@@ -223,10 +274,10 @@ useEffect(() => {
         diversification,
         sectorCount,
         healthScore: health.score,
-	healthRating: health.rating,
-	healthComponents: health.components,
-	healthStrengths: health.strengths,
-	healthWatchlist: health.watchlist,
+        healthRating: health.rating,
+        healthComponents: health.components,
+        healthStrengths: health.strengths,
+        healthWatchlist: health.watchlist,
         timestamp: new Date().toISOString()
       })
     );
@@ -299,6 +350,37 @@ useEffect(() => {
         </View>
       </View>
 
+      {trend && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Portfolio Trend</Text>
+
+          <Text style={styles.body}>
+            Current total value is{" "}
+            <Text style={styles.highlight}>
+              KES {money(trend.latest.totalValue)}
+            </Text>
+            .
+          </Text>
+
+          <Text style={styles.body}>
+            Since first snapshot on {trend.first.date}, portfolio changed by{" "}
+            <Text
+              style={trend.change >= 0 ? styles.greenText : styles.redText}
+            >
+              KES {money(trend.change)} ({trend.changePct.toFixed(2)}%)
+            </Text>
+            .
+          </Text>
+
+          <Pressable
+            style={styles.secondary}
+            onPress={() => router.push("/performance")}
+          >
+            <Text style={styles.secondaryText}>Open Performance</Text>
+          </Pressable>
+        </View>
+      )}
+
       <View style={styles.summaryBottom}>
         <Metric label="Diversification" value={diversification} color="#67e8f9" />
 
@@ -329,21 +411,26 @@ useEffect(() => {
         <Text style={styles.cardTitle}>Coach G Summary</Text>
 
         <Text style={styles.body}>
-  Portfolio Health is{" "}
-  <Text style={styles.highlight}>
-    {health.score}/100 ({health.rating})
-  </Text>
-  . Risk is <Text style={styles.highlight}>{risk}</Text>. Diversification is{" "}
-  <Text style={styles.highlight}>{diversification}</Text>.
-</Text>
+          Portfolio Health is{" "}
+          <Text style={styles.highlight}>
+            {health.score}/100 ({health.rating})
+          </Text>
+          . Risk is <Text style={styles.highlight}>{risk}</Text>.
+          Diversification is{" "}
+          <Text style={styles.highlight}>{diversification}</Text>.
+        </Text>
 
-{health.strengths.slice(0, 2).map((item) => (
-  <Text key={item} style={styles.body}>✓ {item}</Text>
-))}
+        {health.strengths.slice(0, 2).map((item) => (
+          <Text key={item} style={styles.body}>
+            ✓ {item}
+          </Text>
+        ))}
 
-{health.watchlist.slice(0, 2).map((item) => (
-  <Text key={item} style={styles.body}>⚠ {item}</Text>
-))}
+        {health.watchlist.slice(0, 2).map((item) => (
+          <Text key={item} style={styles.body}>
+            ⚠ {item}
+          </Text>
+        ))}
 
         <Text style={styles.body}>
           {largestSector
@@ -398,10 +485,10 @@ useEffect(() => {
       <View style={styles.sectorContainer}>
         <View style={styles.chartPanel}>
           <SectorDonut
-  data={sectorRows}
-  total={sectorTotalValue}
-  onSelect={setSelectedSector}
-/>
+            data={sectorRows}
+            total={sectorTotalValue}
+            onSelect={setSelectedSector}
+          />
         </View>
 
         <View style={styles.tablePanel}>
@@ -448,10 +535,11 @@ useEffect(() => {
 
         <View style={styles.actionGrid}>
           <ActionButton title="Trade" route="/trade" />
-	  <ActionButton title="My Holdings" route="/holding-details" />
-	  <ActionButton title="Activity" route="/portfolio-activity" />
-	  <ActionButton title="Deposit Funds" route="/funds" />
-	  <ActionButton title="Connect Broker" route="/broker-profile" />
+          <ActionButton title="My Holdings" route="/holding-details" />
+          <ActionButton title="Activity" route="/portfolio-activity" />
+          <ActionButton title="Deposit Funds" route="/funds" />
+          <ActionButton title="Connect Broker" route="/broker-profile" />
+          <ActionButton title="Performance" route="/performance" />
         </View>
 
         <Pressable style={styles.primary} onPress={openCoach}>
@@ -571,19 +659,6 @@ function SectorModal({ sector, onClose }) {
 }
 
 function InfoBox({ label, value, positive }) {
-
-async function saveTodaySnapshot() {
-  await savePortfolioSnapshot({
-    investedValue,
-    currentValue,
-    cash,
-    healthScore: health.score,
-    healthRating: health.rating,
-    netGainLoss,
-    gainLossPct
-  });
-}
-
   return (
     <View style={styles.infoCompact}>
       <Text style={styles.infoLabel}>{label}</Text>
