@@ -1,40 +1,41 @@
 import { useEffect } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { View, ActivityIndicator } from "react-native";
+import { getCurrentSession } from "../src/auth/authStore";
 
 export default function Index() {
   useEffect(() => {
-    boot();
+    routeUser();
   }, []);
 
-  async function boot() {
-    const isLoggedIn = await AsyncStorage.getItem("gatecepIsLoggedIn");
-    const completed = await AsyncStorage.getItem("gatecepOnboardingCompleted");
+  async function routeUser() {
+    const session = await getCurrentSession();
 
-    if (isLoggedIn !== "true") {
-      router.replace("/onboarding/welcome");
-      return;
-    }
-
-    if (completed === "true") {
+    if (session?.loggedIn && session?.userId) {
       router.replace("/(tabs)/dashboard");
       return;
     }
 
-    router.replace("/onboarding/name");
+    router.replace("/login");
   }
 
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "#020617"
-      }}
-    >
+    <View style={styles.screen}>
       <ActivityIndicator size="large" color="#67e8f9" />
+      <Text style={styles.text}>Loading Gatecep...</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#020617",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  text: {
+    color: "#94a3b8",
+    marginTop: 12
+  }
+});
