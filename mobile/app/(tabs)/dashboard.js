@@ -11,13 +11,21 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
+
 import { loadPortfolio } from "../../src/portfolio/portfolioStore";
 import { calculatePortfolioHealth } from "../../src/portfolio/portfolioHealth";
 import {
   loadPortfolioSnapshots,
   savePortfolioSnapshot
 } from "../../src/portfolio/portfolioSnapshot";
-import { buildCoachPortfolioReview } from "../../src/portfolio/coachPortfolioReview";
+
+import {
+  fetchWatchlistMarketRows,
+  generateWatchlistSignals,
+  getDefaultWatchlist
+} from "../../src/utils/watchlistSignals";
+import { buildWatchlistScores } from "../../src/watchlist/watchlistScoring";
+
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
@@ -37,6 +45,7 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState("");
   const [selectedSector, setSelectedSector] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
+  const [topSignals, setTopSignals] = useState([]);
 
   const [setupChecks, setSetupChecks] = useState({
     profile: false,
@@ -86,7 +95,6 @@ export default function Dashboard() {
     setSnapshots(snapshotData);
 
     const parsedCash = Number(cashRaw || 0);
-
     setCash(Number.isFinite(parsedCash) ? parsedCash : 0);
 
     setSetupChecks({
@@ -98,8 +106,34 @@ export default function Dashboard() {
       transactionsUpload: transactionUploadRaw === "true"
     });
 
+    await loadTopSignals();
+
     setLastUpdated(new Date().toLocaleString());
     setLoading(false);
+  }
+
+  async function loadTopSignals() {
+    try {
+      const watchlistRaw = await AsyncStorage.getItem("gatecepWatchlist");
+
+      const watchlist = watchlistRaw
+        ? JSON.parse(watchlistRaw)
+        : getDefaultWatchlist();
+
+      const marketRows = await fetchWatchlistMarketRows(watchlist);
+      const generated = generateWatchlistSignals(marketRows);
+      const scored = buildWatchlistScores(generated);
+
+      const ranked = scored
+        .filter((item) => ["BUY", "ACCUMULATE", "INCOME"].includes(item.action))
+        .sort((a, b) => Number(b.confidence || 0) - Number(a.confidence || 0))
+        .slice(0, 3);
+
+      setTopSignals(ranked);
+    } catch (error) {
+      console.log("Dashboard top signals failed:", error.message);
+      setTopSignals([]);
+    }
   }
 
   const investedValue = useMemo(() => {
@@ -202,9 +236,7 @@ export default function Dashboard() {
     const latest = snapshots[0];
     const first = snapshots[snapshots.length - 1];
 
-    if (!latest || !first) {
-      return null;
-    }
+    if (!latest || !first) return null;
 
     const change =
       Number(latest.totalValue || 0) - Number(first.totalValue || 0);
@@ -284,7 +316,7 @@ export default function Dashboard() {
       })
     );
 
-    router.push("/coach-insights")
+    router.push("/coach-insights");
   }
 
   if (loading) {
@@ -444,6 +476,37 @@ export default function Dashboard() {
       </View>
 
       <View style={styles.card}>
+        <Text style={styles.cardTitle}>Top Coach G Signals</Text>
+
+        {topSignals.length === 0 ? (
+          <Text style={styles.body}>
+            No strong signals right now. Open Watchlist to monitor opportunities.
+          </Text>
+        ) : (
+          topSignals.map((item) => (
+            <View key={item.symbol} style={styles.signalRow}>
+              <View>
+                <Text style={styles.holdingSymbol}>{item.symbol}</Text>
+                <Text style={styles.small}>{item.name}</Text>
+              </View>
+
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={signalActionStyle(item.action)}>{item.action}</Text>
+                <Text style={styles.valueText}>{item.confidence}%</Text>
+              </View>
+            </View>
+          ))
+        )}
+
+        <Pressable
+          style={styles.secondary}
+          onPress={() => router.push("/watchlist")}
+        >
+          <Text style={styles.secondaryText}>Open Watchlist</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Top Holdings</Text>
 
         {topHoldings.length === 0 ? (
@@ -536,11 +599,11 @@ export default function Dashboard() {
         <Text style={styles.cardTitle}>Quick Actions</Text>
 
         <View style={styles.actionGrid}>
-  <ActionButton title="Trade" route="/trade" />
-  <ActionButton title="Command Center" route="/portfolio-command-center" />
-  <ActionButton title="Deposit Funds" route="/funds" />
-  <ActionButton title="Connect Broker" route="/broker-profile" />
-</View>
+          <ActionButton title="Trade" route="/trade" />
+          <ActionButton title="Command Center" route="/portfolio-command-center" />
+          <ActionButton title="Deposit Funds" route="/funds" />
+          <ActionButton title="Connect Broker" route="/broker-profile" />
+        </View>
 
         <Pressable style={styles.primary} onPress={openCoach}>
           <Text style={styles.primaryText}>Open Coach G Insights</Text>
@@ -737,6 +800,13 @@ function SectorDonut({ data, total, onSelect }) {
   );
 }
 
+function signalActionStyle(action) {
+  if (action === "BUY") return styles.signalBuy;
+  if (action === "ACCUMULATE") return styles.signalAccumulate;
+  if (action === "INCOME") return styles.signalIncome;
+  return styles.signalHold;
+}
+
 function money(v) {
   return Number(v || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -874,6 +944,20 @@ const styles = StyleSheet.create({
     gap: 12
   },
   holdingSymbol: { color: "white", fontSize: 16, fontWeight: "900" },
+
+  signalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomColor: "#1e293b",
+    borderBottomWidth: 1,
+    paddingVertical: 14,
+    gap: 12
+  },
+  signalBuy: { color: "#22c55e", fontWeight: "900" },
+  signalAccumulate: { color: "#67e8f9", fontWeight: "900" },
+  signalIncome: { color: "#fbbf24", fontWeight: "900" },
+  signalHold: { color: "#a78bfa", fontWeight: "900" },
 
   section: {
     marginTop: 24,
