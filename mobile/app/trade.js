@@ -14,7 +14,7 @@ import { validateOrder } from "../src/utils/orderValidator";
 import {
   loadPortfolio,
   savePortfolio
-} from "../src/utils/portfolioStore";
+} from "../src/portfolio/portfolioStore";
 
 
 const STOCKS = [

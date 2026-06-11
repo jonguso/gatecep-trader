@@ -11,8 +11,8 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { loadPortfolio } from "../src/utils/portfolioStore";
-import { buildCoachPortfolioReview } from "../src/utils/coachPortfolioReview";
+import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import { buildCoachPortfolioReview } from "../src/portfolio/coachPortfolioReview";
 
 export default function Coach() {
   const [portfolio, setPortfolio] = useState([]);

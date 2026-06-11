@@ -14,7 +14,7 @@ import { router } from "expo-router";
 import {
   savePortfolio,
   normalizePortfolioHolding
-} from "../src/utils/portfolioStore";
+} from "../src/portfolio/portfolioStore";
 
 export default function ReviewPortfolioImport() {
   const [fileInfo, setFileInfo] = useState(null);

@@ -8,7 +8,7 @@ import {
   View
 } from "react-native";
 import { router } from "expo-router";
-import { loadPortfolioSnapshots } from "../src/utils/portfolioSnapshot";
+import { loadPortfolioSnapshots } from "../src/portfolio/portfolioSnapshot";
 
 export default function Performance() {
   const [loading, setLoading] = useState(true);

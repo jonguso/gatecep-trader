@@ -11,13 +11,13 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
-import { loadPortfolio } from "../../src/utils/portfolioStore";
-import { calculatePortfolioHealth } from "../../src/utils/portfolioHealth";
+import { loadPortfolio } from "../../src/portfolio/portfolioStore";
+import { calculatePortfolioHealth } from "../../src/portfolio/portfolioHealth";
 import {
   loadPortfolioSnapshots,
   savePortfolioSnapshot
-} from "../../src/utils/portfolioSnapshot";
-import { buildCoachPortfolioReview } from "../../src/utils/coachPortfolioReview";
+} from "../../src/portfolio/portfolioSnapshot";
+import { buildCoachPortfolioReview } from "../../src/portfolio/coachPortfolioReview";
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [

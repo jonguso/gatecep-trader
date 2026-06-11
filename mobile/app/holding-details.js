@@ -8,7 +8,7 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { loadPortfolio } from "../src/utils/portfolioStore";
+import { loadPortfolio } from "../src/portfolio/portfolioStore";
 
 export default function HoldingDetails() {
   const [holdings, setHoldings] = useState([]);
