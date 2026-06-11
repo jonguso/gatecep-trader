@@ -1,11 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  userGetItem,
+  userSetItem
+} from "../auth/userStorage";
 import { applySecurityMaster } from "../utils/nseSecurityMaster";
 
 const API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   "http://localhost:4000";
 
-export const PORTFOLIO_KEY = "gatecepPortfolio";
+export const PORTFOLIO_KEY = "portfolio";
 export const LEGACY_PORTFOLIO_KEY = "gatecepManualPortfolio";
 
 export function normalizePortfolioHolding(row = {}) {
@@ -89,18 +93,18 @@ export async function savePortfolio(rows = []) {
     .filter((row) => row?.symbol && Number(row.quantity || 0) > 0)
     .map(normalizePortfolioHolding);
 
-  await AsyncStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolio));
-
-  // Temporary backward compatibility while all screens migrate
-  await AsyncStorage.setItem(LEGACY_PORTFOLIO_KEY, JSON.stringify(portfolio));
+  await userSetItem(PORTFOLIO_KEY, JSON.stringify(portfolio));
 
   return portfolio;
 }
 
 export async function loadPortfolio({ revalue = true } = {}) {
-  const raw =
-    (await AsyncStorage.getItem(PORTFOLIO_KEY)) ||
-    (await AsyncStorage.getItem(LEGACY_PORTFOLIO_KEY));
+  const scopedRaw = await userGetItem(PORTFOLIO_KEY);
+
+  // temporary read-only fallback for old data
+  const legacyRaw = await AsyncStorage.getItem(LEGACY_PORTFOLIO_KEY);
+
+  const raw = scopedRaw || legacyRaw;
 
   if (!raw) return [];
 
@@ -111,15 +115,13 @@ export async function loadPortfolio({ revalue = true } = {}) {
   const normalized = parsed.map(normalizePortfolioHolding);
 
   if (!revalue) {
-    await AsyncStorage.setItem(PORTFOLIO_KEY, JSON.stringify(normalized));
-    await AsyncStorage.setItem(LEGACY_PORTFOLIO_KEY, JSON.stringify(normalized));
+    await userSetItem(PORTFOLIO_KEY, JSON.stringify(normalized));
     return normalized;
   }
 
   const revalued = await revaluePortfolio(normalized);
 
-  await AsyncStorage.setItem(PORTFOLIO_KEY, JSON.stringify(revalued));
-  await AsyncStorage.setItem(LEGACY_PORTFOLIO_KEY, JSON.stringify(revalued));
+  await userSetItem(PORTFOLIO_KEY, JSON.stringify(revalued));
 
   return revalued;
 }
@@ -142,6 +144,7 @@ export async function revaluePortfolio(rows = []) {
     );
 
     const quantity = Number(mastered.quantity || 0);
+
     const averagePrice = Number(
       mastered.averagePrice ||
         mastered.averageCost ||
@@ -185,7 +188,7 @@ export async function revaluePortfolio(rows = []) {
 
 async function fetchMarketPriceMap() {
   try {
-    const response = await fetch(`${API_URL}/market/prices`);
+    const response = await fetch(`${API_URL}/prices`);
 
     if (!response.ok) {
       throw new Error("Market price request failed.");
