@@ -1,22 +1,71 @@
+import { applySecurityMaster } from "./nseSecurityMaster";
+
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  "http://localhost:4000";
+
 const DEFAULT_WATCHLIST = [
-  { symbol: "SCOM", name: "Safaricom", sector: "Telecom", price: 30.6 },
-  { symbol: "KCB", name: "KCB Group", sector: "Banking", price: 45 },
-  { symbol: "EQTY", name: "Equity Group", sector: "Banking", price: 48 },
-  { symbol: "COOP", name: "Co-operative Bank", sector: "Banking", price: 16 },
-  { symbol: "EABL", name: "East African Breweries", sector: "Mfg. and Allied", price: 248 },
-  { symbol: "BAT", name: "BAT Kenya", sector: "Mfg. and Allied", price: 520 },
-  { symbol: "KEGN", name: "KenGen", sector: "Energy and Petroleum", price: 45.5 },
-  { symbol: "KQ", name: "Kenya Airways", sector: "Comm. and Services", price: 3.8 }
+  { symbol: "SCOM" },
+  { symbol: "KCB" },
+  { symbol: "EQT" },
+  { symbol: "COOP" },
+  { symbol: "EABL" },
+  { symbol: "BAT" },
+  { symbol: "KEGN" },
+  { symbol: "KQ" }
 ];
 
 export function getDefaultWatchlist() {
-  return DEFAULT_WATCHLIST;
+  return DEFAULT_WATCHLIST.map(applySecurityMaster);
+}
+
+export async function fetchWatchlistMarketRows(items = []) {
+  const response = await fetch(`${API_URL}/prices`);
+
+  if (!response.ok) {
+    throw new Error("Market price request failed.");
+  }
+
+  const json = await response.json();
+
+  const marketRows = Array.isArray(json?.data) ? json.data : [];
+
+  const marketMap = new Map();
+
+  marketRows.forEach((row) => {
+    const mastered = applySecurityMaster(row);
+    marketMap.set(mastered.symbol, mastered);
+  });
+
+  return items
+    .map((item) => {
+      const mastered = applySecurityMaster(item);
+      const market = marketMap.get(mastered.symbol);
+
+      if (!market) {
+        return mastered;
+      }
+
+      return {
+        ...mastered,
+        ...market,
+        currentPrice: Number(market.price || market.lastPrice || 0),
+        changePct: Number(market.changePct || 0),
+        updatedAt: json.generatedAt || new Date().toISOString()
+      };
+    })
+    .filter((item) => item.symbol);
 }
 
 export function generateWatchlistSignals(items = []) {
   return items.map((item) => {
-    const changePct = Number(((Math.random() - 0.45) * 6).toFixed(2));
-    const currentPrice = Number((Number(item.price || 0) * (1 + changePct / 100)).toFixed(2));
+    const changePct = Number(item.changePct || 0);
+    const currentPrice = Number(
+      item.currentPrice ||
+      item.price ||
+      item.lastPrice ||
+      0
+    );
 
     let signal = "WATCH";
     let reason = "Price movement is normal. Keep watching.";
@@ -41,7 +90,7 @@ export function generateWatchlistSignals(items = []) {
       changePct,
       signal,
       reason,
-      updatedAt: new Date().toISOString()
+      updatedAt: item.updatedAt || new Date().toISOString()
     };
   });
 }

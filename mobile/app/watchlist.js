@@ -9,13 +9,15 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import {
+  fetchWatchlistMarketRows,
   generateWatchlistSignals,
   getDefaultWatchlist
 } from "../src/utils/watchlistSignals";
+import { buildWatchlistScores } from "../src/watchlist/watchlistScoring";
 
 export default function Watchlist() {
   const [items, setItems] = useState([]);
-  const [signals, setSignals] = useState([]);
+  const [scoredSignals, setScoredSignals] = useState([]);
 
   useEffect(() => {
     load();
@@ -32,26 +34,35 @@ export default function Watchlist() {
   );
 
   async function load() {
-    const raw = await AsyncStorage.getItem("gatecepWatchlist");
-    const saved = raw ? JSON.parse(raw) : getDefaultWatchlist();
+  const raw = await AsyncStorage.getItem("gatecepWatchlist");
+  const saved = raw ? JSON.parse(raw) : getDefaultWatchlist();
 
-    setItems(saved);
-    setSignals(generateWatchlistSignals(saved));
-  }
+  const marketRows = await fetchWatchlistMarketRows(saved);
+  const generated = generateWatchlistSignals(marketRows);
+
+  setItems(saved);
+  setScoredSignals(buildWatchlistScores(generated));
+}
 
   async function resetDefault() {
-    const defaults = getDefaultWatchlist();
+  const defaults = getDefaultWatchlist();
+  const marketRows = await fetchWatchlistMarketRows(defaults);
+  const generated = generateWatchlistSignals(marketRows);
 
-    await AsyncStorage.setItem("gatecepWatchlist", JSON.stringify(defaults));
+  await AsyncStorage.setItem("gatecepWatchlist", JSON.stringify(defaults));
 
-    setItems(defaults);
-    setSignals(generateWatchlistSignals(defaults));
-  }
+  setItems(defaults);
+  setScoredSignals(buildWatchlistScores(generated));
+}
 
-  function refreshSignals() {
-    if (!items.length) return;
-    setSignals(generateWatchlistSignals(items));
-  }
+  async function refreshSignals() {
+  if (!items.length) return;
+
+  const marketRows = await fetchWatchlistMarketRows(items);
+  const generated = generateWatchlistSignals(marketRows);
+
+  setScoredSignals(buildWatchlistScores(generated));
+}
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -64,21 +75,27 @@ export default function Watchlist() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Coach G Signals</Text>
 
-        {signals.map((item) => (
+        {scoredSignals.map((item) => (
           <View key={item.symbol} style={styles.stockRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.symbol}>{item.symbol}</Text>
-              <Text style={styles.small}>{item.name} • {item.sector}</Text>
+              <Text style={styles.small}>
+                {item.name} • {item.sector}
+              </Text>
               <Text style={styles.reason}>{item.reason}</Text>
             </View>
 
             <View style={styles.right}>
               <Text style={styles.price}>KES {money(item.currentPrice)}</Text>
+
               <Text style={item.changePct >= 0 ? styles.green : styles.red}>
                 {item.changePct >= 0 ? "+" : ""}
                 {item.changePct}%
               </Text>
-              <Text style={signalStyle(item.signal)}>{item.signal}</Text>
+
+              <Text style={actionStyle(item.action)}>{item.action}</Text>
+
+              <Text style={styles.confidence}>{item.confidence}%</Text>
             </View>
           </View>
         ))}
@@ -92,19 +109,22 @@ export default function Watchlist() {
         <Text style={styles.secondaryText}>Reset Default Watchlist</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={() => router.replace("/coach-insights")}>
+      <Pressable
+        style={styles.secondary}
+        onPress={() => router.replace("/coach-insights")}
+      >
         <Text style={styles.secondaryText}>Back to Coach G Insights</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-function signalStyle(signal) {
-  if (signal === "HOT") return styles.hot;
-  if (signal === "OPPORTUNITY") return styles.opportunity;
-  if (signal === "POSITIVE") return styles.green;
-  if (signal === "CAUTION") return styles.red;
-  return styles.watch;
+function actionStyle(action) {
+  if (action === "BUY") return styles.buy;
+  if (action === "ACCUMULATE") return styles.accumulate;
+  if (action === "INCOME") return styles.income;
+  if (action === "HOLD") return styles.hold;
+  return styles.caution;
 }
 
 function money(value) {
@@ -148,9 +168,12 @@ const styles = StyleSheet.create({
   price: { color: "white", fontWeight: "900" },
   green: { color: "#86efac", fontWeight: "900", marginTop: 4 },
   red: { color: "#fca5a5", fontWeight: "900", marginTop: 4 },
-  hot: { color: "#fbbf24", fontWeight: "900", marginTop: 4 },
-  opportunity: { color: "#67e8f9", fontWeight: "900", marginTop: 4 },
-  watch: { color: "#c084fc", fontWeight: "900", marginTop: 4 },
+  buy: { color: "#22c55e", fontWeight: "900", marginTop: 4 },
+  accumulate: { color: "#67e8f9", fontWeight: "900", marginTop: 4 },
+  income: { color: "#fbbf24", fontWeight: "900", marginTop: 4 },
+  hold: { color: "#a78bfa", fontWeight: "900", marginTop: 4 },
+  caution: { color: "#f87171", fontWeight: "900", marginTop: 4 },
+  confidence: { color: "white", fontWeight: "900", marginTop: 2 },
   primary: {
     marginTop: 22,
     backgroundColor: "#9333ea",
@@ -164,5 +187,9 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 18
   },
-  secondaryText: { color: "#67e8f9", textAlign: "center", fontWeight: "900" }
+  secondaryText: {
+    color: "#67e8f9",
+    textAlign: "center",
+    fontWeight: "900"
+  }
 });
