@@ -11,6 +11,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
+import { getCurrentSession } from "../../src/auth/authStore";
 
 import { loadPortfolio } from "../../src/portfolio/portfolioStore";
 import { calculatePortfolioHealth } from "../../src/portfolio/portfolioHealth";
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const [selectedSector, setSelectedSector] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [topSignals, setTopSignals] = useState([]);
+  const [session, setSession] = useState(null);
 
   const [setupChecks, setSetupChecks] = useState({
     profile: false,
@@ -64,6 +66,9 @@ export default function Dashboard() {
 
   async function load() {
     setLoading(true);
+ 
+    const currentSession = await getCurrentSession();
+setSession(currentSession);     
 
     const profileRaw = await AsyncStorage.getItem("gatecepInvestorProfile");
 
@@ -358,6 +363,9 @@ sectors[sector].securities.push(h);
       </View>
 
       <Text style={styles.subtitle}>Gatecep investor command center</Text>
+      <Text style={styles.userLine}>
+  Logged in as {session?.username || session?.userId || "Guest"}
+</Text>
       <Text style={styles.timestamp}>Updated {lastUpdated}</Text>
 
       <View style={styles.summaryOuter}>
@@ -1134,6 +1142,12 @@ sectorDownText: {
     justifyContent: "space-between",
     alignItems: "center"
   },
+
+  userLine: {
+  color: "#67e8f9",
+  marginTop: 6,
+  fontWeight: "900"
+},
   compactMetrics: {
     marginTop: 12,
     flexDirection: "row",

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -7,6 +7,9 @@ import {
   StyleSheet
 } from "react-native";
 import { router } from "expo-router";
+import { getCurrentSession, logout } from "../src/auth/authStore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 const items = [
   {
@@ -32,6 +35,28 @@ const items = [
 ];
 
 export default function Menu() {
+
+const [session, setSession] = useState(null);
+
+useEffect(() => {
+  loadSession();
+}, []);
+
+async function loadSession() {
+  const current = await getCurrentSession();
+  setSession(current);
+}
+
+async function handleLogout() {
+  await logout();
+
+  await AsyncStorage.removeItem("gatecepSession");
+  await AsyncStorage.removeItem("gatecepCurrentUserId");
+  await AsyncStorage.setItem("gatecepIsLoggedIn", "false");
+
+  router.replace("/login");
+}
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Menu</Text>
@@ -39,6 +64,13 @@ export default function Menu() {
       <Text style={styles.subtitle}>
         Setup, maintenance, uploads, profile, and support actions.
       </Text>
+     
+       <View style={styles.userCard}>
+  <Text style={styles.userLabel}>Logged in as</Text>
+  <Text style={styles.userName}>
+    {session?.username || session?.userId || "Guest"}
+  </Text>
+</View>
 
       {items.map((item) => (
         <Pressable
@@ -56,11 +88,12 @@ export default function Menu() {
       ))}
 
       <Pressable
-        style={styles.logout}
-        onPress={() => router.replace("/login")}
-      >
-        <Text style={styles.logoutText}>Logout / Reset Session</Text>
-      </Pressable>
+  style={styles.logout}
+  onPress={handleLogout}
+>
+  <Text style={styles.logoutText}>Logout</Text>
+</Pressable>
+
     </ScrollView>
   );
 }
@@ -102,6 +135,28 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 16
   },
+
+userCard: {
+  marginTop: 16,
+  backgroundColor: "#0f172a",
+  borderColor: "#1e293b",
+  borderWidth: 1,
+  borderRadius: 18,
+  padding: 16
+},
+
+userLabel: {
+  color: "#94a3b8",
+  fontSize: 12
+},
+
+userName: {
+  color: "#67e8f9",
+  fontSize: 18,
+  fontWeight: "900",
+  marginTop: 4
+},
+
   itemDetail: {
     color: "#94a3b8",
     marginTop: 6,
