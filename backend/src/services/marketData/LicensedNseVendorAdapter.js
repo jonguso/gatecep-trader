@@ -1,5 +1,12 @@
 import axios from "axios";
 
+function isConfigured() {
+  return Boolean(
+    process.env.NSE_VENDOR_BASE_URL &&
+      process.env.NSE_VENDOR_API_KEY
+  );
+}
+
 function client() {
   return axios.create({
     baseURL: process.env.NSE_VENDOR_BASE_URL,
@@ -13,11 +20,18 @@ function client() {
 
 export default {
   async getPrices() {
-    if (!process.env.NSE_VENDOR_BASE_URL || !process.env.NSE_VENDOR_API_KEY) {
-      throw new Error("Licensed NSE vendor credentials are missing");
+    if (!isConfigured()) {
+      return {
+        provider: "LICENSED_NSE_NOT_CONFIGURED",
+        delayed: false,
+        disclaimer:
+          "Licensed NSE vendor adapter is not configured. Add NSE_VENDOR_BASE_URL and NSE_VENDOR_API_KEY before using this provider.",
+        data: []
+      };
     }
 
     const res = await client().get("/prices");
+
     return {
       provider: "LICENSED_NSE_VENDOR",
       delayed: false,
@@ -27,12 +41,38 @@ export default {
   },
 
   async getCandles(symbol, interval = "1m") {
-    const res = await client().get(`/candles/${symbol}`, { params: { interval } });
+    if (!isConfigured()) {
+      return {
+        provider: "LICENSED_NSE_NOT_CONFIGURED",
+        symbol,
+        interval,
+        data: []
+      };
+    }
+
+    const res = await client().get(`/candles/${symbol}`, {
+      params: { interval }
+    });
+
     return res.data.data || res.data;
   },
 
   async getMarketSummary() {
+    if (!isConfigured()) {
+      return {
+        provider: "LICENSED_NSE_NOT_CONFIGURED",
+        marketStatus: "NOT_CONFIGURED",
+        gainers: [],
+        losers: [],
+        active: []
+      };
+    }
+
     const res = await client().get("/market-summary");
-    return { provider: "LICENSED_NSE_VENDOR", ...res.data };
+
+    return {
+      provider: "LICENSED_NSE_VENDOR",
+      ...res.data
+    };
   }
 };

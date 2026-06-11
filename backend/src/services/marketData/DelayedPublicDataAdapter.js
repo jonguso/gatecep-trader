@@ -1,23 +1,29 @@
-import SimulatedDataAdapter from "./SimulatedDataAdapter.js";
-
 export default {
   async getPrices() {
-    const res = await SimulatedDataAdapter.getPrices();
     return {
-      ...res,
-      provider: "DELAYED_PUBLIC",
+      provider: "DELAYED_PUBLIC_NOT_CONFIGURED",
       delayed: true,
       delayMinutes: Number(process.env.MARKET_DATA_DELAY_MINUTES || 15),
-      disclaimer: "Delayed/public data mode. Replace with authorized vendor feed before production trading."
+      disclaimer:
+        "Delayed public data adapter is not configured yet. Use MARKET_DATA_PROVIDER=LOCAL_EOD until a public source is connected.",
+      data: []
     };
   },
 
-  async getCandles(symbol, interval = "1m") {
-    return SimulatedDataAdapter.getCandles(symbol, interval);
+  async getCandles() {
+    return {
+      provider: "DELAYED_PUBLIC_NOT_CONFIGURED",
+      data: []
+    };
   },
 
   async getMarketSummary() {
-    const res = await SimulatedDataAdapter.getMarketSummary();
-    return { ...res, provider: "DELAYED_PUBLIC", delayed: true };
+    return {
+      provider: "DELAYED_PUBLIC_NOT_CONFIGURED",
+      marketStatus: "NOT_CONFIGURED",
+      gainers: [],
+      losers: [],
+      active: []
+    };
   }
 };

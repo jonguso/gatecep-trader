@@ -1,4 +1,10 @@
-import { SECURITIES, STARTING_PRICES } from "../../data/securities.js";
+import { nseSecurityMaster } from "../../data/nseSecurityMaster.js";
+
+const SECURITIES = Object.values(nseSecurityMaster);
+
+const STARTING_PRICES = Object.fromEntries(
+  SECURITIES.map((s) => [s.symbol, Number(s.price || 10)])
+);
 
 let prices = { ...STARTING_PRICES };
 
