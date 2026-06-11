@@ -10,6 +10,11 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import {
+  buildUserId,
+  getCurrentSession,
+  saveSession
+} from "../src/auth/authStore";
 
 export default function Login() {
   const [form, setForm] = useState({
@@ -21,102 +26,71 @@ export default function Login() {
     checkSession();
   }, []);
 
-  async function checkSession() {
-  const session = await AsyncStorage.getItem("gatecepSession");
-
-  if (session) {
-    await AsyncStorage.setItem("gatecepIsLoggedIn", "true");
-
-    const completed = await AsyncStorage.getItem("gatecepOnboardingCompleted");
+  async function routeAfterLogin(userId) {
+    const completed = await AsyncStorage.getItem(
+      `gatecep:${userId}:onboardingCompleted`
+    );
 
     router.replace(
       completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
     );
   }
-}
 
-async function login() {
-  try {
-    const enteredUser = String(form.username || "").trim();
-    const enteredPass = String(form.password || "").trim();
+  async function checkSession() {
+    const session = await getCurrentSession();
 
-    if (!enteredUser || !enteredPass) {
-      Alert.alert("Missing Login", "Enter username and password.");
-      return;
+    if (session?.loggedIn && session?.userId) {
+      await AsyncStorage.setItem("gatecepIsLoggedIn", "true");
+      await routeAfterLogin(session.userId);
     }
-
-    const normalizedUser = enteredUser.toLowerCase();
-
-    // Demo login
-    if (normalizedUser === "gatecep" && enteredPass === "demo") {
-
-  await AsyncStorage.setItem(
-    "gatecepSession",
-    JSON.stringify({
-      username: "Gatecep",
-      loggedIn: true,
-      demo: true
-    })
-  );
-
-  await AsyncStorage.setItem(
-    "gatecepIsLoggedIn",
-    "true"
-  );
-
-  const completed =
-    await AsyncStorage.getItem(
-      "gatecepOnboardingCompleted"
-    );
-
-  router.replace(
-    completed === "true"
-      ? "/(tabs)/dashboard"
-      : "/onboarding/name"
-  );
-
-  return;
-}
-
-    // Saved signup users
-    const usersRaw = await AsyncStorage.getItem("gatecepUsers");
-    const users = usersRaw ? JSON.parse(usersRaw) : [];
-
-    const user = users.find(
-      (u) =>
-        String(u.username || "").trim().toLowerCase() === normalizedUser &&
-        String(u.password || "").trim() === enteredPass
-    );
-
-    if (user) {
-     await AsyncStorage.setItem(
-  "gatecepSession",
-  JSON.stringify({
-    username: user.username,
-    email: user.email,
-    loggedIn: true
-  })
-);
-
-await AsyncStorage.setItem(
-  "gatecepIsLoggedIn",
-  "true"
-);
-
-      const completed = await AsyncStorage.getItem("gatecepOnboardingCompleted");
-
-router.replace(
-  completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
-);
-
-      return;
-    }
-
-    Alert.alert("Login Failed", "Invalid username or password.");
-  } catch (error) {
-    Alert.alert("Login Error", error.message || "Login failed.");
   }
-}
+
+  async function login() {
+    try {
+      const enteredUser = String(form.username || "").trim();
+      const enteredPass = String(form.password || "").trim();
+
+      if (!enteredUser || !enteredPass) {
+        Alert.alert("Missing Login", "Enter username and password.");
+        return;
+      }
+
+      const normalizedUser = enteredUser.toLowerCase();
+
+      if (normalizedUser === "gatecep" && enteredPass === "demo") {
+        const session = await saveSession({
+          username: "gatecep",
+          demo: true
+        });
+     console.log("SESSION", session);
+        await routeAfterLogin(session.userId);
+        return;
+      }
+
+      const usersRaw = await AsyncStorage.getItem("gatecepUsers");
+      const users = usersRaw ? JSON.parse(usersRaw) : [];
+
+      const user = users.find(
+        (u) =>
+          String(u.username || "").trim().toLowerCase() === normalizedUser &&
+          String(u.password || "").trim() === enteredPass
+      );
+
+      if (user) {
+        const session = await saveSession({
+          username: user.username,
+          email: user.email
+        });
+
+        await routeAfterLogin(session.userId);
+        return;
+      }
+
+      Alert.alert("Login Failed", "Invalid username or password.");
+    } catch (error) {
+      Alert.alert("Login Error", error.message || "Login failed.");
+    }
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -126,13 +100,12 @@ router.replace(
         resizeMode="contain"
       />
 
-      <Text style={styles.title}>
-  Gatecep AI
-</Text>
+      <Text style={styles.title}>Gatecep AI</Text>
 
-<Text style={styles.subtitle}>
-  Smarter Investing. Guided by Coach G.
-</Text>
+      <Text style={styles.subtitle}>
+        Smarter Investing. Guided by Coach G.
+      </Text>
+
       <TextInput
         placeholder="Username"
         placeholderTextColor="#64748b"
@@ -152,14 +125,11 @@ router.replace(
       />
 
       <Pressable
-  style={({ pressed }) => [
-    styles.button,
-    pressed && { opacity: 0.75 }
-  ]}
-  onPress={login}
->
-  <Text style={styles.buttonText}>Login</Text>
-</Pressable>
+        style={({ pressed }) => [styles.button, pressed && { opacity: 0.75 }]}
+        onPress={login}
+      >
+        <Text style={styles.buttonText}>Login</Text>
+      </Pressable>
 
       <Pressable style={styles.secondary} onPress={() => router.push("/signup")}>
         <Text style={styles.secondaryText}>
