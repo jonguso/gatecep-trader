@@ -96,8 +96,16 @@ export default function Markets() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Markets</Text>
+            <View style={styles.headerRow}>
+  <Text style={styles.title}>Markets</Text>
 
+  <Pressable
+    style={styles.dashboardButton}
+    onPress={() => router.replace("/(tabs)/dashboard")}
+  >
+    <Text style={styles.dashboardButtonText}>Dashboard</Text>
+  </Pressable>
+</View>
       <Text style={styles.subtitle}>NSE live market feed powered by Coach G</Text>
 
       <Text style={styles.updated}>Updated {lastUpdated}</Text>
@@ -426,6 +434,26 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 11
   },
+headerRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12
+},
+
+dashboardButton: {
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14
+},
+
+dashboardButtonText: {
+  color: "#67e8f9",
+  fontWeight: "900"
+},
   empty: {
     color: "#94a3b8",
     marginTop: 16

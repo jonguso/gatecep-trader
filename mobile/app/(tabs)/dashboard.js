@@ -165,26 +165,41 @@ export default function Dashboard() {
       const sector = h.sector || "Unknown";
       const value = Number(h.marketValue || h.value || 0);
       const profitLoss = Number(h.profitLoss || 0);
+      const changePct = Number(h.marketChangePct || h.changePct || 0);
 
-      if (!sectors[sector]) {
-        sectors[sector] = {
-          sector,
-          totalValue: 0,
-          profitLoss: 0,
-          securities: []
-        };
-      }
+if (!sectors[sector]) {
+  sectors[sector] = {
+    sector,
+    totalValue: 0,
+    profitLoss: 0,
+    changePctTotal: 0,
+    changePctCount: 0,
+    securities: []
+  };
+}
 
-      sectors[sector].totalValue += value;
-      sectors[sector].profitLoss += profitLoss;
-      sectors[sector].securities.push(h);
+sectors[sector].totalValue += value;
+sectors[sector].profitLoss += profitLoss;
+sectors[sector].changePctTotal += changePct;
+sectors[sector].changePctCount += 1;
+sectors[sector].securities.push(h);      
+
     });
 
     return Object.values(sectors)
-      .map((s) => ({
-        ...s,
-        weight: currentValue > 0 ? (s.totalValue / currentValue) * 100 : 0
-      }))
+      .map((s) => {
+  const sectorChangePct =
+    s.changePctCount > 0
+      ? s.changePctTotal / s.changePctCount
+      : 0;
+
+  return {
+    ...s,
+    sectorChangePct,
+    trend: sectorChangePct >= 0 ? "UP" : "DOWN",
+    weight: currentValue > 0 ? (s.totalValue / currentValue) * 100 : 0
+  };
+})
       .sort((a, b) => b.totalValue - a.totalValue);
   }, [holdings, currentValue]);
 
@@ -581,7 +596,16 @@ export default function Dashboard() {
                       ]}
                     />
 
-                    <Text style={styles.whiteText}>{s.sector}</Text>
+                    <Text
+  style={
+    Number(s.sectorChangePct || 0) >= 0
+      ? styles.sectorUpText
+      : styles.sectorDownText
+  }
+>
+  {Number(s.sectorChangePct || 0) >= 0 ? "▲" : "▼"} {s.sector}
+</Text>
+
                   </View>
                 </View>
 
@@ -970,6 +994,15 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     gap: 18
   },
+sectorUpText: {
+  color: "#86efac",
+  fontWeight: "900"
+},
+
+sectorDownText: {
+  color: "#fca5a5",
+  fontWeight: "900"
+},
   chartPanel: {
     backgroundColor: "#0f172a",
     borderColor: "#1e293b",

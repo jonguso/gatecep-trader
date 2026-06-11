@@ -66,8 +66,15 @@ export default function Watchlist() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <View style={styles.headerRow}>
       <Text style={styles.title}>Watchlist</Text>
-
+        <Pressable
+    style={styles.dashboardButton}
+    onPress={() => router.replace("/(tabs)/dashboard")}
+  >
+    <Text style={styles.dashboardButtonText}>Dashboard</Text>
+  </Pressable>
+</View>
       <Text style={styles.subtitle}>
         Track selected NSE stocks and Coach G signals before buying.
       </Text>
@@ -191,5 +198,26 @@ const styles = StyleSheet.create({
     color: "#67e8f9",
     textAlign: "center",
     fontWeight: "900"
-  }
+  },
+headerRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12
+},
+
+dashboardButton: {
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14
+},
+
+dashboardButtonText: {
+  color: "#67e8f9",
+  fontWeight: "900"
+}
+
 });

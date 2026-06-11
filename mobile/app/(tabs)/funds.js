@@ -226,8 +226,17 @@ export default function Funds() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Funds</Text>
+      
+      <View style={styles.headerRow}>
+  <Text style={styles.title}>Funds</Text>
 
+  <Pressable
+    style={styles.dashboardButton}
+    onPress={() => router.replace("/(tabs)/dashboard")}
+  >
+    <Text style={styles.dashboardButtonText}>Dashboard</Text>
+  </Pressable>
+</View>
       <Text style={styles.subtitle}>
         Import or enter your broker cash / ledger statement to calculate
         available cash for Coach G.
@@ -383,6 +392,26 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14
   },
+headerRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12
+},
+
+dashboardButton: {
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14
+},
+
+dashboardButtonText: {
+  color: "#67e8f9",
+  fontWeight: "900"
+},
   statusText: {
     color: "#cbd5e1",
     lineHeight: 20

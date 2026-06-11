@@ -351,8 +351,16 @@ export default function Coach() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Coach G Insights</Text>
+      <View style={styles.headerRow}>
+  <Text style={styles.title}>Coach G Insights</Text>
 
+  <Pressable
+    style={styles.dashboardButton}
+    onPress={() => router.replace("/(tabs)/dashboard")}
+  >
+    <Text style={styles.dashboardButtonText}>Dashboard</Text>
+  </Pressable>
+</View>
       <View style={styles.card}>
         <Text style={styles.section}>Coach G Portfolio Review</Text>
 
@@ -444,7 +452,7 @@ export default function Coach() {
           </Text>
         )}
       </View>
-
+       
       <Pressable
         style={styles.primary}
         onPress={() => {
@@ -454,7 +462,7 @@ export default function Coach() {
       >
         <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
       </Pressable>
-
+       
       <View style={styles.card}>
         <Text style={styles.section}>What To Avoid</Text>
         <Text style={styles.body}>
@@ -1096,6 +1104,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 16
   },
+
+headerRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12
+},
+
+dashboardButton: {
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14
+},
+
+dashboardButtonText: {
+  color: "#67e8f9",
+  fontWeight: "900"
+},
 
   resultModal: {
     backgroundColor: "#020617",

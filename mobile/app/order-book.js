@@ -32,8 +32,17 @@ export default function OrderBook() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Order Book</Text>
+      
+      <View style={styles.headerRow}>
+  <Text style={styles.title}>Order Book</Text>
 
+  <Pressable
+    style={styles.dashboardButton}
+    onPress={() => router.replace("/(tabs)/dashboard")}
+  >
+    <Text style={styles.dashboardButtonText}>Dashboard</Text>
+  </Pressable>
+</View>
       <Text style={styles.subtitle}>
         Review simulated orders before real broker execution is connected.
       </Text>
@@ -166,6 +175,26 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginBottom: 12
   },
+headerRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12
+},
+
+dashboardButton: {
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14
+},
+
+dashboardButtonText: {
+  color: "#67e8f9",
+  fontWeight: "900"
+},
   body: { color: "#cbd5e1", marginTop: 8, lineHeight: 21 },
   orderRow: {
     flexDirection: "row",

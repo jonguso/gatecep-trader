@@ -340,8 +340,16 @@ await AsyncStorage.setItem(
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Trade</Text>
+            <View style={styles.headerRow}>
+  <Text style={styles.title}>Trade</Text>
 
+  <Pressable
+    style={styles.dashboardButton}
+    onPress={() => router.replace("/(tabs)/dashboard")}
+  >
+    <Text style={styles.dashboardButtonText}>Dashboard</Text>
+  </Pressable>
+</View>
       <Text style={styles.subtitle}>
   Buy or sell securities using your available cash and portfolio holdings.
 </Text>
@@ -666,6 +674,27 @@ warningBox: {
 
 warningTitle: {
   color: "#fca5a5",
+  fontWeight: "900"
+},
+
+headerRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12
+},
+
+dashboardButton: {
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14
+},
+
+dashboardButtonText: {
+  color: "#67e8f9",
   fontWeight: "900"
 },
 

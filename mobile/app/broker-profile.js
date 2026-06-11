@@ -123,8 +123,16 @@ await AsyncStorage.setItem(
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Broker Profile</Text>
+             <View style={styles.headerRow}>
+  <Text style={styles.title}>Broker Profile</Text>
 
+  <Pressable
+    style={styles.dashboardButton}
+    onPress={() => router.replace("/(tabs)/dashboard")}
+  >
+    <Text style={styles.dashboardButtonText}>Dashboard</Text>
+  </Pressable>
+</View>
       <Text style={styles.subtitle}>
         This does not connect to your broker yet. It helps Gatecep match your
         uploaded valuation or statement to the correct broker profile.
@@ -314,6 +322,26 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginTop: 12
   },
+headerRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12
+},
+
+dashboardButton: {
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 14
+},
+
+dashboardButtonText: {
+  color: "#67e8f9",
+  fontWeight: "900"
+},
   secondaryText: { color: "#67e8f9", textAlign: "center", fontWeight: "900" },
   backLink: { color: "#94a3b8", textAlign: "center", marginTop: 24 }
 });
