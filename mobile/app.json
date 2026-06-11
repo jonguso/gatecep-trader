@@ -1,24 +1,18 @@
 {
   "expo": {
-    "name": "Gatecep Trader",
-    "slug": "gatecep-trader",
+    "name": "GateCEP",
+    "slug": "gatecep",
     "scheme": "gatecep",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "plugins": [
-      "expo-router",
-      "expo-font",
-      "expo-secure-store"
-    ],
     "android": {
-      "package": "com.gatecepproject.gateceptrader"
+      "package": "com.gatecep.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.gatecep.app"
     },
     "extra": {
-      "router": {},
       "eas": {
-        "projectId": "e9704f51-aef9-4066-8a73-5d51f212bbd4"
+        "projectId": "8c412c28-c7a5-4541-9484-7469917a1e8c"
       }
-    },
-    "owner": "gatecep-mob"
+    }
   }
 }

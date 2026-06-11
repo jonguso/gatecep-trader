@@ -12,7 +12,17 @@ const DEFAULT_WATCHLIST = [
   { symbol: "EABL" },
   { symbol: "BAT" },
   { symbol: "KEGN" },
-  { symbol: "KQ" }
+  { symbol: "KQ" },
+  { symbol: "KPC" },
+  { symbol: "KPLC" },
+  { symbol: "SBIC" },
+  { symbol: "SMWF" },
+  { symbol: "SCBK" },
+  { symbol: "GLD" },
+  { symbol: "ABSA" },
+  { symbol: "KNRE" }
+  { symbol: "IMH" },
+  { symbol: "DTK" }
 ];
 
 export function getDefaultWatchlist() {

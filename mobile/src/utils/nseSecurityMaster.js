@@ -28,14 +28,6 @@ export const nseSecurityMaster = {
     price: 149.00
   },
 
-NCBA: {
-    symbol: "NCBA",
-    name: "NCBA Group PLC",
-    sector: "Banking",
-    price: 88.00
-  },
-
-
   KCB: {
     symbol: "KCB",
     name: "KCB Group PLC",
@@ -56,15 +48,8 @@ NCBA: {
     sector: "Banking",
     price: 31.60
   },
-
-  NCBA: {
-    symbol: "NCBA",
-    name: "NCBA Group PLC",
-    sector: "Banking",
-    price: 88.00
-  },
-
-KQ: {
+  
+ KQ: {
     symbol: "KQ",
     name: "Kenya Airways",
     sector: "Comm. and Services",
@@ -121,7 +106,7 @@ KPC: {
   symbol: "KPC",
   name: "Kenya Pipeline Company PLC",
   sector: "Energy and Petroleum",
-  price: 9.20
+  price: 9.10
 },
 
 KPLC:{
@@ -147,12 +132,13 @@ SMWF:{
  sector:"ETF",
  price: 940.00
 },
-  SCBK:{
-    symbol:"SCBK",
-    name:"Standard Chartered Bank Kenya Ltd",
-    sector:"Banking",
-    price: 336.00
-  }
+
+SCBK:{
+ symbol:"SCBK",
+ name:"Standard Chartered Bank Kenya Ltd",
+ sector:"Banking",
+ price: 336.00
+}
 
 };
 

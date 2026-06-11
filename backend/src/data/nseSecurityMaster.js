@@ -28,14 +28,6 @@ export const nseSecurityMaster = {
     price: 149.00
   },
 
-NCBA: {
-    symbol: "NCBA",
-    name: "NCBA Group PLC",
-    sector: "Banking",
-    price: 88.00
-  },
-
-
   KCB: {
     symbol: "KCB",
     name: "KCB Group PLC",
@@ -56,14 +48,7 @@ NCBA: {
     sector: "Banking",
     price: 31.60
   },
-
-  NCBA: {
-    symbol: "NCBA",
-    name: "NCBA Group PLC",
-    sector: "Banking",
-    price: 88.00
-  },
-
+  
 KQ: {
     symbol: "KQ",
     name: "Kenya Airways",
