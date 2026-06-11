@@ -2,198 +2,156 @@ import {
   nseSecurityMaster,
   applySecurityMaster
 } from "../../data/nseSecurityMaster.js";
+import { nseEodPrices } from "../../data/nseEodPrices.js";
 
-function rand(min, max) {
-  return Math.random() * (max - min) + min;
+function getProviderName() {
+  return String(process.env.MARKET_DATA_PROVIDER || "LOCAL_EOD")
+    .trim()
+    .toUpperCase();
 }
 
-function round2(value) {
-  return Number(Number(value || 0).toFixed(2));
+function buildLocalEodPrices() {
+  const priceMap = new Map();
+
+  nseEodPrices.data.forEach((row) => {
+    const mastered = applySecurityMaster(row);
+    priceMap.set(mastered.symbol, mastered);
+  });
+
+  const data = Object.values(nseSecurityMaster).map((security) => {
+    const eod = priceMap.get(security.symbol);
+
+    const price = Number(eod?.price || security.price || 0);
+    const prevClose = Number(eod?.prevClose || security.price || price || 0);
+    const change = Number((price - prevClose).toFixed(2));
+
+    const changePct =
+      prevClose > 0
+        ? Number(((change / prevClose) * 100).toFixed(2))
+        : 0;
+
+    const volume = Number(eod?.volume || 0);
+
+    return applySecurityMaster({
+      symbol: security.symbol,
+      name: security.name,
+      sector: security.sector,
+      price,
+      lastPrice: price,
+      prevClose,
+      open: prevClose,
+      high: Math.max(price, prevClose),
+      low: Math.min(price, prevClose),
+      change,
+      changePct,
+      volume,
+      turnover: Math.round(price * volume),
+      bid: Number((price * 0.995).toFixed(2)),
+      ask: Number((price * 1.005).toFixed(2)),
+      hasLivePrice: false,
+      priceSource: "LOCAL_EOD",
+      marketDate: nseEodPrices.marketDate
+    });
+  });
+
+  return {
+    provider: "LOCAL_EOD",
+    generatedAt: new Date().toISOString(),
+    marketDate: nseEodPrices.marketDate,
+    count: data.length,
+    data
+  };
 }
 
-const MARKET_BASE_PRICES = {
-  ABSA: 29.00,
-  AMAC: 102.00,
-  BAT: 520.00,
-  BKG: 52.50,
-  BOC: 178.25,
-  BRIT: 12.50,
-  CARB: 29.50,
-  CGEN: 79.25,
-  CIC: 4.16,
-  COOP: 31.60,
-  DTK: 149.00,
-  EABL: 248.00,
-  EQT: 75.25,
-  GLD: 5650.00,
-  HFCK: 9.70,
-  IMH: 50.50,
-  KCB: 67.75,
-  KEGN: 9.12,
-  KPC: 9.20,
-  KPLC: 16.10,
-  KNRE: 3.34,
-  KQ: 5.88,
-  NCBA: 88.00,
-  NSE: 18.75,
-  SBIC: 270.00,
-  SCBK: 336.00,
-  SCOM: 30.60,
-  SMWF: 940.00,
-  TOTL: 46.00
-};
+async function loadAdapter(provider) {
+  if (provider === "SIMULATED") {
+    const module = await import("./SimulatedDataAdapter.js");
+    return module.default;
+  }
 
-function priceFor(symbol) {
+  if (provider === "DELAYED_PUBLIC") {
+    const module = await import("./DelayedPublicDataAdapter.js");
+    return module.default;
+  }
 
-  const base =
-    MARKET_BASE_PRICES[
-      String(symbol || "")
-      .trim()
-      .toUpperCase()
-    ] || 25;
+  if (provider === "LICENSED_NSE") {
+    const module = await import("./LicensedNseVendorAdapter.js");
+    return module.default;
+  }
 
-  const movement =
-    (
-      (
-        symbol.charCodeAt(0) % 5
-      ) - 2
-    ) * 0.35;
-
-  return round2(
-    base + movement
-  );
-
+  return null;
 }
 
 class MarketDataGateway {
-
   async getPrices() {
+    const provider = getProviderName();
 
-    const securities =
-      Object.values(
-        nseSecurityMaster
-      );
+    if (provider === "LOCAL_EOD") {
+      return buildLocalEodPrices();
+    }
 
-    const data =
-      securities.map(
-        (security)=>{
+    const adapter = await loadAdapter(provider);
 
-      const price =
-        priceFor(
-          security.symbol
-        );
+    if (!adapter?.getPrices) {
+      return buildLocalEodPrices();
+    }
 
-      const changePct =
-        round2(
-          rand(-4,4)
-        );
-
-      const prevClose =
-        price /
-        (
-          1 +
-          changePct/100
-        );
-
-      const volume =
-        Math.floor(
-          rand(
-            10000,
-            8000000
-          )
-        );
-
-      const row = {
-
-        symbol:
-          security.symbol,
-
-        name:
-          security.name,
-
-        sector:
-          security.sector,
-
-        price,
-
-        lastPrice:
-          price,
-
-        open:
-          round2(
-            prevClose*1.01
-          ),
-
-        high:
-          round2(
-            price*1.03
-          ),
-
-        low:
-          round2(
-            price*0.97
-          ),
-
-        prevClose:
-          round2(
-            prevClose
-          ),
-
-        change:
-          round2(
-            price-prevClose
-          ),
-
-        changePct,
-
-        volume,
-
-        turnover:
-          Math.round(
-            price*
-            volume
-          ),
-
-        bid:
-          round2(
-            price*0.995
-          ),
-
-        ask:
-          round2(
-            price*1.005
-          ),
-
-        hasLivePrice:
-          true
-
-      };
-
-      return applySecurityMaster(
-        row
-      );
-
-    });
-
-    return {
-
-      provider:
-        "gatecep-generated-nse-feed",
-
-      generatedAt:
-        new Date()
-        .toISOString(),
-
-      count:
-        data.length,
-
-      data
-
-    };
-
+    return await adapter.getPrices();
   }
 
+  async getCandles(symbol, interval = "1m") {
+    const provider = getProviderName();
+    const adapter = await loadAdapter(provider);
+
+    if (adapter?.getCandles) {
+      return await adapter.getCandles(symbol, interval);
+    }
+
+    return {
+      provider: "LOCAL_EOD",
+      symbol,
+      interval,
+      data: []
+    };
+  }
+
+  async getMarketSummary() {
+    const provider = getProviderName();
+
+    if (provider !== "LOCAL_EOD") {
+      const adapter = await loadAdapter(provider);
+
+      if (adapter?.getMarketSummary) {
+        return await adapter.getMarketSummary();
+      }
+    }
+
+    const prices = buildLocalEodPrices();
+
+    const rows = prices.data.map((row) => ({
+      ...row,
+      changePct: Number(row.changePct || 0),
+      volume: Number(row.volume || 0)
+    }));
+
+    return {
+      provider: "LOCAL_EOD",
+      marketStatus: "EOD",
+      marketDate: prices.marketDate,
+      gainers: rows
+        .slice()
+        .sort((a, b) => b.changePct - a.changePct)
+        .slice(0, 5),
+      losers: rows
+        .slice()
+        .sort((a, b) => a.changePct - b.changePct)
+        .slice(0, 5),
+      active: rows
+        .slice()
+        .sort((a, b) => b.volume - a.volume)
+        .slice(0, 5)
+    };
+  }
 }
 
-export const marketDataGateway =
-  new MarketDataGateway();
+export const marketDataGateway = new MarketDataGateway();
