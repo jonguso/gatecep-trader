@@ -20,6 +20,13 @@ export const nseSecurityMaster = {
  price: 50.50
 },
 
+ NCBA: {
+    symbol: "NCBA",
+    name: "NCBA Group PLC",
+    sector: "Banking",
+    price: 88.00
+  },
+
   DTK: {
     symbol: "DTK",
     aliases: ["DTB"],
