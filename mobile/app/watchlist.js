@@ -7,8 +7,7 @@ import {
   View
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import {
   generateWatchlistSignals,
   getDefaultWatchlist
@@ -93,7 +92,7 @@ export default function Watchlist() {
         <Text style={styles.secondaryText}>Reset Default Watchlist</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={() => router.replace("/coach")}>
+      <Pressable style={styles.secondary} onPress={() => router.replace("/coach-insights")}>
         <Text style={styles.secondaryText}>Back to Coach G Insights</Text>
       </Pressable>
     </ScrollView>
