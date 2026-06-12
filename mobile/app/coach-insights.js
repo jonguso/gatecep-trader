@@ -12,7 +12,9 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import ActiveUserBanner from "../src/components/ActiveUserBanner";
 import { buildCoachPortfolioReview } from "../src/portfolio/coachPortfolioReview";
+import { buildPerformanceAttribution } from "../src/portfolio/performanceAttribution";
 import {
   userGetItem,
   userSetItem
@@ -36,6 +38,7 @@ export default function Coach() {
   const [goalOpen, setGoalOpen] = useState(false);
   const [scenarioOpen, setScenarioOpen] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [attribution, setAttribution] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -44,30 +47,54 @@ export default function Coach() {
   );
 
   async function load() {
-    const savedPortfolio = await loadPortfolio({ revalue: true });
-    const contextRaw = await userGetItem("coachContext");
-    const txUploadedRaw = await AsyncStorage.getItem("gatecepTransactionsUploaded");
-    const txRaw = await AsyncStorage.getItem("gatecepTransactionHistory");
-    const historyRaw = await AsyncStorage.getItem("gatecepRecommendationHistory");
+  const savedPortfolio =
+    await loadPortfolio({ revalue: true });
 
-    setPortfolio(savedPortfolio);
+  const contextRaw =
+    await userGetItem("coachContext");
 
-    if (contextRaw) {
-      setDashboardContext(JSON.parse(contextRaw));
-    }
+  const txUploadedRaw =
+    await userGetItem("transactionsUploaded");
 
-    setTransactionsUploaded(txUploadedRaw === "true");
+  const scopedTxRaw =
+    await userGetItem("transactionHistory");
 
-    setTransactions(txRaw ? JSON.parse(txRaw) : []);
-    setRecommendationHistory(historyRaw ? JSON.parse(historyRaw) : []);
+  const historyRaw =
+    await userGetItem("recommendationHistory");
+
+  const scopedTransactions =
+    scopedTxRaw ? JSON.parse(scopedTxRaw) : [];
+
+  setPortfolio(savedPortfolio);
+  setTransactions(scopedTransactions);
+
+  setAttribution(
+    buildPerformanceAttribution(
+      savedPortfolio,
+      scopedTransactions
+    )
+  );
+
+  if (contextRaw) {
+    setDashboardContext(JSON.parse(contextRaw));
   }
+
+  setTransactionsUploaded(
+    txUploadedRaw === "true"
+  );
+
+  setRecommendationHistory(
+    historyRaw ? JSON.parse(historyRaw) : []
+  );
+}
 
   const value = useMemo(() => {
     return portfolio.reduce(
       (sum, x) => sum + Number(x.marketValue || x.value || 0),
       0
     );
-  }, [portfolio]);
+  }, 
+[portfolio]);
 
   const sectorRows = useMemo(() => {
     const grouped = {};
@@ -357,7 +384,7 @@ export default function Coach() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
   <Text style={styles.title}>Coach G Insights</Text>
-   <ActiveUserBanner />
+   
   <Pressable
     style={styles.dashboardButton}
     onPress={() => router.replace("/(tabs)/dashboard")}
@@ -366,6 +393,7 @@ export default function Coach() {
   </Pressable>
 
   </View>
+<ActiveUserBanner />
       <View style={styles.card}>
         <Text style={styles.section}>Coach G Portfolio Review</Text>
 
@@ -441,6 +469,57 @@ export default function Coach() {
           <Text key={index} style={styles.body}>• {item}</Text>
         ))}
       </View>
+
+       <View style={styles.card}>
+  <Text style={styles.section}>Performance Attribution</Text>
+
+  <Text style={styles.body}>
+    Best performer:{" "}
+    {attribution?.bestPerformer
+      ? `${attribution.bestPerformer.symbol} (${Number(
+          attribution.bestPerformer.profitLossPct || 0
+        ).toFixed(2)}%)`
+      : "N/A"}
+  </Text>
+
+  <Text style={styles.body}>
+    Worst performer:{" "}
+    {attribution?.worstPerformer
+      ? `${attribution.worstPerformer.symbol} (${Number(
+          attribution.worstPerformer.profitLossPct || 0
+        ).toFixed(2)}%)`
+      : "N/A"}
+  </Text>
+
+  <Text style={styles.body}>
+    Largest position:{" "}
+    {attribution?.largestPosition
+      ? `${attribution.largestPosition.symbol} - KES ${money(
+          attribution.largestPosition.marketValue ||
+            attribution.largestPosition.value
+        )}`
+      : "N/A"}
+  </Text>
+
+  <Text style={styles.body}>
+    Most accumulated:{" "}
+    {attribution?.mostAccumulated
+      ? `${attribution.mostAccumulated.symbol} (${attribution.mostAccumulated.buys} buys)`
+      : "N/A"}
+  </Text>
+
+  <Text style={styles.body}>
+    Most traded:{" "}
+    {attribution?.mostTraded
+      ? `${attribution.mostTraded.symbol} (${attribution.mostTraded.trades} trades)`
+      : "N/A"}
+  </Text>
+
+  <Text style={styles.body}>
+    Estimated annual dividend income: KES{" "}
+    {money(attribution?.estimatedDividendIncome || 0)}
+  </Text>
+</View>
 
       <View style={styles.card}>
         <Text style={styles.section}>Latest Saved Strategy</Text>
