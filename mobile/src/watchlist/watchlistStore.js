@@ -1,15 +1,15 @@
 import { userGetItem, userSetItem } from "../auth/userStorage";
 
 export const WATCHLIST_NAMES = [
-  "My WatchList 1",
-  "My WatchList 2",
-  "My WatchList 3"
+  "Dividend Income",
+  "Capital Growth",
+  "Balanced Growth"
 ];
 
 export const DEFAULT_WATCHLISTS = {
-  "My WatchList 1": ["SCOM", "KCB", "BAT", "EABL", "COOP"],
-  "My WatchList 2": [],
-  "My WatchList 3": []
+  "Dividend Income": ["BAT", "EABL", "SCBK", "KCB", "COOP"],
+  "Capital Growth": ["SCOM", "EABL", "KCB", "ABSA", "KEGN"],
+  "Balanced Growth": ["SCOM", "KCB", "COOP", "EABL", "SMWF"]
 };
 
 export async function loadWatchlists() {
