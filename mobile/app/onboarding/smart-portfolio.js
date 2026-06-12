@@ -179,10 +179,6 @@ export default function SmartPortfolio() {
   async function continueToDashboard() {
     await savePortfolio(starterHoldings);
 
-    await userGetItem("availableCash", String(cashReserve));
-    await AsyncStorage.setItem("gatecepStatementUploaded", "true");
-    await AsyncStorage.setItem("gatecepOnboardingCompleted", "true");
-
     await userSetItem("availableCash", String(cashReserve));
     await userSetItem("statementUploaded", "true");
     await userSetItem("onboardingCompleted", "true");

@@ -15,6 +15,7 @@ import {
   getCurrentSession,
   saveSession
 } from "../src/auth/authStore";
+import { userGetItem } from "../src/auth/userStorage";
 
 export default function Login() {
   const [form, setForm] = useState({
@@ -26,22 +27,20 @@ export default function Login() {
     checkSession();
   }, []);
 
-  async function routeAfterLogin(userId) {
-    const completed = await AsyncStorage.getItem(
-      `gatecep:${userId}:onboardingCompleted`
-    );
+ async function routeAfterLogin() {
+  const completed = await userGetItem("onboardingCompleted");
 
-    router.replace(
-      completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
-    );
-  }
+  router.replace(
+    completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
+  );
+}
 
   async function checkSession() {
     const session = await getCurrentSession();
 
     if (session?.loggedIn && session?.userId) {
       await AsyncStorage.setItem("gatecepIsLoggedIn", "true");
-      await routeAfterLogin(session.userId);
+      await routeAfterLogin();
     }
   }
 
