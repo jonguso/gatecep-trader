@@ -48,7 +48,14 @@ const sections = [
     title: "Trade",
     desc: "Buy or sell securities using available cash.",
     route: "/trade"
-  }
+  },
+
+{
+  title: "Sync Center",
+  desc: "Upload and sync holdings, cash, and transaction history.",
+  route: "/portfolio-sync-center"
+}
+
 ];
 
 export default function PortfolioCommandCenter() {

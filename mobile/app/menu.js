@@ -24,6 +24,12 @@ const items = [
   route: "/my-profile"
 },
 
+{
+  title: "Portfolio Sync Center",
+  detail: "Sync holdings, cash, statements, and transaction history",
+  route: "/portfolio-sync-center"
+},
+
   {
     title: "Upload Center",
     detail: "Upload valuation, statement, holdings, and order history",

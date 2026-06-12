@@ -121,6 +121,13 @@ export default function MyProfile() {
         </Pressable>
       </View>
 
+       <Pressable
+  style={styles.secondary}
+  onPress={() => router.push("/portfolio-sync-center")}
+>
+  <Text style={styles.secondaryText}>Open Sync Center</Text>
+</Pressable>
+
       <Pressable style={styles.logout} onPress={handleLogout}>
         <Text style={styles.logoutText}>Logout</Text>
       </Pressable>
