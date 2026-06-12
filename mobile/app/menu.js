@@ -17,6 +17,13 @@ const items = [
     detail: "Portfolio health and Coach G summary",
     route: "/dashboard"
   },
+
+   {
+  title: "My Profile",
+  detail: "View account, investor profile, broker, and cash details",
+  route: "/my-profile"
+},
+
   {
     title: "Upload Center",
     detail: "Upload valuation, statement, holdings, and order history",
