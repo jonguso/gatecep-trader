@@ -10,6 +10,7 @@ import { router, useFocusEffect } from "expo-router";
 import { userGetItem } from "../src/auth/userStorage";
 import { loadPortfolio } from "../src/portfolio/portfolioStore";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
 export default function PortfolioSyncCenter() {
   const [cash, setCash] = useState(0);
@@ -18,6 +19,7 @@ export default function PortfolioSyncCenter() {
   const [portfolioUploaded, setPortfolioUploaded] = useState(false);
   const [cashUploaded, setCashUploaded] = useState(false);
   const [transactionsUploaded, setTransactionsUploaded] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -31,6 +33,8 @@ export default function PortfolioSyncCenter() {
     const portfolioUploadedRaw = await userGetItem("statementUploaded");
     const cashUploadedRaw = await userGetItem("cashStatementUploaded");
     const transactionsUploadedRaw = await userGetItem("transactionsUploaded");
+    const status = await buildSyncStatus();
+    setSyncStatus(status);
 
     setCash(Number(cashRaw || 0));
     setHoldingsCount(holdings.length);
@@ -79,6 +83,41 @@ export default function PortfolioSyncCenter() {
         <StatusRow label="Cash Statement" done={cashUploaded} />
         <StatusRow label="Transaction History" done={transactionsUploaded} />
       </View>
+
+       <View style={styles.card}>
+  <Text style={styles.cardTitle}>Portfolio Sync Status</Text>
+
+  <StatusRow
+    label="Broker"
+    done={syncStatus?.brokerConnected}
+    value={syncStatus?.broker || "No broker"}
+  />
+
+  <StatusRow
+    label="Portfolio Holdings"
+    done={Number(syncStatus?.holdingsCount || 0) > 0}
+    value={`${syncStatus?.holdingsCount || 0} holdings`}
+  />
+
+  <StatusRow
+    label="Transactions"
+    done={Number(syncStatus?.transactionCount || 0) > 0}
+    value={`${syncStatus?.transactionCount || 0} records`}
+  />
+
+  <StatusRow
+    label="Available Cash"
+    done={Number(syncStatus?.availableCash || 0) > 0}
+    value={`KES ${money(syncStatus?.availableCash || 0)}`}
+  />
+
+  <Text style={styles.syncNote}>
+    Last updated:{" "}
+    {syncStatus?.updatedAt
+      ? new Date(syncStatus.updatedAt).toLocaleString()
+      : "N/A"}
+  </Text>
+</View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Upload & Sync</Text>
@@ -136,10 +175,15 @@ function Metric({ label, value }) {
   );
 }
 
-function StatusRow({ label, done }) {
+
+function StatusRow({ label, done, value }) {
   return (
     <View style={styles.statusRow}>
-      <Text style={styles.statusLabel}>{label}</Text>
+      <View>
+        <Text style={styles.statusLabel}>{label}</Text>
+        {value ? <Text style={styles.statusValue}>{value}</Text> : null}
+      </View>
+
       <Text style={done ? styles.done : styles.missing}>
         {done ? "SYNCED" : "MISSING"}
       </Text>
@@ -301,6 +345,19 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 16
   },
+
+statusValue: {
+  color: "#94a3b8",
+  marginTop: 4,
+  fontSize: 12
+},
+
+syncNote: {
+  color: "#64748b",
+  marginTop: 14,
+  fontSize: 12
+},
+
   primaryText: {
     color: "white",
     textAlign: "center",
