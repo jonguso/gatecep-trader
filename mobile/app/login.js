@@ -1,20 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
-  Text,
-  TextInput,
+  Image,
   Pressable,
-  StyleSheet,
   ScrollView,
-  Image
+  StyleSheet,
+  Text,
+  TextInput
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import {
-  buildUserId,
-  getCurrentSession,
-  saveSession
-} from "../src/auth/authStore";
+import { saveSession } from "../src/auth/authStore";
 import { userGetItem } from "../src/auth/userStorage";
 
 export default function Login() {
@@ -23,25 +19,12 @@ export default function Login() {
     password: ""
   });
 
-  useEffect(() => {
-    checkSession();
-  }, []);
+  async function routeAfterLogin() {
+    const completed = await userGetItem("onboardingCompleted");
 
- async function routeAfterLogin() {
-  const completed = await userGetItem("onboardingCompleted");
-
-  router.replace(
-    completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
-  );
-}
-
-  async function checkSession() {
-    const session = await getCurrentSession();
-
-    if (session?.loggedIn && session?.userId) {
-      await AsyncStorage.setItem("gatecepIsLoggedIn", "true");
-      await routeAfterLogin();
-    }
+    router.replace(
+      completed === "true" ? "/(tabs)/dashboard" : "/onboarding/name"
+    );
   }
 
   async function login() {
@@ -57,12 +40,12 @@ export default function Login() {
       const normalizedUser = enteredUser.toLowerCase();
 
       if (normalizedUser === "gatecep" && enteredPass === "demo") {
-        const session = await saveSession({
+        await saveSession({
           username: "gatecep",
           demo: true
         });
-     console.log("SESSION", session);
-        await routeAfterLogin(session.userId);
+
+        await routeAfterLogin();
         return;
       }
 
@@ -75,17 +58,17 @@ export default function Login() {
           String(u.password || "").trim() === enteredPass
       );
 
-      if (user) {
-        const session = await saveSession({
-          username: user.username,
-          email: user.email
-        });
-
-        await routeAfterLogin(session.userId);
+      if (!user) {
+        Alert.alert("Login Failed", "Invalid username or password.");
         return;
       }
 
-      Alert.alert("Login Failed", "Invalid username or password.");
+      await saveSession({
+        username: user.username,
+        email: user.email
+      });
+
+      await routeAfterLogin();
     } catch (error) {
       Alert.alert("Login Error", error.message || "Login failed.");
     }
@@ -111,6 +94,7 @@ export default function Login() {
         value={form.username}
         onChangeText={(value) => setForm({ ...form, username: value })}
         autoCapitalize="none"
+        autoCorrect={false}
         style={styles.input}
       />
 
