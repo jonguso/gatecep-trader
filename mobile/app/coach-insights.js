@@ -357,14 +357,15 @@ export default function Coach() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
   <Text style={styles.title}>Coach G Insights</Text>
-
+   <ActiveUserBanner />
   <Pressable
     style={styles.dashboardButton}
     onPress={() => router.replace("/(tabs)/dashboard")}
   >
     <Text style={styles.dashboardButtonText}>Dashboard</Text>
   </Pressable>
-</View>
+
+  </View>
       <View style={styles.card}>
         <Text style={styles.section}>Coach G Portfolio Review</Text>
 

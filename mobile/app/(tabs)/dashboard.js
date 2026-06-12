@@ -30,7 +30,7 @@ import {
   getDefaultWatchlist
 } from "../../src/utils/watchlistSignals";
 import { buildWatchlistScores } from "../../src/watchlist/watchlistScoring";
-
+import ActiveUserBanner from "../../src/components/ActiveUserBanner";
 import FloatingCoachG from "../../components/FloatingCoachG";
 
 const COLORS = [
@@ -339,6 +339,7 @@ sectors[sector].securities.push(h);
     timestamp: new Date().toISOString()
   })
 );
+<ActiveUserBanner />
 
     router.push("/coach-insights");
   }
@@ -371,7 +372,7 @@ sectors[sector].securities.push(h);
   Logged in as {session?.username || session?.userId || "Guest"}
 </Text>
       <Text style={styles.timestamp}>Updated {lastUpdated}</Text>
-
+      <ActiveUserBanner />
       <View style={styles.summaryOuter}>
         <View style={styles.summaryTopPlain}>
           <PlainMetric

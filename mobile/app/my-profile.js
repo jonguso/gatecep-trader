@@ -15,6 +15,7 @@ import {
   userGetItem
 } from "../src/auth/userStorage";
 import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import ActiveUserBanner from "../src/components/ActiveUserBanner";
 
 export default function MyProfile() {
   const [session, setSession] = useState(null);
@@ -58,7 +59,7 @@ export default function MyProfile() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>My Profile</Text>
-
+        
         <Pressable
           style={styles.dashboardButton}
           onPress={() => router.replace("/(tabs)/dashboard")}
@@ -70,7 +71,7 @@ export default function MyProfile() {
       <Text style={styles.subtitle}>
         Account, investor profile, broker status, and portfolio summary.
       </Text>
-
+      <ActiveUserBanner />
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Account</Text>
 

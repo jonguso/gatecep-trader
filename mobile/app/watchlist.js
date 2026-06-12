@@ -18,6 +18,8 @@ import {
   userGetItem,
   userSetItem
 } from "../src/auth/userStorage";
+import ActiveUserBanner from "../src/components/ActiveUserBanner";
+
 
 
 export default function Watchlist() {
@@ -73,6 +75,7 @@ export default function Watchlist() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
       <Text style={styles.title}>Watchlist</Text>
+      
         <Pressable
     style={styles.dashboardButton}
     onPress={() => router.replace("/(tabs)/dashboard")}
@@ -83,7 +86,7 @@ export default function Watchlist() {
       <Text style={styles.subtitle}>
         Track selected NSE stocks and Coach G signals before buying.
       </Text>
-
+       <ActiveUserBanner />
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Coach G Signals</Text>
 
