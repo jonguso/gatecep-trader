@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { router } from "expo-router";
 import {
   ActivityIndicator,
   Pressable,
@@ -166,44 +167,51 @@ export default function Markets() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
-        <Text style={styles.subtitle}>NSE market feed powered by Gatecep</Text>
-        </Text>
+  {filter === "nse" ? "NSE Market Feed" : "Filtered Market Feed"}
+</Text>
 
         {visibleStocks.map((item, index) => {
           const change = Number(item.change || 0);
           const changePct = Number(item.changePct || 0);
           const positive = changePct >= 0;
 
-          return (
-            <View key={`${item.symbol}-${index}`} style={styles.stockRow}>
-  <View style={styles.logoCircle}>
-    <Text style={styles.logoText}>
-      {String(item.symbol || "?").slice(0, 2)}
-    </Text>
-  </View>
-              <View style={styles.stockLeft}>
-                <Text style={styles.symbol}>{item.symbol}</Text>
+      return (
+  <Pressable
+    key={`${item.symbol}-${index}`}
+    style={styles.stockRow}
+    onPress={() => router.push(`/security/${item.symbol}`)}
+  >
+    <View style={styles.logoCircle}>
+      <Text style={styles.logoText}>
+        {String(item.symbol || "?").slice(0, 2)}
+      </Text>
+    </View>
 
-                <Text style={styles.name}>
-                  {item.name || item.companyName || item.symbol}
-                </Text>
+    <View style={styles.stockLeft}>
+      <Text style={styles.symbol}>{item.symbol}</Text>
 
-                <Text style={styles.sector}>{item.sector || "NSE"}</Text>
-              </View>
+      <Text style={styles.name}>
+        {item.name || item.companyName || item.symbol}
+      </Text>
 
-              <View style={styles.stockRight}>
-                <Text style={styles.price}>KES {money(item.price || item.lastPrice)}</Text>
+      <Text style={styles.sector}>{item.sector || "NSE"}</Text>
+    </View>
 
-                <Text style={positive ? styles.green : styles.red}>
-                  {positive ? "▲" : "▼"} {pct(changePct)}%
-                </Text>
+    <View style={styles.stockRight}>
+      <Text style={styles.price}>
+        KES {money(item.price || item.lastPrice)}
+      </Text>
 
-                <Text style={styles.turnover}>
-                  KES {money(item.turnover || item.value || 0)}
-                </Text>
-              </View>
-            </View>
-          );
+      <Text style={positive ? styles.green : styles.red}>
+        {positive ? "▲" : "▼"} {pct(changePct)}%
+      </Text>
+
+      <Text style={styles.turnover}>
+        KES {money(item.turnover || item.value || 0)}
+      </Text>
+    </View>
+  </Pressable>
+);
         })}
 
         {visibleStocks.length === 0 && (
