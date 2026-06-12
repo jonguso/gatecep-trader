@@ -362,11 +362,13 @@ sectors[sector].securities.push(h);
 
         <Text style={styles.title}>Dashboard</Text>
 
-        <View style={styles.icon}>
-          <Text>🔔</Text>
-        </View>
-      </View>
-
+        <Pressable
+  style={styles.bellButton}
+  onPress={() => router.push("/alerts")}
+>
+  <Text style={styles.bell}>🔔</Text>
+</Pressable>
+ </View>       
       <Text style={styles.subtitle}>Gatecep investor command center</Text>
       <Text style={styles.userLine}>
   Logged in as {session?.username || session?.userId || "Guest"}
