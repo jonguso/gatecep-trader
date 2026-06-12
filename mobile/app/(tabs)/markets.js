@@ -8,6 +8,7 @@ import {
   View
 } from "react-native";
 
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function Markets() {
@@ -24,7 +25,7 @@ export default function Markets() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_URL}/market/prices`);
+      const res = await fetch(`${API_URL}/prices`);
       const data = await res.json();
 
       const list = Array.isArray(data)
@@ -165,7 +166,7 @@ export default function Markets() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
-          {filter === "nse" ? "NSE Live Feed" : "Live Feed"}
+        <Text style={styles.subtitle}>NSE market feed powered by Gatecep</Text>
         </Text>
 
         {visibleStocks.map((item, index) => {
@@ -175,6 +176,11 @@ export default function Markets() {
 
           return (
             <View key={`${item.symbol}-${index}`} style={styles.stockRow}>
+  <View style={styles.logoCircle}>
+    <Text style={styles.logoText}>
+      {String(item.symbol || "?").slice(0, 2)}
+    </Text>
+  </View>
               <View style={styles.stockLeft}>
                 <Text style={styles.symbol}>{item.symbol}</Text>
 
@@ -387,13 +393,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 10
   },
+
   stockRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    borderBottomColor: "#1e293b",
-    borderBottomWidth: 1
-  },
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingVertical: 14,
+  borderBottomColor: "#1e293b",
+  borderBottomWidth: 1
+},
+
   stockLeft: {
     flex: 1
   },
@@ -457,5 +466,24 @@ dashboardButtonText: {
   empty: {
     color: "#94a3b8",
     marginTop: 16
-  }
+  },
+
+logoCircle: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: "#1e293b",
+  borderColor: "#334155",
+  borderWidth: 1,
+  justifyContent: "center",
+  alignItems: "center",
+  marginRight: 12
+},
+
+logoText: {
+  color: "#67e8f9",
+  fontWeight: "900",
+  fontSize: 13
+},
+
 });
