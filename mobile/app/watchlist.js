@@ -14,6 +14,11 @@ import {
   getDefaultWatchlist
 } from "../src/utils/watchlistSignals";
 import { buildWatchlistScores } from "../src/watchlist/watchlistScoring";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
+
 
 export default function Watchlist() {
   const [items, setItems] = useState([]);
@@ -34,7 +39,7 @@ export default function Watchlist() {
   );
 
   async function load() {
-  const raw = await AsyncStorage.getItem("gatecepWatchlist");
+  const raw = await userGetItem("watchlist");
   const saved = raw ? JSON.parse(raw) : getDefaultWatchlist();
 
   const marketRows = await fetchWatchlistMarketRows(saved);
@@ -49,7 +54,7 @@ export default function Watchlist() {
   const marketRows = await fetchWatchlistMarketRows(defaults);
   const generated = generateWatchlistSignals(marketRows);
 
-  await AsyncStorage.setItem("gatecepWatchlist", JSON.stringify(defaults));
+  await userSetItem("watchlist", JSON.stringify(defaults));
 
   setItems(defaults);
   setScoredSignals(buildWatchlistScores(generated));

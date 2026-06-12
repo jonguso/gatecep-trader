@@ -9,6 +9,11 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
+
 
 const steps = [
   {
@@ -59,10 +64,10 @@ export default function BrokerStatus() {
   }, []);
 
   async function load() {
-    const profileRaw = await AsyncStorage.getItem("gatecepInvestorProfile");
+    const profileRaw = userGetItem("investorProfile");
     const statusRaw = await AsyncStorage.getItem("gatecepBrokerReadiness");
     const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
-    const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
+    const cashRaw = userGetItem("availableCash");
 
     let nextStatus = { ...status };
 

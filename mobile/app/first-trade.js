@@ -11,6 +11,11 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { validateOrder } from "../src/utils/orderValidator";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
+
 
 const STOCKS = [
   {
@@ -72,7 +77,7 @@ export default function FirstTrade() {
 
   async function load() {
     const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
-    const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
+    const cashRaw = await userGetItem("availableCash");
 
     if (portfolioRaw) {
       setPortfolio(JSON.parse(portfolioRaw));
@@ -264,7 +269,7 @@ settlementStatus: "SETTLED"
     trades.unshift(trade);
 
     await AsyncStorage.setItem("gatecepManualPortfolio", JSON.stringify(nextPortfolio));
-    await AsyncStorage.setItem("gatecepAvailableCash", String(estimate.remainingCash));
+    await userGetItem("availableCash", String(estimate.remainingCash));
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
     await AsyncStorage.setItem("gatecepSimulatedTrades", JSON.stringify(trades));
     await AsyncStorage.setItem(

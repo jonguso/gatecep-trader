@@ -19,6 +19,10 @@ import {
   loadPortfolioSnapshots,
   savePortfolioSnapshot
 } from "../../src/portfolio/portfolioSnapshot";
+import {
+  userGetItem,
+  userSetItem
+} from "../../src/auth/userStorage";
 
 import {
   fetchWatchlistMarketRows,
@@ -70,13 +74,13 @@ export default function Dashboard() {
     const currentSession = await getCurrentSession();
 setSession(currentSession);     
 
-    const profileRaw = await AsyncStorage.getItem("gatecepInvestorProfile");
+    const profileRaw = await userGetItem("investorProfile");
 
     const brokerRaw =
       (await AsyncStorage.getItem("gatecepBrokerProfile")) ||
       (await AsyncStorage.getItem("gatecepDefaultBrokerProfile"));
 
-    const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
+    const cashRaw = await userGetItem("availableCash");
 
     const portfolioUploadRaw = await AsyncStorage.getItem(
       "gatecepStatementUploaded"
@@ -119,7 +123,7 @@ setSession(currentSession);
 
   async function loadTopSignals() {
     try {
-      const watchlistRaw = await AsyncStorage.getItem("gatecepWatchlist");
+      const watchlistRaw = await userGetItem("watchlist");
 
       const watchlist = watchlistRaw
         ? JSON.parse(watchlistRaw)
@@ -314,27 +318,27 @@ sectors[sector].securities.push(h);
   ].filter((item) => !item.done);
 
   async function openCoach() {
-    await AsyncStorage.setItem(
-      "gatecepCoachContext",
-      JSON.stringify({
-        largestSector: largestSector?.sector || "N/A",
-        risk,
-        cash,
-        currentValue,
-        investedValue,
-        netGainLoss,
-        gainLossPct,
-        diversification,
-        sectorCount,
-        sectorRows,
-        healthScore: health.score,
-        healthRating: health.rating,
-        healthComponents: health.components,
-        healthStrengths: health.strengths,
-        healthWatchlist: health.watchlist,
-        timestamp: new Date().toISOString()
-      })
-    );
+    await userSetItem(
+  "coachContext",
+  JSON.stringify({
+    largestSector: largestSector?.sector || "N/A",
+    risk,
+    cash,
+    currentValue,
+    investedValue,
+    netGainLoss,
+    gainLossPct,
+    diversification,
+    sectorCount,
+    sectorRows,
+    healthScore: health.score,
+    healthRating: health.rating,
+    healthComponents: health.components,
+    healthStrengths: health.strengths,
+    healthWatchlist: health.watchlist,
+    timestamp: new Date().toISOString()
+  })
+);
 
     router.push("/coach-insights");
   }

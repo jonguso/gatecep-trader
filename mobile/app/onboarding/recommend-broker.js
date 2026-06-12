@@ -8,6 +8,10 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import {
+  userGetItem,
+  userSetItem
+} from "../../src/auth/userStorage";
 
 const brokers = [
   {
@@ -39,7 +43,7 @@ export default function RecommendBroker() {
     );
 
     const profileRaw =
-      await AsyncStorage.getItem("gatecepInvestorProfile");
+      await userGetItem("investorProfile");
 
     const profile = profileRaw
       ? JSON.parse(profileRaw)
@@ -50,8 +54,7 @@ export default function RecommendBroker() {
       source: "COACH_G_RECOMMENDATION"
     };
 
-    await AsyncStorage.setItem(
-      "gatecepInvestorProfile",
+    await userGetItem("investorProfile",
       JSON.stringify(profile)
     );
 

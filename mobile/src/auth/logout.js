@@ -3,20 +3,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export async function logout() {
   await AsyncStorage.multiRemove([
     "gatecepAuth",
-    "gatecepSession"
+    "gatecepSession",
+    "gatecepCurrentUserId",
+    "gatecepIsLoggedIn"
   ]);
 }
 
 export async function logoutAndClearDemoData() {
-  await AsyncStorage.multiRemove([
-    "gatecepAuth",
-    "gatecepSession",
-    "gatecepUser",
-    "gatecepAccount",
-    "gatecepInvestorProfile",
-    "gatecepBrokerProfile",
-    "gatecepBrokerProfileSkipped",
-    "gatecepLatestUpload",
-    "gatecepRecommendationHistory"
-  ]);
+  await logout();
 }

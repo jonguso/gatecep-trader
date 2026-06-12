@@ -10,6 +10,10 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
 
 const scenarios = [
   { key: "market_drop", title: "Market Drops 10%", growthRate: -10, monthly: 0 },
@@ -34,7 +38,7 @@ export default function PortfolioSimulator() {
 
   async function load() {
     const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
-    const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
+    const cashRaw = userGetItem("availableCash");
 
     if (portfolioRaw) {
       setHoldings(JSON.parse(portfolioRaw));

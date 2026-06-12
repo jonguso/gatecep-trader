@@ -8,7 +8,11 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { savePortfolio } from "../../src/portfolio/portfolioStore";
-import { userSetItem } from "../../src/auth/userStorage";
+import {
+  userGetItem,
+  userSetItem
+} from "../../src/auth/userStorage";
+
 
 const STARTER_AMOUNT = 10000;
 
@@ -46,7 +50,7 @@ export default function SmartPortfolio() {
   }, []);
 
   async function buildPlan() {
-    const raw = await AsyncStorage.getItem("gatecepInvestorProfile");
+    const raw = userGetItem("investorProfile");
     const saved = raw ? JSON.parse(raw) : {};
 
     const risk = saved.riskTolerance || "Balanced";
@@ -106,8 +110,7 @@ export default function SmartPortfolio() {
       updatedAt: new Date().toISOString()
     };
 
-    await AsyncStorage.setItem(
-      "gatecepInvestorProfile",
+    await userGetItem("investorProfile",
       JSON.stringify(completedProfile)
     );
 
@@ -176,7 +179,7 @@ export default function SmartPortfolio() {
   async function continueToDashboard() {
     await savePortfolio(starterHoldings);
 
-    await AsyncStorage.setItem("gatecepAvailableCash", String(cashReserve));
+    await userGetItem("availableCash", String(cashReserve));
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
     await AsyncStorage.setItem("gatecepOnboardingCompleted", "true");
 

@@ -15,6 +15,10 @@ import {
   loadPortfolio,
   savePortfolio
 } from "../src/portfolio/portfolioStore";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
 
 
 const STOCKS = [
@@ -79,7 +83,7 @@ export default function FirstTrade() {
     const savedPortfolio = await loadPortfolio({ revalue: false });
 setPortfolio(savedPortfolio);
 
-const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
+const cashRaw = await userGetItem("availableCash");
 
     if (cashRaw) {
       setCash(Number(cashRaw || 0));
@@ -310,7 +314,7 @@ settlementStatus: "SETTLED"
     trades.unshift(trade);
 
     await savePortfolio(nextPortfolio);
-    await AsyncStorage.setItem("gatecepAvailableCash", String(estimate.remainingCash));
+    await userGetItem("availableCash", String(estimate.remainingCash));
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
     await AsyncStorage.setItem("gatecepSimulatedTrades", JSON.stringify(trades));
     await AsyncStorage.setItem(

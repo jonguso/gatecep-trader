@@ -20,7 +20,7 @@ const DEFAULT_WATCHLIST = [
   { symbol: "SCBK" },
   { symbol: "GLD" },
   { symbol: "ABSA" },
-  { symbol: "KNRE" }
+  { symbol: "KNRE" },
   { symbol: "IMH" },
   { symbol: "DTK" }
 ];

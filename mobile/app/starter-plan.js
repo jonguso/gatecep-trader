@@ -9,6 +9,11 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
+
 
 export default function StarterPlan() {
   const [profile, setProfile] = useState(null);
@@ -19,7 +24,7 @@ export default function StarterPlan() {
   }, []);
 
   async function load() {
-    const raw = await AsyncStorage.getItem("gatecepInvestorProfile");
+    const raw = userGetItem("investorProfile");
 
     if (!raw) return;
 
@@ -54,7 +59,7 @@ export default function StarterPlan() {
       .reduce((sum, x) => sum + Number(x.invested || 0), 0);
 
     await AsyncStorage.setItem("gatecepManualPortfolio", JSON.stringify(holdings));
-    await AsyncStorage.setItem("gatecepAvailableCash", String(cash));
+    await userGetItem("availableCash", String(cash));
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
 
     Alert.alert("Portfolio Created", "Your starter portfolio is now ready.");

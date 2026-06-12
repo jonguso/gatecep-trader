@@ -10,6 +10,10 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
 
 const questions = [
   {
@@ -282,7 +286,7 @@ export default function NewInvestor() {
       starterPlan
     };
 
-    await AsyncStorage.setItem("gatecepInvestorProfile", JSON.stringify(saved));
+    await userGetItem("investorProfile", JSON.stringify(saved));
     setResult(saved);
   }
 

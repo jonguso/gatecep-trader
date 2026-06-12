@@ -13,6 +13,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import { loadPortfolio } from "../src/portfolio/portfolioStore";
 import { buildCoachPortfolioReview } from "../src/portfolio/coachPortfolioReview";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
 
 export default function Coach() {
   const [portfolio, setPortfolio] = useState([]);
@@ -41,7 +45,7 @@ export default function Coach() {
 
   async function load() {
     const savedPortfolio = await loadPortfolio({ revalue: true });
-    const contextRaw = await AsyncStorage.getItem("gatecepCoachContext");
+    const contextRaw = await userGetItem("coachContext");
     const txUploadedRaw = await AsyncStorage.getItem("gatecepTransactionsUploaded");
     const txRaw = await AsyncStorage.getItem("gatecepTransactionHistory");
     const historyRaw = await AsyncStorage.getItem("gatecepRecommendationHistory");

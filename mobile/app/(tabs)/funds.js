@@ -10,10 +10,13 @@ import {
   View
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import * as XLSX from "xlsx";
 import * as FileSystem from "expo-file-system/legacy";
+import {
+  userGetItem,
+  userSetItem
+} from "../../src/auth/userStorage";
 
 export default function Funds() {
   const [cash, setCash] = useState("");
@@ -205,19 +208,17 @@ export default function Funds() {
       return;
     }
 
-    await AsyncStorage.setItem("gatecepCashStatementUploaded", "true");
-    await AsyncStorage.setItem("gatecepAvailableCash", String(amount));
+    const summary = {
+  broker,
+  availableCash: amount,
+  uploadedAt: new Date().toISOString(),
+  source: selectedFile ? "MOBILE_STATEMENT_UPLOAD" : "MANUAL_STATEMENT_ENTRY",
+  fileName: selectedFile?.name || null
+};
 
-    await AsyncStorage.setItem(
-      "gatecepStatementSummary",
-      JSON.stringify({
-        broker,
-        availableCash: amount,
-        uploadedAt: new Date().toISOString(),
-        source: selectedFile ? "MOBILE_STATEMENT_UPLOAD" : "MANUAL_STATEMENT_ENTRY",
-        fileName: selectedFile?.name || null
-      })
-    );
+await userSetItem("availableCash", String(amount));
+await userSetItem("cashStatementUploaded", "true");
+await userSetItem("statementSummary", JSON.stringify(summary));
 
     Alert.alert("Statement Saved", "Available cash updated.");
 
