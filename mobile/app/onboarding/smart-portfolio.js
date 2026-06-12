@@ -50,11 +50,11 @@ export default function SmartPortfolio() {
   }, []);
 
   async function buildPlan() {
-    const raw = userGetItem("investorProfile");
-    const saved = raw ? JSON.parse(raw) : {};
+  const raw = await userGetItem("investorProfile");
+  const saved = raw ? JSON.parse(raw) : {};
 
-    const risk = saved.riskTolerance || "Balanced";
-    const goal = saved.goal || "Build Wealth";
+  const risk = saved.riskTolerance || "Balanced";
+  const goal = saved.goal || "Build Wealth";
 
     let allocation = [];
 
@@ -110,15 +110,16 @@ export default function SmartPortfolio() {
       updatedAt: new Date().toISOString()
     };
 
-    await userGetItem("investorProfile",
-      JSON.stringify(completedProfile)
-    );
+    await userSetItem(
+    "investorProfile",
+    JSON.stringify(completedProfile)
+  );
 
-    setProfile(completedProfile);
-    setPlan(smartPlan);
-    setStarterHoldings(holdings);
-    setCashReserve(remainingCash);
-  }
+  setProfile(completedProfile);
+  setPlan(smartPlan);
+  setStarterHoldings(holdings);
+  setCashReserve(remainingCash);
+}
 
   function buildStarterHoldings(smartPlan = []) {
     const holdings = [];
