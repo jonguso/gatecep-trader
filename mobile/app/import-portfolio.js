@@ -9,11 +9,13 @@ import {
   View
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import * as FileSystem from "expo-file-system/legacy";
 import * as XLSX from "xlsx";
+
 import { applySecurityMaster } from "../src/utils/nseSecurityMaster";
+import { userSetItem } from "../src/auth/userStorage";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
 export default function ImportPortfolio() {
   const [status, setStatus] = useState("");
@@ -46,8 +48,8 @@ export default function ImportPortfolio() {
 
       setStatus(`Reading ${file.name}...`);
 
-      await AsyncStorage.setItem(
-        "gatecepPendingPortfolioImport",
+      await userSetItem(
+        "pendingPortfolioImport",
         JSON.stringify({
           fileName: file.name,
           uri: file.uri,
@@ -66,12 +68,20 @@ export default function ImportPortfolio() {
         );
       }
 
-      await AsyncStorage.setItem(
-        "gatecepImportedPortfolioDraft",
-        JSON.stringify(draftRows)
+      await userSetItem("importedPortfolioDraft", JSON.stringify(draftRows));
+      await userSetItem("statementUploaded", "true");
+
+      await userSetItem(
+        "statementSummary",
+        JSON.stringify({
+          count: draftRows.length,
+          fileName: file.name,
+          source: "PORTFOLIO_VALUATION_UPLOAD",
+          uploadedAt: new Date().toISOString()
+        })
       );
 
-      await AsyncStorage.setItem("gatecepStatementUploaded", "true");
+      await buildSyncStatus();
 
       setStatus(
         `${file.name} extracted. ${draftRows.length} holdings ready for review.`
@@ -153,15 +163,25 @@ export default function ImportPortfolio() {
     const findValue = (names) => {
       for (const name of names) {
         const foundKey = keys.find(
-          (k) =>
-            String(k).trim().toLowerCase() ===
+          (key) =>
+            String(key).trim().toLowerCase() ===
             String(name).trim().toLowerCase()
         );
 
         if (foundKey) return row[foundKey];
       }
 
-      return "";
+      const normalizedNames = names.map((name) =>
+        String(name).toLowerCase().replace(/\s+/g, "").replace(/[./_-]/g, "")
+      );
+
+      const foundLooseKey = keys.find((key) =>
+        normalizedNames.includes(
+          String(key).toLowerCase().replace(/\s+/g, "").replace(/[./_-]/g, "")
+        )
+      );
+
+      return foundLooseKey ? row[foundLooseKey] : "";
     };
 
     const symbol = findValue([
@@ -197,17 +217,17 @@ export default function ImportPortfolio() {
     );
 
     const averagePrice = cleanNumber(
-  findValue([
-    "Average Price",
-    "Avg Price",
-    "Avg.Price",
-    "Weighted Average Price",
-    "WAP",
-    "Cost Price",
-    "Book Price",
-    "Purchase Price"
-  ])
-);
+      findValue([
+        "Average Price",
+        "Avg Price",
+        "Avg.Price",
+        "Weighted Average Price",
+        "WAP",
+        "Cost Price",
+        "Book Price",
+        "Purchase Price"
+      ])
+    );
 
     const marketPrice = cleanNumber(
       findValue([
@@ -230,16 +250,16 @@ export default function ImportPortfolio() {
     );
 
     const profitLoss = cleanNumber(
-  findValue([
-    "Profit Loss",
-    "Profit/Loss",
-    "Profit / Loss",
-    "P/L",
-    "Gain Loss",
-    "Unrealized P/L",
-    "Unrealized Profit Loss"
-  ])
-);
+      findValue([
+        "Profit Loss",
+        "Profit/Loss",
+        "Profit / Loss",
+        "P/L",
+        "Gain Loss",
+        "Unrealized P/L",
+        "Unrealized Profit Loss"
+      ])
+    );
 
     if (!symbol || !quantity) return null;
 
@@ -255,20 +275,31 @@ export default function ImportPortfolio() {
       symbol: String(symbol).trim().toUpperCase(),
       name: String(name || symbol).trim(),
       sector: String(sector || "Unknown").trim(),
-      quantity: String(quantity),
-      averagePrice: String(averagePrice || ""),
-      marketPrice: String(finalMarketPrice || ""),
+      quantity,
+      averagePrice,
+      averageCost: averagePrice,
+      marketPrice: finalMarketPrice,
       price: Number(finalMarketPrice || 0),
       marketValue: finalMarketValue,
       value: finalMarketValue,
       profitLoss: Number.isFinite(profitLoss) ? profitLoss : 0,
-      source: "PORTFOLIO_VALUATION_UPLOAD"
+      source: "PORTFOLIO_VALUATION_UPLOAD",
+      uploadedAt: new Date().toISOString()
     });
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Import Portfolio</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Import Portfolio</Text>
+
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.subtitle}>
         Upload a broker valuation CSV or Excel file. Gatecep will extract
@@ -317,9 +348,32 @@ function cleanNumber(value) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
-  content: { padding: 22, paddingTop: 70, paddingBottom: 40 },
-  title: { color: "white", fontSize: 34, fontWeight: "900" },
+  content: { padding: 22, paddingTop: 70, paddingBottom: 100 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
+  title: {
+    color: "white",
+    fontSize: 30,
+    fontWeight: "900",
+    flex: 1
+  },
   subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: {
+    color: "#67e8f9",
+    fontWeight: "900"
+  },
   card: {
     marginTop: 24,
     backgroundColor: "#0f172a",
