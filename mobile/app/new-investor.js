@@ -9,10 +9,7 @@ import {
   View
 } from "react-native";
 import { router } from "expo-router";
-import {
-  userGetItem,
-  userSetItem
-} from "../src/auth/userStorage";
+import { userSetItem } from "../src/auth/userStorage";
 
 const questions = [
   {
@@ -97,8 +94,10 @@ export default function NewInvestor() {
 
     setAnswers(updated);
 
-    if (step < questions.length) {
+    if (step < questions.length - 1) {
       setStep(step + 1);
+    } else {
+      setStep(questions.length);
     }
   }
 
@@ -273,7 +272,8 @@ export default function NewInvestor() {
       amount: Number(amount || 0),
       customerPath: "NEW_INVESTOR",
       questionnaireCompleted: true,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     const broker = recommendedBroker(risk, answers.experience, answers.goal);
@@ -288,6 +288,8 @@ export default function NewInvestor() {
     await userSetItem("investorProfile", JSON.stringify(saved));
     await userSetItem("onboardingCompleted", "false");
     await userSetItem("questionnaireCompleted", "true");
+
+    setResult(saved);
   }
 
   if (result) {
@@ -419,7 +421,7 @@ export default function NewInvestor() {
 
         <Pressable
           style={styles.secondary}
-          onPress={() => router.replace("/(tabs)/dashboard")
+          onPress={() => router.replace("/(tabs)/dashboard")}
         >
           <Text style={styles.secondaryText}>Start My Investing Journey</Text>
         </Pressable>
@@ -446,7 +448,7 @@ export default function NewInvestor() {
         </Text>
       </View>
 
-      {step < questions.length && (
+      {step < questions.length && currentQuestion ? (
         <View style={styles.questionBlock}>
           <Text style={styles.questionTitle}>{currentQuestion.title}</Text>
           <Text style={styles.questionSubtitle}>{currentQuestion.subtitle}</Text>
@@ -472,7 +474,7 @@ export default function NewInvestor() {
             </Pressable>
           )}
         </View>
-      )}
+      ) : null}
 
       {step >= questions.length && (
         <View style={styles.amountCard}>
@@ -507,6 +509,13 @@ export default function NewInvestor() {
 
           <Pressable style={styles.primary} onPress={generateProfile}>
             <Text style={styles.primaryText}>Generate Coach G Profile</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.secondary}
+            onPress={() => setStep(questions.length - 1)}
+          >
+            <Text style={styles.secondaryText}>Back</Text>
           </Pressable>
         </View>
       )}
@@ -628,7 +637,7 @@ function money(value) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
-  content: { padding: 22, paddingTop: 70, paddingBottom: 60 },
+  content: { padding: 22, paddingTop: 70, paddingBottom: 90 },
   title: { color: "white", fontSize: 32, fontWeight: "900" },
   subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
   progressCard: {
