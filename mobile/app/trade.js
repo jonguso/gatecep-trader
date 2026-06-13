@@ -8,65 +8,26 @@ import {
   TextInput,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { validateOrder } from "../src/utils/orderValidator";
-import {
-  loadPortfolio,
-  savePortfolio
-} from "../src/portfolio/portfolioStore";
-import {
-  userGetItem,
-  userSetItem
-} from "../src/auth/userStorage";
 
+import { validateOrder } from "../src/utils/orderValidator";
+import { loadPortfolio, savePortfolio } from "../src/portfolio/portfolioStore";
+import { userGetItem, userSetItem } from "../src/auth/userStorage";
+import {
+  loadBasketExecution,
+  updateExecutionOrder
+} from "../src/trade/basketExecutionStore";
 
 const STOCKS = [
-  {
-    symbol: "SCOM",
-    name: "Safaricom",
-    sector: "Telecom",
-    price: 30.6,
-    reason: "Beginner-friendly telecom and mobile money exposure."
-  },
-  {
-    symbol: "KCB",
-    name: "KCB Group",
-    sector: "Banking",
-    price: 45,
-    reason: "Large banking exposure with regional presence."
-  },
-  {
-    symbol: "EQTY",
-    name: "Equity Group",
-    sector: "Banking",
-    price: 48,
-    reason: "Strong retail and regional banking franchise."
-  },
-  {
-    symbol: "COOP",
-    name: "Co-operative Bank",
-    sector: "Banking",
-    price: 16,
-    reason: "Lower-priced banking exposure for starter portfolios."
-  },
-  {
-    symbol: "EABL",
-    name: "East African Breweries",
-    sector: "Mfg. and Allied",
-    price: 248,
-    reason: "Defensive consumer income exposure."
-  },
-  {
-    symbol: "BAT",
-    name: "BAT Kenya",
-    sector: "Mfg. and Allied",
-    price: 520,
-    reason: "High dividend defensive stock."
-  }
+  { symbol: "SCOM", name: "Safaricom", sector: "Telecom", price: 30.6, reason: "Beginner-friendly telecom and mobile money exposure." },
+  { symbol: "KCB", name: "KCB Group", sector: "Banking", price: 45, reason: "Large banking exposure with regional presence." },
+  { symbol: "EQTY", name: "Equity Group", sector: "Banking", price: 48, reason: "Strong retail and regional banking franchise." },
+  { symbol: "COOP", name: "Co-operative Bank", sector: "Banking", price: 16, reason: "Lower-priced banking exposure for starter portfolios." },
+  { symbol: "EABL", name: "East African Breweries", sector: "Mfg. and Allied", price: 248, reason: "Defensive consumer income exposure." },
+  { symbol: "BAT", name: "BAT Kenya", sector: "Mfg. and Allied", price: 520, reason: "High dividend defensive stock." }
 ];
 
-export default function FirstTrade() {
+export default function Trade() {
   const [portfolio, setPortfolio] = useState([]);
   const [cash, setCash] = useState(0);
   const [selectedStock, setSelectedStock] = useState(STOCKS[0]);
@@ -74,6 +35,7 @@ export default function FirstTrade() {
   const [quantity, setQuantity] = useState("1");
   const [limitPrice, setLimitPrice] = useState(String(STOCKS[0].price));
   const [confirmedTrade, setConfirmedTrade] = useState(null);
+  const [activeExecution, setActiveExecution] = useState(null);
 
   useEffect(() => {
     load();
@@ -81,13 +43,49 @@ export default function FirstTrade() {
 
   async function load() {
     const savedPortfolio = await loadPortfolio({ revalue: false });
-setPortfolio(savedPortfolio);
+    const cashRaw = await userGetItem("availableCash");
+    const execution = await loadBasketExecution();
 
-const cashRaw = await userGetItem("availableCash");
+    setPortfolio(savedPortfolio);
+    setCash(Number(cashRaw || 0));
 
-    if (cashRaw) {
-      setCash(Number(cashRaw || 0));
+    if (execution?.orders?.length) {
+      setActiveExecution(execution);
+
+      const nextOrder =
+        execution.orders.find((order) => order.status !== "FILLED") ||
+        execution.orders[0];
+
+      loadOrderIntoTicket(nextOrder);
     }
+  }
+
+  function loadOrderIntoTicket(order) {
+    if (!order) return;
+
+    const stock =
+      STOCKS.find((item) => item.symbol === order.symbol) || {
+        symbol: order.symbol,
+        name: order.name || order.symbol,
+        sector: "NSE",
+        price: Number(order.price || 0),
+        reason: order.reason || "Coach G basket order"
+      };
+
+    const price = Number(order.price || stock.price || 0);
+
+    const qty =
+      Number(order.quantity || 0) > 0
+        ? Number(order.quantity)
+        : Number(order.amount || 0) > 0 && price > 0
+        ? Math.floor(Number(order.amount) / price)
+        : 1;
+
+    setSelectedStock(stock);
+    setSide(order.side || "BUY");
+    setQuantity(String(qty || 1));
+    setLimitPrice(String(price || stock.price || 0));
+    setConfirmedTrade(null);
   }
 
   function selectStock(stock) {
@@ -106,14 +104,9 @@ const cashRaw = await userGetItem("availableCash");
     const totalFees = brokerFee + regulatoryFee;
 
     const totalCost =
-      side === "BUY"
-        ? gross + totalFees
-        : Math.max(gross - totalFees, 0);
+      side === "BUY" ? gross + totalFees : Math.max(gross - totalFees, 0);
 
-    const remainingCash =
-      side === "BUY"
-        ? cash - totalCost
-        : cash + totalCost;
+    const remainingCash = side === "BUY" ? cash - totalCost : cash + totalCost;
 
     return {
       qty,
@@ -146,34 +139,34 @@ const cashRaw = await userGetItem("availableCash");
       return;
     }
 
-const brokerRaw = await AsyncStorage.getItem("gatecepDefaultBrokerProfile");
+    const brokerRaw = await userGetItem("defaultBrokerProfile");
 
-const brokerProfile = brokerRaw
-  ? JSON.parse(brokerRaw)
-  : {
-      broker: "AIB-AXYS",
-      nickname: "Demo Broker",
-      clientNumber: "DEMO",
-      cdsNumber: "DEMO",
-      defaultBroker: true,
-      connectionMode: "SIMULATION"
-    };
+    const brokerProfile = brokerRaw
+      ? JSON.parse(brokerRaw)
+      : {
+          broker: "AIB-AXYS",
+          nickname: "Demo Broker",
+          clientNumber: "DEMO",
+          cdsNumber: "DEMO",
+          defaultBroker: true,
+          connectionMode: "SIMULATION"
+        };
 
-const validation = validateOrder({
-  side,
-  symbol: selectedStock.symbol,
-  quantity: estimate.qty,
-  price: estimate.price,
-  cash,
-  totalCost: estimate.totalCost,
-  portfolio,
-  brokerProfile
-});
+    const validation = validateOrder({
+      side,
+      symbol: selectedStock.symbol,
+      quantity: estimate.qty,
+      price: estimate.price,
+      cash,
+      totalCost: estimate.totalCost,
+      portfolio,
+      brokerProfile
+    });
 
-if (!validation.ok) {
-  Alert.alert("Order Blocked", validation.errors.join("\n"));
-  return;
-}
+    if (!validation.ok) {
+      Alert.alert("Order Blocked", validation.errors.join("\n"));
+      return;
+    }
 
     let nextPortfolio = [...portfolio];
 
@@ -185,76 +178,65 @@ if (!validation.ok) {
       if (existingIndex >= 0) {
         const existing = nextPortfolio[existingIndex];
 
-       const existingQty = Number(existing.quantity || 0);
+        const existingQty = Number(existing.quantity || 0);
+        const existingAvgPrice = Number(
+          existing.averagePrice || existing.averageCost || 0
+        );
+        const existingCostValue = existingQty * existingAvgPrice;
 
-const existingAvgPrice = Number(
-  existing.averagePrice ||
-  existing.averageCost ||
-  0
-);
+        const newQty = existingQty + estimate.qty;
+        const newCostValue = existingCostValue + Number(estimate.totalCost || 0);
+        const newAveragePrice = newQty > 0 ? newCostValue / newQty : 0;
+        const newMarketValue = newQty * estimate.price;
 
-const existingCostValue = existingQty * existingAvgPrice;
-
-const buyCostIncludingFees = Number(estimate.totalCost || 0);
-
-const newQty = existingQty + estimate.qty;
-
-const newCostValue = existingCostValue + buyCostIncludingFees;
-
-const newAveragePrice =
-  newQty > 0 ? newCostValue / newQty : 0;
-
-const newMarketValue =
-  newQty * estimate.price;
-
-nextPortfolio[existingIndex] = {
-  ...existing,
-  quantity: newQty,
-  averagePrice: newAveragePrice,
-  averageCost: newAveragePrice,
-  costValue: newCostValue,
-  investedValue: newCostValue,
-  marketPrice: estimate.price,
-  price: estimate.price,
-  marketValue: newMarketValue,
-  value: newMarketValue,
-  profitLoss: newMarketValue - newCostValue,
-  profitLossPct:
-    newCostValue > 0
-      ? ((newMarketValue - newCostValue) / newCostValue) * 100
-      : 0,
-  source: "TRADE_SIMULATION"
-};
+        nextPortfolio[existingIndex] = {
+          ...existing,
+          quantity: newQty,
+          averagePrice: newAveragePrice,
+          averageCost: newAveragePrice,
+          costValue: newCostValue,
+          investedValue: newCostValue,
+          marketPrice: estimate.price,
+          price: estimate.price,
+          marketValue: newMarketValue,
+          value: newMarketValue,
+          profitLoss: newMarketValue - newCostValue,
+          profitLossPct:
+            newCostValue > 0
+              ? ((newMarketValue - newCostValue) / newCostValue) * 100
+              : 0,
+          source: "TRADE_SIMULATION",
+          updatedAt: new Date().toISOString()
+        };
       } else {
-        const buyCostIncludingFees = Number(estimate.totalCost || 0);
+        const averagePrice =
+          estimate.qty > 0 ? estimate.totalCost / estimate.qty : estimate.price;
 
-const averagePrice =
-  estimate.qty > 0
-    ? buyCostIncludingFees / estimate.qty
-    : estimate.price;
-
-nextPortfolio.push({
-  symbol: selectedStock.symbol,
-  name: selectedStock.name,
-  sector: selectedStock.sector,
-  quantity: estimate.qty,
-  averagePrice,
-  averageCost: averagePrice,
-  costValue: buyCostIncludingFees,
-  investedValue: buyCostIncludingFees,
-  marketPrice: estimate.price,
-  price: estimate.price,
-  marketValue: estimate.gross,
-  value: estimate.gross,
-  profitLoss: estimate.gross - buyCostIncludingFees,
-  profitLossPct:
-    buyCostIncludingFees > 0
-      ? ((estimate.gross - buyCostIncludingFees) / buyCostIncludingFees) * 100
-      : 0,
-  source: "TRADE_SIMULATION"
-  });
- }
-}
+        nextPortfolio.push({
+          symbol: selectedStock.symbol,
+          name: selectedStock.name,
+          sector: selectedStock.sector,
+          quantity: estimate.qty,
+          averagePrice,
+          averageCost: averagePrice,
+          costValue: estimate.totalCost,
+          investedValue: estimate.totalCost,
+          marketPrice: estimate.price,
+          price: estimate.price,
+          marketValue: estimate.gross,
+          value: estimate.gross,
+          profitLoss: estimate.gross - estimate.totalCost,
+          profitLossPct:
+            estimate.totalCost > 0
+              ? ((estimate.gross - estimate.totalCost) / estimate.totalCost) *
+                100
+              : 0,
+          source: "TRADE_SIMULATION",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    }
 
     if (side === "SELL") {
       if (existingIndex < 0) {
@@ -280,10 +262,13 @@ nextPortfolio.push({
       } else {
         nextPortfolio[existingIndex] = {
           ...existing,
-          quantity: String(remainingQty),
-          marketPrice: String(estimate.price),
+          quantity: remainingQty,
+          marketPrice: estimate.price,
+          price: estimate.price,
           marketValue: remainingQty * estimate.price,
-          source: "FIRST_TRADE_SIMULATION"
+          value: remainingQty * estimate.price,
+          source: "TRADE_SIMULATION",
+          updatedAt: new Date().toISOString()
         };
       }
     }
@@ -304,59 +289,114 @@ nextPortfolio.push({
       cashAfter: estimate.remainingCash,
       tradedAt: new Date().toISOString(),
       status: "SIMULATED_EXECUTED",
-orderType: "MARKET",
-settlementStatus: "SETTLED"
+      orderType: "MARKET",
+      settlementStatus: "SETTLED"
     };
 
-    const tradeRaw = await AsyncStorage.getItem("gatecepSimulatedTrades");
+    const tradeRaw = await userGetItem("simulatedTrades");
     const trades = tradeRaw ? JSON.parse(tradeRaw) : [];
 
     trades.unshift(trade);
 
     await savePortfolio(nextPortfolio);
-    await userGetItem("availableCash", String(estimate.remainingCash));
-    await AsyncStorage.setItem("gatecepStatementUploaded", "true");
-    await AsyncStorage.setItem("gatecepSimulatedTrades", JSON.stringify(trades));
-    await AsyncStorage.setItem(
-"gatecepFirstTradeCompleted",
-"true"
-);
+    await userSetItem("availableCash", String(estimate.remainingCash));
+    await userSetItem("statementUploaded", "true");
+    await userSetItem("simulatedTrades", JSON.stringify(trades));
+    await userSetItem("firstTradeCompleted", "true");
 
-await AsyncStorage.setItem(
-  "gatecepBrokerReadiness",
-  JSON.stringify({
-    brokerSelected: true,
-    cdsCreated: false,
-    brokerOpened: false,
-    brokerFunded: true,
-    starterPortfolioReady: true,
-    readyToInvest: true,
-    firstTradeCompleted: true
-  })
-);
+    await userSetItem(
+      "brokerReadiness",
+      JSON.stringify({
+        brokerSelected: true,
+        cdsCreated: false,
+        brokerOpened: false,
+        brokerFunded: true,
+        starterPortfolioReady: true,
+        readyToInvest: true,
+        firstTradeCompleted: true
+      })
+    );
+
+    await markBasketOrderFilled(trade);
 
     setPortfolio(nextPortfolio);
     setCash(estimate.remainingCash);
     setConfirmedTrade(trade);
 
-    Alert.alert("Trade Complete", `${side} ${estimate.qty} ${selectedStock.symbol} simulated.`);
+    Alert.alert(
+      "Trade Complete",
+      `${side} ${estimate.qty} ${selectedStock.symbol} simulated.`
+    );
   }
+
+  async function markBasketOrderFilled(trade) {
+    if (!activeExecution?.orders?.length) return;
+
+    const currentOrder = activeExecution.orders.find(
+      (order) =>
+        order.symbol === selectedStock.symbol && order.status !== "FILLED"
+    );
+
+    if (!currentOrder) return;
+
+    const updated = await updateExecutionOrder(currentOrder.id, {
+      status: "FILLED",
+      message: "Simulated trade completed",
+      trade
+    });
+
+    setActiveExecution(updated);
+
+    const nextOrder = updated?.orders?.find(
+      (order) => order.status !== "FILLED"
+    );
+
+    if (nextOrder) {
+      setTimeout(() => {
+        loadOrderIntoTicket(nextOrder);
+      }, 300);
+    }
+  }
+
+  const basketRemaining =
+    activeExecution?.orders?.filter((order) => order.status !== "FILLED")
+      .length || 0;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-            <View style={styles.headerRow}>
-  <Text style={styles.title}>Trade</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Trade</Text>
 
-  <Pressable
-    style={styles.dashboardButton}
-    onPress={() => router.replace("/(tabs)/dashboard")}
-  >
-    <Text style={styles.dashboardButtonText}>Dashboard</Text>
-  </Pressable>
-</View>
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.subtitle}>
-  Buy or sell securities using your available cash and portfolio holdings.
-</Text>
+        Buy or sell securities using your available cash and portfolio holdings.
+      </Text>
+
+      {activeExecution ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Active Basket Execution</Text>
+          <Text style={styles.body}>
+            {activeExecution.source} • {activeExecution.status}
+          </Text>
+          <Text style={styles.body}>
+            Remaining orders: {basketRemaining}
+          </Text>
+
+          <Pressable
+            style={styles.secondary}
+            onPress={() => router.push("/basket-execution")}
+          >
+            <Text style={styles.secondaryText}>Review Basket Execution</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.summaryCard}>
         <Metric label="Available Cash" value={`KES ${money(cash)}`} />
@@ -379,7 +419,9 @@ await AsyncStorage.setItem(
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.symbol}>{stock.symbol}</Text>
-              <Text style={styles.small}>{stock.name} • {stock.sector}</Text>
+              <Text style={styles.small}>
+                {stock.name} • {stock.sector}
+              </Text>
               <Text style={styles.reason}>{stock.reason}</Text>
             </View>
 
@@ -392,31 +434,34 @@ await AsyncStorage.setItem(
         <Text style={styles.cardTitle}>Order Ticket</Text>
 
         <View style={styles.sideRow}>
-  {["BUY", "SELL"].map((item) => (
-    <Pressable
-      key={item}
-      style={[styles.sideChip, side === item && styles.sideActive]}
-      onPress={() => {
-        setSide(item);
-        setConfirmedTrade(null);
-      }}
-    >
-      <Text style={side === item ? styles.sideTextActive : styles.sideText}>
-        {item}
-      </Text>
-    </Pressable>
-  ))}
-</View>
+          {["BUY", "SELL"].map((item) => (
+            <Pressable
+              key={item}
+              style={[styles.sideChip, side === item && styles.sideActive]}
+              onPress={() => {
+                setSide(item);
+                setConfirmedTrade(null);
+              }}
+            >
+              <Text
+                style={side === item ? styles.sideTextActive : styles.sideText}
+              >
+                {item}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
-{side === "BUY" && estimate.remainingCash < 0 && (
-  <View style={styles.warningBox}>
-    <Text style={styles.warningTitle}>Insufficient Cash</Text>
-    <Text style={styles.warningText}>
-      Reduce quantity or add funds. You need KES {money(estimate.totalCost)} but only have KES {money(cash)}.
-    </Text>
-  </View>
-)}
-       
+        {side === "BUY" && estimate.remainingCash < 0 && (
+          <View style={styles.warningBox}>
+            <Text style={styles.warningTitle}>Insufficient Cash</Text>
+            <Text style={styles.warningText}>
+              Reduce quantity or add funds. You need KES{" "}
+              {money(estimate.totalCost)} but only have KES {money(cash)}.
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.label}>Quantity</Text>
         <TextInput
           value={quantity}
@@ -449,7 +494,10 @@ await AsyncStorage.setItem(
 
         <Info label="Gross Value" value={`KES ${money(estimate.gross)}`} />
         <Info label="Broker Fee" value={`KES ${money(estimate.brokerFee)}`} />
-        <Info label="Regulatory Fee" value={`KES ${money(estimate.regulatoryFee)}`} />
+        <Info
+          label="Regulatory Fee"
+          value={`KES ${money(estimate.regulatoryFee)}`}
+        />
         <Info label="Total Fees" value={`KES ${money(estimate.totalFees)}`} />
         <Info
           label={side === "BUY" ? "Cash Required" : "Estimated Proceeds"}
@@ -463,24 +511,18 @@ await AsyncStorage.setItem(
       </View>
 
       <Pressable
-  style={[
-    styles.primary,
-    side === "BUY" &&
-    estimate.remainingCash < 0 &&
-    styles.disabledButton
-  ]}
-  disabled={
-    side === "BUY" &&
-    estimate.remainingCash < 0
-  }
-  onPress={confirmTrade}
->
+        style={[
+          styles.primary,
+          side === "BUY" && estimate.remainingCash < 0 && styles.disabledButton
+        ]}
+        disabled={side === "BUY" && estimate.remainingCash < 0}
+        onPress={confirmTrade}
+      >
         <Text style={styles.primaryText}>
-  {side === "BUY" && estimate.remainingCash < 0
-    ? "Insufficient Cash"
-    : `Confirm Simulated ${side}`
-  }
-</Text>
+          {side === "BUY" && estimate.remainingCash < 0
+            ? "Insufficient Cash"
+            : `Confirm Simulated ${side}`}
+        </Text>
       </Pressable>
 
       {confirmedTrade && (
@@ -488,26 +530,41 @@ await AsyncStorage.setItem(
           <Text style={styles.cardTitle}>Trade Complete</Text>
 
           <Text style={styles.body}>
-            {confirmedTrade.side} {confirmedTrade.quantity} {confirmedTrade.symbol} at KES{" "}
-            {money(confirmedTrade.price)} has been simulated.
+            {confirmedTrade.side} {confirmedTrade.quantity}{" "}
+            {confirmedTrade.symbol} at KES {money(confirmedTrade.price)} has
+            been simulated.
           </Text>
 
-          <Text style={styles.body}>
-            Portfolio and cash have been updated for Coach G monitoring.
-          </Text>
+          {basketRemaining > 0 ? (
+            <Text style={styles.body}>
+              Next basket order has been loaded into the ticket.
+            </Text>
+          ) : (
+            <Text style={styles.body}>
+              Portfolio and cash have been updated for Coach G monitoring.
+            </Text>
+          )}
 
-          <Pressable style={styles.secondary} onPress={() => router.replace("/dashboard")}>
+          <Pressable
+            style={styles.secondary}
+            onPress={() => router.replace("/(tabs)/dashboard")}
+          >
             <Text style={styles.secondaryText}>Open Dashboard</Text>
           </Pressable>
 
-           <Pressable style={styles.secondary} onPress={() => router.push("/trade-history")}>
-              <Text style={styles.secondaryText}>View Trade History</Text>
+          <Pressable
+            style={styles.secondary}
+            onPress={() => router.push("/trade-history")}
+          >
+            <Text style={styles.secondaryText}>View Trade History</Text>
           </Pressable>
-
         </View>
       )}
 
-      <Pressable style={styles.backButton} onPress={() => router.replace("/broker-status")}>
+      <Pressable
+        style={styles.backButton}
+        onPress={() => router.replace("/broker-status")}
+      >
         <Text style={styles.backText}>Back to Broker Readiness</Text>
       </Pressable>
     </ScrollView>
@@ -598,10 +655,7 @@ const styles = StyleSheet.create({
   small: { color: "#94a3b8", marginTop: 4 },
   reason: { color: "#cbd5e1", marginTop: 6, lineHeight: 19, fontSize: 12 },
   price: { color: "#86efac", fontWeight: "900", marginTop: 2 },
-  sideRow: {
-    flexDirection: "row",
-    gap: 10
-  },
+  sideRow: { flexDirection: "row", gap: 10 },
   sideChip: {
     flex: 1,
     padding: 14,
@@ -614,10 +668,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#9333ea",
     borderColor: "#c084fc"
   },
-
-disabledButton: {
-  opacity: .45
-},
   sideText: { color: "#94a3b8", textAlign: "center", fontWeight: "900" },
   sideTextActive: { color: "white", textAlign: "center", fontWeight: "900" },
   label: { color: "#94a3b8", marginTop: 14 },
@@ -643,6 +693,7 @@ disabledButton: {
     padding: 18,
     borderRadius: 18
   },
+  disabledButton: { opacity: 0.45 },
   primaryText: { color: "white", textAlign: "center", fontWeight: "900" },
   confirmCard: {
     marginTop: 22,
@@ -666,49 +717,32 @@ disabledButton: {
     padding: 16,
     borderRadius: 18
   },
-
-warningBox: {
-  marginTop: 18,
-  backgroundColor: "rgba(239,68,68,.12)",
-  borderColor: "rgba(239,68,68,.35)",
-  borderWidth: 1,
-  borderRadius: 16,
-  padding: 14
-},
-
-warningTitle: {
-  color: "#fca5a5",
-  fontWeight: "900"
-},
-
-headerRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12
-},
-
-dashboardButton: {
-  backgroundColor: "#1e293b",
-  borderColor: "#334155",
-  borderWidth: 1,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 14
-},
-
-dashboardButtonText: {
-  color: "#67e8f9",
-  fontWeight: "900"
-},
-
-warningText: {
-  color: "#cbd5e1",
-  marginTop: 6,
-  lineHeight: 20
-},
-
   backText: { color: "#cbd5e1", textAlign: "center", fontWeight: "900" },
+  warningBox: {
+    marginTop: 18,
+    backgroundColor: "rgba(239,68,68,.12)",
+    borderColor: "rgba(239,68,68,.35)",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14
+  },
+  warningTitle: { color: "#fca5a5", fontWeight: "900" },
+  warningText: { color: "#cbd5e1", marginTop: 6, lineHeight: 20 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: { color: "#67e8f9", fontWeight: "900" },
   green: { color: "#86efac" },
   red: { color: "#fca5a5" }
 });

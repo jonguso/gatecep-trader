@@ -9,12 +9,14 @@ import {
   TextInput,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
+
 import { loadPortfolio } from "../src/portfolio/portfolioStore";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 import { buildCoachPortfolioReview } from "../src/portfolio/coachPortfolioReview";
 import { buildPerformanceAttribution } from "../src/portfolio/performanceAttribution";
+import { saveTradeBasket } from "../src/trade/tradeBasketStore";
+import { createBasketExecution } from "../src/trade/basketExecutionStore";
 import {
   userGetItem,
   userSetItem
@@ -47,54 +49,34 @@ export default function Coach() {
   );
 
   async function load() {
-  const savedPortfolio =
-    await loadPortfolio({ revalue: true });
+    const savedPortfolio = await loadPortfolio({ revalue: true });
+    const contextRaw = await userGetItem("coachContext");
+    const txUploadedRaw = await userGetItem("transactionsUploaded");
+    const txRaw = await userGetItem("transactionHistory");
+    const historyRaw = await userGetItem("recommendationHistory");
 
-  const contextRaw =
-    await userGetItem("coachContext");
+    const scopedTransactions = txRaw ? JSON.parse(txRaw) : [];
 
-  const txUploadedRaw =
-    await userGetItem("transactionsUploaded");
+    setPortfolio(savedPortfolio);
+    setTransactions(scopedTransactions);
+    setAttribution(
+      buildPerformanceAttribution(savedPortfolio, scopedTransactions)
+    );
 
-  const scopedTxRaw =
-    await userGetItem("transactionHistory");
+    if (contextRaw) {
+      setDashboardContext(JSON.parse(contextRaw));
+    }
 
-  const historyRaw =
-    await userGetItem("recommendationHistory");
-
-  const scopedTransactions =
-    scopedTxRaw ? JSON.parse(scopedTxRaw) : [];
-
-  setPortfolio(savedPortfolio);
-  setTransactions(scopedTransactions);
-
-  setAttribution(
-    buildPerformanceAttribution(
-      savedPortfolio,
-      scopedTransactions
-    )
-  );
-
-  if (contextRaw) {
-    setDashboardContext(JSON.parse(contextRaw));
+    setTransactionsUploaded(txUploadedRaw === "true");
+    setRecommendationHistory(historyRaw ? JSON.parse(historyRaw) : []);
   }
-
-  setTransactionsUploaded(
-    txUploadedRaw === "true"
-  );
-
-  setRecommendationHistory(
-    historyRaw ? JSON.parse(historyRaw) : []
-  );
-}
 
   const value = useMemo(() => {
     return portfolio.reduce(
       (sum, x) => sum + Number(x.marketValue || x.value || 0),
       0
     );
-  }, 
-[portfolio]);
+  }, [portfolio]);
 
   const sectorRows = useMemo(() => {
     const grouped = {};
@@ -189,10 +171,11 @@ export default function Coach() {
   }
 
   async function saveRecommendation() {
-    const raw = await AsyncStorage.getItem("gatecepRecommendationHistory");
+    const raw = await userGetItem("recommendationHistory");
     const history = raw ? JSON.parse(raw) : [];
 
     history.unshift({
+      id: `REC-${Date.now()}`,
       savedAt: new Date().toISOString(),
       portfolioValue: value,
       largestSector,
@@ -201,17 +184,51 @@ export default function Coach() {
       scenario,
       intensity,
       sectorPlan,
-      status: "SAVED_NOT_EXECUTED"
+      status: "SAVED_NOT_EXECUTED",
+      version: "3.8.1"
     });
 
-    await AsyncStorage.setItem(
-      "gatecepRecommendationHistory",
-      JSON.stringify(history)
-    );
-
+    await userSetItem("recommendationHistory", JSON.stringify(history));
     setRecommendationHistory(history);
 
     Alert.alert("Saved", "Coach G strategy saved to your profile.");
+  }
+
+  async function createTradeBasketFromRecommendation() {
+    const actionableSectors = sectorPlan.filter((item) => !item.reserve);
+    const basketItems = [];
+
+    actionableSectors.slice(0, 3).forEach((sector) => {
+      const details = buildSectorDetails(sector);
+
+      details.holdings.forEach((holding) => {
+        basketItems.push({
+          symbol: holding.symbol,
+          name: holding.name,
+          side: "BUY",
+          amount: holding.invested,
+          quantity: holding.qty,
+          price: holding.price,
+          reason: `${sector.sector} allocation from Coach G ${goal} strategy`
+        });
+      });
+    });
+
+    if (!basketItems.length) {
+      Alert.alert(
+        "No Basket Created",
+        "Coach G could not create full-share basket orders from this allocation."
+      );
+      return;
+    }
+
+    await saveTradeBasket(basketItems, "COACH_G_SIMULATION");
+    await createBasketExecution();
+
+    setShowResults(false);
+    setShowSimulator(false);
+
+    router.push("/basket-execution");
   }
 
   function buildBehaviorInsights() {
@@ -383,17 +400,18 @@ export default function Coach() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
-  <Text style={styles.title}>Coach G Insights</Text>
-   
-  <Pressable
-    style={styles.dashboardButton}
-    onPress={() => router.replace("/(tabs)/dashboard")}
-  >
-    <Text style={styles.dashboardButtonText}>Dashboard</Text>
-  </Pressable>
+        <Text style={styles.title}>Coach G Insights</Text>
 
-  </View>
-<ActiveUserBanner />
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
+
+      <ActiveUserBanner />
+
       <View style={styles.card}>
         <Text style={styles.section}>Coach G Portfolio Review</Text>
 
@@ -451,7 +469,6 @@ export default function Coach() {
 
       <View style={styles.card}>
         <Text style={styles.section}>Risk & Diversification</Text>
-
         <Text style={styles.body}>Current risk: {risk}</Text>
         <Text style={styles.body}>
           Largest sector: {largestSector}{" "}
@@ -464,62 +481,61 @@ export default function Coach() {
 
       <View style={styles.card}>
         <Text style={styles.section}>Behavior Analysis</Text>
-
         {buildBehaviorInsights().map((item, index) => (
           <Text key={index} style={styles.body}>• {item}</Text>
         ))}
       </View>
 
-       <View style={styles.card}>
-  <Text style={styles.section}>Performance Attribution</Text>
+      <View style={styles.card}>
+        <Text style={styles.section}>Performance Attribution</Text>
 
-  <Text style={styles.body}>
-    Best performer:{" "}
-    {attribution?.bestPerformer
-      ? `${attribution.bestPerformer.symbol} (${Number(
-          attribution.bestPerformer.profitLossPct || 0
-        ).toFixed(2)}%)`
-      : "N/A"}
-  </Text>
+        <Text style={styles.body}>
+          Best performer:{" "}
+          {attribution?.bestPerformer
+            ? `${attribution.bestPerformer.symbol} (${Number(
+                attribution.bestPerformer.profitLossPct || 0
+              ).toFixed(2)}%)`
+            : "N/A"}
+        </Text>
 
-  <Text style={styles.body}>
-    Worst performer:{" "}
-    {attribution?.worstPerformer
-      ? `${attribution.worstPerformer.symbol} (${Number(
-          attribution.worstPerformer.profitLossPct || 0
-        ).toFixed(2)}%)`
-      : "N/A"}
-  </Text>
+        <Text style={styles.body}>
+          Worst performer:{" "}
+          {attribution?.worstPerformer
+            ? `${attribution.worstPerformer.symbol} (${Number(
+                attribution.worstPerformer.profitLossPct || 0
+              ).toFixed(2)}%)`
+            : "N/A"}
+        </Text>
 
-  <Text style={styles.body}>
-    Largest position:{" "}
-    {attribution?.largestPosition
-      ? `${attribution.largestPosition.symbol} - KES ${money(
-          attribution.largestPosition.marketValue ||
-            attribution.largestPosition.value
-        )}`
-      : "N/A"}
-  </Text>
+        <Text style={styles.body}>
+          Largest position:{" "}
+          {attribution?.largestPosition
+            ? `${attribution.largestPosition.symbol} - KES ${money(
+                attribution.largestPosition.marketValue ||
+                  attribution.largestPosition.value
+              )}`
+            : "N/A"}
+        </Text>
 
-  <Text style={styles.body}>
-    Most accumulated:{" "}
-    {attribution?.mostAccumulated
-      ? `${attribution.mostAccumulated.symbol} (${attribution.mostAccumulated.buys} buys)`
-      : "N/A"}
-  </Text>
+        <Text style={styles.body}>
+          Most accumulated:{" "}
+          {attribution?.mostAccumulated
+            ? `${attribution.mostAccumulated.symbol} (${attribution.mostAccumulated.buys} buys)`
+            : "N/A"}
+        </Text>
 
-  <Text style={styles.body}>
-    Most traded:{" "}
-    {attribution?.mostTraded
-      ? `${attribution.mostTraded.symbol} (${attribution.mostTraded.trades} trades)`
-      : "N/A"}
-  </Text>
+        <Text style={styles.body}>
+          Most traded:{" "}
+          {attribution?.mostTraded
+            ? `${attribution.mostTraded.symbol} (${attribution.mostTraded.trades} trades)`
+            : "N/A"}
+        </Text>
 
-  <Text style={styles.body}>
-    Estimated annual dividend income: KES{" "}
-    {money(attribution?.estimatedDividendIncome || 0)}
-  </Text>
-</View>
+        <Text style={styles.body}>
+          Estimated annual dividend income: KES{" "}
+          {money(attribution?.estimatedDividendIncome || 0)}
+        </Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.section}>Latest Saved Strategy</Text>
@@ -536,7 +552,7 @@ export default function Coach() {
           </Text>
         )}
       </View>
-       
+
       <Pressable
         style={styles.primary}
         onPress={() => {
@@ -546,7 +562,7 @@ export default function Coach() {
       >
         <Text style={styles.primaryText}>Simulate Coach G Recommendations</Text>
       </Pressable>
-       
+
       <View style={styles.card}>
         <Text style={styles.section}>What To Avoid</Text>
         <Text style={styles.body}>
@@ -573,6 +589,7 @@ export default function Coach() {
         sectorPlan={sectorPlan}
         projectedValue={value + Number(amount || 0)}
         saveRecommendation={saveRecommendation}
+        createTradeBasketFromRecommendation={createTradeBasketFromRecommendation}
         setSelectedSector={setSelectedSector}
         showResults={showResults}
         setShowResults={setShowResults}
@@ -617,6 +634,7 @@ function SimulatorModal({
   setShowResults,
   projectedValue,
   saveRecommendation,
+  createTradeBasketFromRecommendation,
   setSelectedSector
 }) {
   return (
@@ -757,6 +775,13 @@ function SimulatorModal({
                 >
                   <Text style={styles.primaryText}>Save Strategy To Profile</Text>
                 </Pressable>
+
+                <Pressable
+                  style={styles.primary}
+                  onPress={createTradeBasketFromRecommendation}
+                >
+                  <Text style={styles.primaryText}>Create Trade Basket</Text>
+                </Pressable>
               </View>
             </View>
           </Modal>
@@ -888,7 +913,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
   content: { padding: 20, paddingTop: 60, paddingBottom: 120 },
   title: { fontSize: 34, fontWeight: "900", color: "white" },
-
   card: {
     marginTop: 18,
     padding: 18,
@@ -897,7 +921,6 @@ const styles = StyleSheet.create({
     borderColor: "#1e293b",
     borderWidth: 1
   },
-
   label: { color: "#94a3b8", marginTop: 8 },
   metric: { fontSize: 30, fontWeight: "900", color: "#67e8f9" },
   metric2: { fontSize: 24, fontWeight: "900", color: "white" },
@@ -905,14 +928,12 @@ const styles = StyleSheet.create({
   body: { marginTop: 8, color: "#cbd5e1", lineHeight: 20 },
   white: { color: "white" },
   gray: { color: "#94a3b8" },
-
   quickGrid: {
     marginTop: 12,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12
   },
-
   quickCard: {
     width: "48%",
     backgroundColor: "#020617",
@@ -923,36 +944,30 @@ const styles = StyleSheet.create({
     minHeight: 96,
     justifyContent: "center"
   },
-
   quickTitle: {
     color: "#67e8f9",
     fontWeight: "900",
     fontSize: 16
   },
-
   quickDesc: {
     color: "#94a3b8",
     marginTop: 6,
     lineHeight: 18,
     fontSize: 12
   },
-
   primary: {
     marginTop: 20,
     backgroundColor: "#9333ea",
     padding: 18,
     borderRadius: 16
   },
-
   secondary: {
     marginTop: 14,
     backgroundColor: "#1e293b",
     padding: 18,
     borderRadius: 16
   },
-
   primaryText: { color: "white", fontWeight: "900", textAlign: "center" },
-
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,.72)",
@@ -960,7 +975,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 35
   },
-
   simulatorModal: {
     width: "100%",
     maxHeight: "92%",
@@ -970,7 +984,6 @@ const styles = StyleSheet.create({
     borderColor: "#9333ea",
     borderWidth: 1
   },
-
   popup: {
     width: "100%",
     maxHeight: "92%",
@@ -980,24 +993,20 @@ const styles = StyleSheet.create({
     borderColor: "#0891b2",
     borderWidth: 1
   },
-
   popupHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start"
   },
-
   popupTitle: {
     fontSize: 24,
     fontWeight: "900",
     color: "#67e8f9"
   },
-
   inputLabel: {
     color: "#94a3b8",
     marginTop: 16
   },
-
   input: {
     marginTop: 8,
     backgroundColor: "#111827",
@@ -1007,7 +1016,6 @@ const styles = StyleSheet.create({
     padding: 14,
     color: "white"
   },
-
   dropdown: {
     marginTop: 8,
     backgroundColor: "#111827",
@@ -1019,17 +1027,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center"
   },
-
   dropdownText: {
     color: "white",
     fontWeight: "800"
   },
-
   dropdownArrow: {
     color: "white",
     fontSize: 18
   },
-
   dropdownList: {
     marginTop: 6,
     backgroundColor: "#111827",
@@ -1038,19 +1043,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: "hidden"
   },
-
   dropdownItem: {
     padding: 14,
     borderBottomColor: "#1e293b",
     borderBottomWidth: 1
   },
-
   sliderRow: {
     marginTop: 10,
     flexDirection: "row",
     gap: 8
   },
-
   sliderChip: {
     flex: 1,
     padding: 12,
@@ -1059,24 +1061,20 @@ const styles = StyleSheet.create({
     borderColor: "#334155",
     borderWidth: 1
   },
-
   sliderChipActive: {
     backgroundColor: "#9333ea",
     borderColor: "#c084fc"
   },
-
   sliderText: {
     color: "#94a3b8",
     textAlign: "center",
     fontWeight: "800"
   },
-
   sliderTextActive: {
     color: "white",
     textAlign: "center",
     fontWeight: "900"
   },
-
   resultCard: {
     marginTop: 18,
     padding: 16,
@@ -1085,7 +1083,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(147,51,234,.35)",
     borderWidth: 1
   },
-
   buyCard: {
     marginTop: 18,
     padding: 16,
@@ -1094,25 +1091,21 @@ const styles = StyleSheet.create({
     borderColor: "rgba(16,185,129,.35)",
     borderWidth: 1
   },
-
   recommendationRow: {
     marginTop: 12,
     padding: 14,
     borderRadius: 14,
     backgroundColor: "#111827"
   },
-
   planTitle: {
     color: "white",
     fontWeight: "900"
   },
-
   link: {
     color: "#67e8f9",
     fontWeight: "900",
     marginTop: 6
   },
-
   stockRow: {
     marginTop: 12,
     padding: 14,
@@ -1124,7 +1117,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12
   },
-
   stockLeft: { flex: 1 },
   stockSymbol: { color: "white", fontSize: 16, fontWeight: "900" },
   stockName: { color: "#94a3b8", marginTop: 4 },
@@ -1133,7 +1125,6 @@ const styles = StyleSheet.create({
   stockShares: { color: "#67e8f9", fontWeight: "900" },
   marketPrice: { color: "#94a3b8", fontSize: 12, marginTop: 2 },
   stockValue: { color: "#cbd5e1", marginTop: 4 },
-
   summaryStrip: {
     marginTop: 18,
     backgroundColor: "#111827",
@@ -1142,12 +1133,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
-
   summaryItem: { flex: 1, alignItems: "center" },
   summaryLabel: { color: "#94a3b8", fontSize: 11 },
   summaryValue: { color: "#67e8f9", fontWeight: "900", marginTop: 5 },
   summaryValueYellow: { color: "#fde047", fontWeight: "900", marginTop: 5 },
-
   dividendBox: {
     marginTop: 14,
     backgroundColor: "rgba(16,185,129,.10)",
@@ -1156,14 +1145,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16
   },
-
   dividendValue: {
     color: "#86efac",
     fontSize: 24,
     fontWeight: "900",
     marginTop: 6
   },
-
   unused: {
     marginTop: 16,
     padding: 16,
@@ -1172,44 +1159,37 @@ const styles = StyleSheet.create({
     borderColor: "#854d0e",
     borderWidth: 1
   },
-
   dropdownRow: {
     flexDirection: "row",
     gap: 10
   },
-
   dropdownHalf: {
     flex: 1
   },
-
   resultOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,.75)",
     justifyContent: "center",
     padding: 16
   },
-
-headerRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12
-},
-
-dashboardButton: {
-  backgroundColor: "#1e293b",
-  borderColor: "#334155",
-  borderWidth: 1,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 14
-},
-
-dashboardButtonText: {
-  color: "#67e8f9",
-  fontWeight: "900"
-},
-
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: {
+    color: "#67e8f9",
+    fontWeight: "900"
+  },
   resultModal: {
     backgroundColor: "#020617",
     padding: 20,
