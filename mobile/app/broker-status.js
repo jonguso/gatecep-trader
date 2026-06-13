@@ -7,7 +7,6 @@ import {
   Text,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import {
   userGetItem,
@@ -63,61 +62,53 @@ export default function BrokerStatus() {
     load();
   }, []);
 
-  async function load() {
-    const profileRaw = userGetItem("investorProfile");
-    const statusRaw = await AsyncStorage.getItem("gatecepBrokerReadiness");
-    const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
-    const cashRaw = userGetItem("availableCash");
+async function load() {
+  const profileRaw = await userGetItem("investorProfile");
+  const statusRaw = await userGetItem("brokerReadiness");
+  const portfolioRaw = await userGetItem("portfolio");
+  const cashRaw = await userGetItem("availableCash");
+  const brokerRaw = await userGetItem("brokerProfile");
 
-    let nextStatus = { ...status };
+  let nextStatus = { ...status };
 
-    if (profileRaw) {
-  const saved = JSON.parse(profileRaw);
+  if (profileRaw) {
+    setProfile(JSON.parse(profileRaw));
+  }
 
-  setProfile(saved);
+  if (brokerRaw) {
+    const broker = JSON.parse(brokerRaw);
 
-  const brokerName =
-    saved?.broker?.name ||
-    saved?.profile?.broker ||
-    null;
+    if (broker?.broker || broker?.name || broker?.brokerName) {
+      nextStatus.brokerSelected = true;
+    }
+  }
 
-  if (brokerName) {
-    saved.broker = {
-      ...(saved.broker || {}),
-      name: brokerName
+  if (portfolioRaw) {
+    const holdings = JSON.parse(portfolioRaw);
+    nextStatus.starterPortfolioReady =
+      Array.isArray(holdings) && holdings.length > 0;
+  }
+
+  if (cashRaw && Number(cashRaw || 0) > 0) {
+    nextStatus.brokerFunded = true;
+  }
+
+  if (statusRaw) {
+    nextStatus = {
+      ...nextStatus,
+      ...JSON.parse(statusRaw)
     };
-
-    setProfile(saved);
-
-    nextStatus.brokerSelected = true;
   }
+
+  nextStatus.readyToInvest =
+    nextStatus.brokerSelected &&
+    nextStatus.cdsCreated &&
+    nextStatus.brokerOpened &&
+    nextStatus.brokerFunded &&
+    nextStatus.starterPortfolioReady;
+
+  setStatus(nextStatus);
 }
-
-    if (portfolioRaw) {
-      const holdings = JSON.parse(portfolioRaw);
-      nextStatus.starterPortfolioReady = Array.isArray(holdings) && holdings.length > 0;
-    }
-
-    if (cashRaw && Number(cashRaw || 0) > 0) {
-      nextStatus.brokerFunded = true;
-    }
-
-    if (statusRaw) {
-      nextStatus = {
-        ...nextStatus,
-        ...JSON.parse(statusRaw)
-      };
-    }
-
-    nextStatus.readyToInvest =
-      nextStatus.brokerSelected &&
-      nextStatus.cdsCreated &&
-      nextStatus.brokerOpened &&
-      nextStatus.brokerFunded &&
-      nextStatus.starterPortfolioReady;
-
-    setStatus(nextStatus);
-  }
 
   async function toggleStep(key) {
     const nextStatus = {
@@ -134,17 +125,8 @@ export default function BrokerStatus() {
 
     setStatus(nextStatus);
 
-    await AsyncStorage.setItem(
-      "gatecepBrokerReadiness",
-      JSON.stringify(nextStatus)
-    );
-  }
-
-  async function saveAndContinue() {
-    await AsyncStorage.setItem(
-      "gatecepBrokerReadiness",
-      JSON.stringify(status)
-    );
+   await userSetItem("brokerReadiness", JSON.stringify(nextStatus));
+   await userSetItem("brokerReadiness", JSON.stringify(status));
 
     if (status.readyToInvest) {
       Alert.alert("Ready", "You are ready for first trade simulation.");

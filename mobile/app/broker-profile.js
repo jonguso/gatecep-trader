@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from "react";
 import {
-  ScrollView,
-  Text,
-  View,
-  TextInput,
+  Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
-  Alert
+  Text,
+  TextInput,
+  View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
 
 const brokers = [
   "AIB-AXYS",
@@ -36,13 +39,13 @@ export default function BrokerProfile() {
 
   async function loadExistingProfile() {
     try {
-      const raw = await AsyncStorage.getItem("gatecepBrokerProfile");
+      const raw = await userGetItem("brokerProfile");
 
       if (raw) {
         const saved = JSON.parse(raw);
 
         setForm({
-          broker: saved.broker || "AIB-AXYS",
+          broker: saved.broker || saved.name || saved.brokerName || "AIB-AXYS",
           clientNumber: saved.clientNumber || "",
           cdsNumber: saved.cdsNumber || "",
           brokerEmail: saved.brokerEmail || ""
@@ -57,48 +60,30 @@ export default function BrokerProfile() {
 
   async function saveProfile() {
     try {
-      const profile = {
+      const baseProfile = {
         id: `BP-${Date.now()}`,
         broker: form.broker,
+        name: form.broker,
+        brokerName: form.broker,
+        nickname: form.broker,
         clientNumber: form.clientNumber.trim(),
         cdsNumber: form.cdsNumber.trim(),
         brokerEmail: form.brokerEmail.trim(),
+        defaultBroker: true,
+        linked: false,
+        status: "CONNECTED_MANUAL",
+        connectionMode: "MANUAL_PROFILE",
         verificationMode: "STATEMENT_MATCH",
         source: "USER_PROVIDED",
         updatedAt: new Date().toISOString()
       };
 
-      await AsyncStorage.setItem(
-        "gatecepBrokerProfile",
-        JSON.stringify(profile)
-      );
+      await userSetItem("brokerProfile", JSON.stringify(baseProfile));
+      await userSetItem("brokerProfileSkipped", "false");
+      await userSetItem("defaultBrokerProfile", JSON.stringify(baseProfile));
+      await userSetItem("brokerProfiles", JSON.stringify([baseProfile]));
 
-const brokerProfile = {
-  id: profile.id,
-  broker: profile.broker,
-  nickname: profile.broker,
-  clientNumber: profile.clientNumber,
-  cdsNumber: profile.cdsNumber,
-  brokerEmail: profile.brokerEmail,
-  defaultBroker: true,
-  linked: false,
-  connectionMode: "MANUAL_PROFILE",
-  verificationMode: profile.verificationMode,
-  source: profile.source,
-  updatedAt: profile.updatedAt
-};
-
-await AsyncStorage.setItem(
-  "gatecepDefaultBrokerProfile",
-  JSON.stringify(brokerProfile)
-);
-
-await AsyncStorage.setItem(
-  "gatecepBrokerProfiles",
-  JSON.stringify([brokerProfile])
-);
-
-      const verify = await AsyncStorage.getItem("gatecepBrokerProfile");
+      const verify = await userGetItem("brokerProfile");
 
       if (!verify) {
         throw new Error("Save verification failed.");
@@ -123,16 +108,17 @@ await AsyncStorage.setItem(
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-             <View style={styles.headerRow}>
-  <Text style={styles.title}>Broker Profile</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Broker Profile</Text>
 
-  <Pressable
-    style={styles.dashboardButton}
-    onPress={() => router.replace("/(tabs)/dashboard")}
-  >
-    <Text style={styles.dashboardButtonText}>Dashboard</Text>
-  </Pressable>
-</View>
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.subtitle}>
         This does not connect to your broker yet. It helps Gatecep match your
         uploaded valuation or statement to the correct broker profile.
@@ -234,8 +220,8 @@ await AsyncStorage.setItem(
         <Text style={styles.secondaryText}>Save Broker Profile Only</Text>
       </Pressable>
 
-      <Pressable onPress={() => router.push("/onboarding/broker-question")}>
-        <Text style={styles.backLink}>Go Back</Text>
+      <Pressable onPress={() => router.push("/broker-account-center")}>
+        <Text style={styles.backLink}>Back to Broker Account Center</Text>
       </Pressable>
     </ScrollView>
   );
@@ -257,9 +243,27 @@ function Input({ label, ...props }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
-  content: { padding: 22, paddingTop: 70, paddingBottom: 40 },
-  title: { color: "white", fontSize: 32, fontWeight: "900" },
+  content: { padding: 22, paddingTop: 70, paddingBottom: 60 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
+  title: { color: "white", fontSize: 32, fontWeight: "900", flex: 1 },
   subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: {
+    color: "#67e8f9",
+    fontWeight: "900"
+  },
   notice: {
     marginTop: 22,
     backgroundColor: "rgba(6, 182, 212, 0.10)",
@@ -322,26 +326,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginTop: 12
   },
-headerRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12
-},
-
-dashboardButton: {
-  backgroundColor: "#1e293b",
-  borderColor: "#334155",
-  borderWidth: 1,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 14
-},
-
-dashboardButtonText: {
-  color: "#67e8f9",
-  fontWeight: "900"
-},
   secondaryText: { color: "#67e8f9", textAlign: "center", fontWeight: "900" },
   backLink: { color: "#94a3b8", textAlign: "center", marginTop: 24 }
 });

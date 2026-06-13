@@ -6,6 +6,7 @@ export async function buildSyncStatus() {
 
   const cashRaw = await userGetItem("availableCash");
   const brokerRaw = await userGetItem("brokerProfile");
+  const brokerSkippedRaw = await userGetItem("brokerProfileSkipped");
   const txRaw = await userGetItem("transactionHistory");
 
   const portfolioUploaded = await userGetItem("statementUploaded");
@@ -15,16 +16,31 @@ export async function buildSyncStatus() {
   const statementSummaryRaw = await userGetItem("statementSummary");
   const txSummaryRaw = await userGetItem("transactionUploadSummary");
 
-  const broker = brokerRaw ? JSON.parse(brokerRaw) : null;
+  const brokerProfile = brokerRaw ? JSON.parse(brokerRaw) : null;
   const transactions = txRaw ? JSON.parse(txRaw) : [];
+
   const statementSummary = statementSummaryRaw
     ? JSON.parse(statementSummaryRaw)
     : null;
+
   const txSummary = txSummaryRaw ? JSON.parse(txSummaryRaw) : null;
 
+  const brokerName =
+    brokerProfile?.broker ||
+    brokerProfile?.name ||
+    brokerProfile?.brokerName ||
+    brokerProfile?.selectedBroker ||
+    brokerProfile?.firm ||
+    brokerProfile?.company ||
+    brokerProfile?.provider ||
+    null;
+
+  const brokerConnected =
+    !!brokerName && brokerSkippedRaw !== "true";
+
   const status = {
-    broker: broker?.broker || broker?.name || "No broker",
-    brokerConnected: !!broker,
+    broker: brokerName || "No broker",
+    brokerConnected,
     holdingsCount: holdings.length,
     availableCash: Number(cashRaw || 0),
     transactionCount: transactions.length,
