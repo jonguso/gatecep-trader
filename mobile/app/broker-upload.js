@@ -7,29 +7,47 @@ import {
   View
 } from "react-native";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import {
+  userGetItem
+} from "../src/auth/userStorage";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
 export default function BrokerUpload() {
   const [portfolioUploaded, setPortfolioUploaded] = useState(false);
   const [cashUploaded, setCashUploaded] = useState(false);
+  const [transactionsUploaded, setTransactionsUploaded] = useState(false);
 
   useEffect(() => {
     loadStatus();
   }, []);
 
   async function loadStatus() {
-    const portfolio = await AsyncStorage.getItem("gatecepStatementUploaded");
-    const cash = await AsyncStorage.getItem("gatecepCashStatementUploaded");
+    const portfolio = await userGetItem("statementUploaded");
+    const cash = await userGetItem("cashStatementUploaded");
+    const transactions = await userGetItem("transactionsUploaded");
 
     setPortfolioUploaded(portfolio === "true");
     setCashUploaded(cash === "true");
+    setTransactionsUploaded(transactions === "true");
+
+    await buildSyncStatus();
   }
 
   const canContinue = portfolioUploaded && cashUploaded;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Connect Your Portfolio</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Connect Your Portfolio</Text>
+
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.subtitle}>
         Upload your broker valuation, cash statement, or transaction history so
@@ -41,6 +59,7 @@ export default function BrokerUpload() {
 
         <StatusRow label="Portfolio Valuation" done={portfolioUploaded} />
         <StatusRow label="Cash / Ledger Statement" done={cashUploaded} />
+        <StatusRow label="Transaction / Order History" done={transactionsUploaded} />
       </View>
 
       <View style={styles.card}>
@@ -82,7 +101,9 @@ export default function BrokerUpload() {
           onPress={() => router.push("/transaction-import")}
         >
           <Text style={styles.docTitle}>Transaction / Order History</Text>
-          <Text style={styles.optional}>Optional</Text>
+          <Text style={transactionsUploaded ? styles.complete : styles.optional}>
+            {transactionsUploaded ? "Completed" : "Optional"}
+          </Text>
           <Text style={styles.docDesc}>
             Helps Coach G understand buying behavior, selling discipline, and
             goal alignment.
@@ -96,7 +117,7 @@ export default function BrokerUpload() {
           !canContinue && styles.disabledButton
         ]}
         disabled={!canContinue}
-        onPress={() => router.replace("/dashboard")}
+        onPress={() => router.replace("/(tabs)/dashboard")}
       >
         <Text style={styles.continueText}>
           {canContinue
@@ -136,15 +157,34 @@ const styles = StyleSheet.create({
     paddingTop: 70,
     paddingBottom: 90
   },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
   title: {
     color: "white",
-    fontSize: 34,
-    fontWeight: "900"
+    fontSize: 30,
+    fontWeight: "900",
+    flex: 1
   },
   subtitle: {
     color: "#94a3b8",
     marginTop: 10,
     lineHeight: 22
+  },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: {
+    color: "#67e8f9",
+    fontWeight: "900"
   },
   statusCard: {
     marginTop: 22,
@@ -173,11 +213,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderBottomColor: "rgba(148,163,184,.18)",
     borderBottomWidth: 1,
-    paddingVertical: 12
+    paddingVertical: 12,
+    gap: 12
   },
   statusLabel: {
     color: "white",
-    fontWeight: "800"
+    fontWeight: "800",
+    flex: 1
   },
   statusDone: {
     color: "#86efac",
