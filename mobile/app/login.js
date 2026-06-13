@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -10,7 +10,11 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { saveSession } from "../src/auth/authStore";
+
+import {
+  getCurrentSession,
+  saveSession
+} from "../src/auth/authStore";
 import { userGetItem } from "../src/auth/userStorage";
 
 export default function Login() {
@@ -18,6 +22,18 @@ export default function Login() {
     username: "",
     password: ""
   });
+
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
+
+  async function checkExistingSession() {
+    const session = await getCurrentSession();
+
+    if (session?.loggedIn && session?.userId) {
+      await routeAfterLogin();
+    }
+  }
 
   async function routeAfterLogin() {
     const completed = await userGetItem("onboardingCompleted");
@@ -53,9 +69,9 @@ export default function Login() {
       const users = usersRaw ? JSON.parse(usersRaw) : [];
 
       const user = users.find(
-        (u) =>
-          String(u.username || "").trim().toLowerCase() === normalizedUser &&
-          String(u.password || "").trim() === enteredPass
+        (item) =>
+          String(item.username || "").trim().toLowerCase() === normalizedUser &&
+          String(item.password || "").trim() === enteredPass
       );
 
       if (!user) {
