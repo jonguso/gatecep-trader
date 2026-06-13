@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import {
-  View,
-  Text,
   Pressable,
-  StyleSheet
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+
 import { savePortfolio } from "../../src/portfolio/portfolioStore";
 import {
   userGetItem,
   userSetItem
 } from "../../src/auth/userStorage";
-
 
 const STARTER_AMOUNT = 10000;
 
@@ -50,11 +50,11 @@ export default function SmartPortfolio() {
   }, []);
 
   async function buildPlan() {
-  const raw = await userGetItem("investorProfile");
-  const saved = raw ? JSON.parse(raw) : {};
+    const raw = await userGetItem("investorProfile");
+    const saved = raw ? JSON.parse(raw) : {};
 
-  const risk = saved.riskTolerance || "Balanced";
-  const goal = saved.goal || "Build Wealth";
+    const risk = saved.riskTolerance || "Balanced";
+    const goal = saved.goal || "Build Wealth";
 
     let allocation = [];
 
@@ -110,16 +110,13 @@ export default function SmartPortfolio() {
       updatedAt: new Date().toISOString()
     };
 
-    await userSetItem(
-    "investorProfile",
-    JSON.stringify(completedProfile)
-  );
+    await userSetItem("investorProfile", JSON.stringify(completedProfile));
 
-  setProfile(completedProfile);
-  setPlan(smartPlan);
-  setStarterHoldings(holdings);
-  setCashReserve(remainingCash);
-}
+    setProfile(completedProfile);
+    setPlan(smartPlan);
+    setStarterHoldings(holdings);
+    setCashReserve(remainingCash);
+  }
 
   function buildStarterHoldings(smartPlan = []) {
     const holdings = [];
@@ -195,12 +192,12 @@ export default function SmartPortfolio() {
   }
 
   return (
-    <View style={styles.screen}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Your Smart Portfolio is Ready</Text>
 
       <Text style={styles.subtitle}>
-        Coach G built this KES {money(STARTER_AMOUNT)} starter allocation from your goal,
-        experience, risk preference, and broker status.
+        Coach G built this KES {money(STARTER_AMOUNT)} starter allocation from
+        your goal, experience, risk preference, and broker status.
       </Text>
 
       <View style={styles.card}>
@@ -210,7 +207,7 @@ export default function SmartPortfolio() {
 
         {plan.map((item) => (
           <View key={item.name} style={styles.row}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.amount}>KES {money(item.amount)}</Text>
             </View>
@@ -229,9 +226,9 @@ export default function SmartPortfolio() {
             allocation. It will remain as cash reserve.
           </Text>
         ) : (
-          starterHoldings.map((holding) => (
-            <View key={holding.symbol} style={styles.row}>
-              <View>
+          starterHoldings.map((holding, index) => (
+            <View key={`${holding.symbol}-${index}`} style={styles.row}>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{holding.symbol}</Text>
                 <Text style={styles.amount}>
                   {holding.quantity} shares • {holding.sector}
@@ -270,7 +267,7 @@ export default function SmartPortfolio() {
       <Pressable style={styles.primary} onPress={continueToDashboard}>
         <Text style={styles.primaryText}>Continue to Dashboard</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -284,9 +281,12 @@ function money(value) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#020617",
+    backgroundColor: "#020617"
+  },
+  content: {
     padding: 25,
-    justifyContent: "center"
+    paddingTop: 70,
+    paddingBottom: 110
   },
   title: {
     color: "white",
@@ -331,7 +331,8 @@ const styles = StyleSheet.create({
   },
   weight: {
     color: "white",
-    fontWeight: "900"
+    fontWeight: "900",
+    textAlign: "right"
   },
   cashRow: {
     flexDirection: "row",
@@ -353,6 +354,11 @@ const styles = StyleSheet.create({
   noticeTitle: {
     color: "#67e8f9",
     fontWeight: "900"
+  },
+  noticeText: {
+    color: "#cbd5e1",
+    marginTop: 8,
+    lineHeight: 20
   },
   noticeText: {
     color: "#cbd5e1",
