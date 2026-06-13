@@ -1,12 +1,10 @@
 import React from "react";
 import {
-  View,
-  Text,
   Pressable,
+  ScrollView,
   StyleSheet,
-  ScrollView
+  Text
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import {
   userGetItem,
@@ -34,45 +32,53 @@ const brokers = [
 
 export default function RecommendBroker() {
   async function selectBroker(broker) {
-    await AsyncStorage.setItem(
-      "gatecepRecommendedBroker",
-      JSON.stringify({
-        name: broker.name,
-        selectedAt: new Date().toISOString()
-      })
-    );
-
-    const profileRaw =
-      await userGetItem("investorProfile");
-
-    const profile = profileRaw
-      ? JSON.parse(profileRaw)
-      : {};
-
-    profile.broker = {
+    const selected = {
+      id: `BR-${Date.now()}`,
+      broker: broker.name,
       name: broker.name,
-      source: "COACH_G_RECOMMENDATION"
+      brokerName: broker.name,
+      nickname: broker.name,
+      reason: broker.reason,
+      status: "RECOMMENDED",
+      source: "COACH_G_RECOMMENDATION",
+      selectedAt: new Date().toISOString()
     };
 
-    await userGetItem("investorProfile",
-      JSON.stringify(profile)
-    );
+    await userSetItem("recommendedBroker", JSON.stringify(selected));
+    await userSetItem("brokerProfile", JSON.stringify(selected));
+    await userSetItem("brokerProfileSkipped", "false");
+
+    const profileRaw = await userGetItem("investorProfile");
+    const profile = profileRaw ? JSON.parse(profileRaw) : {};
+
+    const nextProfile = {
+      ...profile,
+      broker: {
+        name: broker.name,
+        reason: broker.reason,
+        source: "COACH_G_RECOMMENDATION",
+        selectedAt: selected.selectedAt
+      },
+      updatedAt: new Date().toISOString()
+    };
+
+    await userSetItem("investorProfile", JSON.stringify(nextProfile));
+
+    router.push("/broker-status");
+  }
+
+  async function skipBroker() {
+    await userSetItem("brokerProfileSkipped", "true");
 
     router.push("/broker-status");
   }
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-    >
-      <Text style={styles.title}>
-        Coach G Broker Recommendation
-      </Text>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Coach G Broker Recommendation</Text>
 
       <Text style={styles.subtitle}>
-        Based on your onboarding profile,
-        Coach G recommends starting with one
+        Based on your onboarding profile, Coach G recommends starting with one
         of the brokers below.
       </Text>
 
@@ -82,25 +88,13 @@ export default function RecommendBroker() {
           style={styles.card}
           onPress={() => selectBroker(broker)}
         >
-          <Text style={styles.brokerName}>
-            {broker.name}
-          </Text>
-
-          <Text style={styles.reason}>
-            {broker.reason}
-          </Text>
+          <Text style={styles.brokerName}>{broker.name}</Text>
+          <Text style={styles.reason}>{broker.reason}</Text>
         </Pressable>
       ))}
 
-      <Pressable
-        style={styles.skip}
-        onPress={() =>
-          router.push("/broker-status")
-        }
-      >
-        <Text style={styles.skipText}>
-          Continue Without Selecting
-        </Text>
+      <Pressable style={styles.skip} onPress={skipBroker}>
+        <Text style={styles.skipText}>Continue Without Selecting</Text>
       </Pressable>
     </ScrollView>
   );
@@ -111,26 +105,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#020617"
   },
-
   content: {
     padding: 24,
     paddingTop: 70,
     paddingBottom: 60
   },
-
   title: {
     color: "white",
     fontSize: 32,
     fontWeight: "900"
   },
-
   subtitle: {
     color: "#94a3b8",
     marginTop: 12,
     marginBottom: 24,
     lineHeight: 22
   },
-
   card: {
     backgroundColor: "#0f172a",
     borderColor: "#9333ea",
@@ -139,24 +129,20 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 14
   },
-
   brokerName: {
     color: "#67e8f9",
     fontSize: 18,
     fontWeight: "900"
   },
-
   reason: {
     color: "#cbd5e1",
     marginTop: 8,
     lineHeight: 20
   },
-
   skip: {
     marginTop: 20,
     padding: 16
   },
-
   skipText: {
     color: "#94a3b8",
     textAlign: "center",
