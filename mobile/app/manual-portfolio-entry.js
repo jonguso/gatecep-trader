@@ -8,7 +8,9 @@ import {
   StyleSheet,
   Alert
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { savePortfolio } from "../src/portfolio/portfolioStore";
+import { userSetItem } from "../src/auth/userStorage";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 import { router } from "expo-router";
 
 const market = {
@@ -85,43 +87,59 @@ export default function ManualPortfolioEntry() {
   }
 
   async function submitPortfolio() {
-    if (enrichedRows.length === 0) {
-      Alert.alert("No holdings", "Add at least one holding.");
-      return;
-    }
-
-    await AsyncStorage.setItem(
-      "gatecepManualPortfolio",
-      JSON.stringify(enrichedRows)
-    );
-
-    await AsyncStorage.setItem(
-      "gatecepLatestUpload",
-      JSON.stringify({
-        uploadedAt: new Date().toISOString(),
-        valuation: {
-          reportType: "manual",
-          fileName: "Manual Portfolio Entry",
-          uploadedAt: new Date().toISOString(),
-          backendStored: false,
-          manualEntry: true,
-          parsedHoldings: enrichedRows
-        }
-      })
-    );
-
-    await AsyncStorage.setItem(
-      "gatecepBrokerProfile",
-      JSON.stringify({
-        broker: "MANUAL",
-        clientNumber: "",
-        cdsNumber: "",
-        updatedAt: new Date().toISOString()
-      })
-    );
-
-    router.push("/dashboard");
+  if (enrichedRows.length === 0) {
+    Alert.alert("No holdings", "Add at least one holding.");
+    return;
   }
+
+  await savePortfolio(enrichedRows);
+
+  await userSetItem(
+    "latestUpload",
+    JSON.stringify({
+      uploadedAt: new Date().toISOString(),
+      valuation: {
+        reportType: "manual",
+        fileName: "Manual Portfolio Entry",
+        uploadedAt: new Date().toISOString(),
+        backendStored: false,
+        manualEntry: true,
+        parsedHoldings: enrichedRows
+      }
+    })
+  );
+
+  await userSetItem(
+    "statementSummary",
+    JSON.stringify({
+      count: enrichedRows.length,
+      fileName: "Manual Portfolio Entry",
+      source: "MANUAL_PORTFOLIO_ENTRY",
+      uploadedAt: new Date().toISOString()
+    })
+  );
+
+  await userSetItem("statementUploaded", "true");
+
+  await userSetItem(
+    "brokerProfile",
+    JSON.stringify({
+      broker: "MANUAL",
+      name: "MANUAL",
+      brokerName: "MANUAL",
+      clientNumber: "",
+      cdsNumber: "",
+      source: "MANUAL_PORTFOLIO_ENTRY",
+      updatedAt: new Date().toISOString()
+    })
+  );
+
+  await userSetItem("brokerProfileSkipped", "false");
+
+  await buildSyncStatus();
+
+  router.push("/(tabs)/dashboard");
+}
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -215,8 +233,8 @@ export default function ManualPortfolioEntry() {
         <Text style={styles.primaryText}>Submit Portfolio for Coach G Analysis</Text>
       </Pressable>
 
-      <Pressable style={styles.linkButton} onPress={() => router.push("/investor-home")}>
-        <Text style={styles.linkText}>Back to Investor Home</Text>
+      <Pressable style={styles.linkButton} onPress={() => router.push("/(tabs)/dashboard")}>
+        <Text style={styles.linkText}>Back to Dashboard</Text>
       </Pressable>
     </ScrollView>
   );
