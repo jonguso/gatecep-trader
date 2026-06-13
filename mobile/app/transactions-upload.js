@@ -15,6 +15,7 @@ import { router } from "expo-router";
 
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 import { userSetItem } from "../src/auth/userStorage";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
 export default function TransactionsUpload() {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -307,6 +308,8 @@ export default function TransactionsUpload() {
         uploadedAt: new Date().toISOString()
       })
     );
+
+    await buildSyncStatus();
 
     Alert.alert("Transactions Saved", `${transactions.length} transactions saved.`);
     router.replace("/portfolio-sync-center");

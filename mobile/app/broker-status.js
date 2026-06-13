@@ -13,7 +13,6 @@ import {
   userSetItem
 } from "../src/auth/userStorage";
 
-
 const steps = [
   {
     key: "brokerSelected",
@@ -39,16 +38,12 @@ const steps = [
     key: "starterPortfolioReady",
     title: "Starter Portfolio Ready",
     detail: "Coach G has built your starter allocation."
-  },
-  {
-    key: "readyToInvest",
-    title: "Ready To Place First Trade",
-    detail: "You are ready for the first simulated or real trade."
   }
 ];
 
 export default function BrokerStatus() {
   const [profile, setProfile] = useState(null);
+  const [brokerProfile, setBrokerProfile] = useState(null);
   const [status, setStatus] = useState({
     brokerSelected: false,
     cdsCreated: false,
@@ -62,53 +57,63 @@ export default function BrokerStatus() {
     load();
   }, []);
 
-async function load() {
-  const profileRaw = await userGetItem("investorProfile");
-  const statusRaw = await userGetItem("brokerReadiness");
-  const portfolioRaw = await userGetItem("portfolio");
-  const cashRaw = await userGetItem("availableCash");
-  const brokerRaw = await userGetItem("brokerProfile");
+  async function load() {
+    const profileRaw = await userGetItem("investorProfile");
+    const statusRaw = await userGetItem("brokerReadiness");
+    const portfolioRaw = await userGetItem("portfolio");
+    const cashRaw = await userGetItem("availableCash");
+    const brokerRaw = await userGetItem("brokerProfile");
 
-  let nextStatus = { ...status };
+    let nextStatus = { ...status };
 
-  if (profileRaw) {
-    setProfile(JSON.parse(profileRaw));
-  }
-
-  if (brokerRaw) {
-    const broker = JSON.parse(brokerRaw);
-
-    if (broker?.broker || broker?.name || broker?.brokerName) {
-      nextStatus.brokerSelected = true;
+    if (profileRaw) {
+      setProfile(JSON.parse(profileRaw));
     }
+
+    if (brokerRaw) {
+      const savedBroker = JSON.parse(brokerRaw);
+      setBrokerProfile(savedBroker);
+
+      if (
+        savedBroker?.broker ||
+        savedBroker?.name ||
+        savedBroker?.brokerName
+      ) {
+        nextStatus.brokerSelected = true;
+      }
+    }
+
+    if (portfolioRaw) {
+      const holdings = JSON.parse(portfolioRaw);
+      nextStatus.starterPortfolioReady =
+        Array.isArray(holdings) && holdings.length > 0;
+    }
+
+    if (cashRaw && Number(cashRaw || 0) > 0) {
+      nextStatus.brokerFunded = true;
+    }
+
+    if (statusRaw) {
+      nextStatus = {
+        ...nextStatus,
+        ...JSON.parse(statusRaw)
+      };
+    }
+
+    nextStatus.readyToInvest = isReady(nextStatus);
+
+    setStatus(nextStatus);
   }
 
-  if (portfolioRaw) {
-    const holdings = JSON.parse(portfolioRaw);
-    nextStatus.starterPortfolioReady =
-      Array.isArray(holdings) && holdings.length > 0;
+  function isReady(nextStatus) {
+    return (
+      nextStatus.brokerSelected &&
+      nextStatus.cdsCreated &&
+      nextStatus.brokerOpened &&
+      nextStatus.brokerFunded &&
+      nextStatus.starterPortfolioReady
+    );
   }
-
-  if (cashRaw && Number(cashRaw || 0) > 0) {
-    nextStatus.brokerFunded = true;
-  }
-
-  if (statusRaw) {
-    nextStatus = {
-      ...nextStatus,
-      ...JSON.parse(statusRaw)
-    };
-  }
-
-  nextStatus.readyToInvest =
-    nextStatus.brokerSelected &&
-    nextStatus.cdsCreated &&
-    nextStatus.brokerOpened &&
-    nextStatus.brokerFunded &&
-    nextStatus.starterPortfolioReady;
-
-  setStatus(nextStatus);
-}
 
   async function toggleStep(key) {
     const nextStatus = {
@@ -116,19 +121,22 @@ async function load() {
       [key]: !status[key]
     };
 
-    nextStatus.readyToInvest =
-      nextStatus.brokerSelected &&
-      nextStatus.cdsCreated &&
-      nextStatus.brokerOpened &&
-      nextStatus.brokerFunded &&
-      nextStatus.starterPortfolioReady;
+    nextStatus.readyToInvest = isReady(nextStatus);
 
     setStatus(nextStatus);
+    await userSetItem("brokerReadiness", JSON.stringify(nextStatus));
+  }
 
-   await userSetItem("brokerReadiness", JSON.stringify(nextStatus));
-   await userSetItem("brokerReadiness", JSON.stringify(status));
+  async function saveAndContinue() {
+    const nextStatus = {
+      ...status,
+      readyToInvest: isReady(status)
+    };
 
-    if (status.readyToInvest) {
+    await userSetItem("brokerReadiness", JSON.stringify(nextStatus));
+    setStatus(nextStatus);
+
+    if (nextStatus.readyToInvest) {
       Alert.alert("Ready", "You are ready for first trade simulation.");
       router.push("/first-trade");
       return;
@@ -142,7 +150,12 @@ async function load() {
     return steps.filter((step) => status[step.key]).length;
   }, [status]);
 
-  const recommendedBroker = profile?.broker?.name || "Not selected yet";
+  const recommendedBroker =
+    brokerProfile?.broker ||
+    brokerProfile?.name ||
+    brokerProfile?.brokerName ||
+    profile?.broker?.name ||
+    "Not selected yet";
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -213,10 +226,11 @@ async function load() {
 
       <Pressable style={styles.primary} onPress={saveAndContinue}>
         <Text style={styles.primaryText}>
-          {status.readyToInvest ? "Go to First Trade Simulation" : "Save Readiness Status"}
+          {status.readyToInvest
+            ? "Go to First Trade Simulation"
+            : "Save Readiness Status"}
         </Text>
       </Pressable>
-      
     </ScrollView>
   );
 }
@@ -333,17 +347,6 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: "white",
-    textAlign: "center",
-    fontWeight: "900"
-  },
-  secondary: {
-    marginTop: 14,
-    backgroundColor: "#1e293b",
-    padding: 16,
-    borderRadius: 18
-  },
-  secondaryText: {
-    color: "#67e8f9",
     textAlign: "center",
     fontWeight: "900"
   }

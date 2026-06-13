@@ -11,9 +11,10 @@ import {
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import * as XLSX from "xlsx";
+import { userSetItem } from "../src/auth/userStorage";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
 export default function TransactionImport() {
   const [form, setForm] = useState({
@@ -265,32 +266,30 @@ export default function TransactionImport() {
   }
 
   async function saveTransactions() {
-    if (!transactions.length) {
-      Alert.alert("No Transactions", "Add or upload at least one transaction.");
-      return;
-    }
-
-    await AsyncStorage.setItem("gatecepTransactionsUploaded", "true");
-
-    await AsyncStorage.setItem(
-      "gatecepTransactionHistory",
-      JSON.stringify(transactions)
-    );
-
-    await AsyncStorage.setItem(
-      "gatecepTransactionSummary",
-      JSON.stringify({
-        count: transactions.length,
-        uploadedAt: new Date().toISOString(),
-        source: selectedFile ? "MOBILE_TRANSACTION_UPLOAD" : "MANUAL_ENTRY",
-        fileName: selectedFile?.name || null
-      })
-    );
-
-    Alert.alert("Saved", "Transaction history saved for Coach G.");
-
-    router.replace("/broker-upload");
+  if (!transactions.length) {
+    Alert.alert("No Transactions", "Add or upload at least one transaction.");
+    return;
   }
+
+  await userSetItem("transactionHistory", JSON.stringify(transactions));
+  await userSetItem("transactionsUploaded", "true");
+
+  await userSetItem(
+    "transactionUploadSummary",
+    JSON.stringify({
+      count: transactions.length,
+      uploadedAt: new Date().toISOString(),
+      source: selectedFile ? "TRANSACTION_IMPORT_FILE" : "MANUAL_ENTRY",
+      fileName: selectedFile?.name || null
+    })
+  );
+
+  await buildSyncStatus();
+
+  Alert.alert("Saved", "Transaction history saved for Coach G.");
+
+  router.replace("/portfolio-sync-center");
+}
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
