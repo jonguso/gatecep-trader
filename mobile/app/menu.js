@@ -9,6 +9,7 @@ import {
 import { router } from "expo-router";
 import { getCurrentSession, logout } from "../src/auth/authStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BUILD_INFO } from "../src/config/buildInfo";
 
 
 const items = [
