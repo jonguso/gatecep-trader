@@ -12,6 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
 import { getCurrentSession } from "../../src/auth/authStore";
+import { APP_VERSION } from "../../src/version/versionRegistry";
 
 import { loadPortfolio } from "../../src/portfolio/portfolioStore";
 import { calculatePortfolioHealth } from "../../src/portfolio/portfolioHealth";
@@ -642,6 +643,7 @@ sectors[sector].securities.push(h);
           <ActionButton title="Command Center" route="/portfolio-command-center" />
           <ActionButton title="Deposit Funds" route="/funds" />
           <ActionButton title="Connect Broker" route="/broker-profile" />
+          <ActionButton title="Version Center" route="/version-center" />
         </View>
 
         <Pressable style={styles.primary} onPress={openCoach}>
