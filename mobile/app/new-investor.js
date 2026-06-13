@@ -8,7 +8,6 @@ import {
   TextInput,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import {
   userGetItem,
@@ -286,8 +285,9 @@ export default function NewInvestor() {
       starterPlan
     };
 
-    await userGetItem("investorProfile", JSON.stringify(saved));
-    setResult(saved);
+    await userSetItem("investorProfile", JSON.stringify(saved));
+    await userSetItem("onboardingCompleted", "false");
+    await userSetItem("questionnaireCompleted", "true");
   }
 
   if (result) {
@@ -419,7 +419,7 @@ export default function NewInvestor() {
 
         <Pressable
           style={styles.secondary}
-          onPress={() => router.replace("/dashboard")}
+          onPress={() => router.replace("/(tabs)/dashboard")
         >
           <Text style={styles.secondaryText}>Start My Investing Journey</Text>
         </Pressable>
