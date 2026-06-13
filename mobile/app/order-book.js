@@ -6,8 +6,9 @@ import {
   Text,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+
+import { userGetItem } from "../src/auth/userStorage";
 
 export default function OrderBook() {
   const [trades, setTrades] = useState([]);
@@ -17,7 +18,7 @@ export default function OrderBook() {
   }, []);
 
   async function load() {
-    const raw = await AsyncStorage.getItem("gatecepSimulatedTrades");
+    const raw = await userGetItem("simulatedTrades");
     setTrades(raw ? JSON.parse(raw) : []);
   }
 
@@ -32,17 +33,17 @@ export default function OrderBook() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      
       <View style={styles.headerRow}>
-  <Text style={styles.title}>Order Book</Text>
+        <Text style={styles.title}>Order Book</Text>
 
-  <Pressable
-    style={styles.dashboardButton}
-    onPress={() => router.replace("/(tabs)/dashboard")}
-  >
-    <Text style={styles.dashboardButtonText}>Dashboard</Text>
-  </Pressable>
-</View>
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.subtitle}>
         Review simulated orders before real broker execution is connected.
       </Text>
@@ -61,7 +62,10 @@ export default function OrderBook() {
           <Text style={styles.body}>No simulated orders yet.</Text>
         ) : (
           trades.map((order, index) => (
-            <View key={`${order.symbol}-${order.tradedAt}-${index}`} style={styles.orderRow}>
+            <View
+              key={`${order.symbol}-${order.tradedAt}-${index}`}
+              style={styles.orderRow}
+            >
               <View style={{ flex: 1 }}>
                 <Text style={styles.symbol}>
                   {order.side} {order.symbol}
@@ -71,9 +75,7 @@ export default function OrderBook() {
                   {order.quantity} shares @ KES {money(order.price)}
                 </Text>
 
-                <Text style={styles.tiny}>
-                  {formatDate(order.tradedAt)}
-                </Text>
+                <Text style={styles.tiny}>{formatDate(order.tradedAt)}</Text>
               </View>
 
               <View style={styles.right}>
@@ -81,9 +83,7 @@ export default function OrderBook() {
                   KES {money(order.gross)}
                 </Text>
 
-                <Text style={styles.status}>
-                  {order.status || "SIMULATED"}
-                </Text>
+                <Text style={styles.status}>{order.status || "SIMULATED"}</Text>
 
                 <Text style={styles.tiny}>
                   {order.settlementStatus || "SETTLED"}
@@ -94,7 +94,7 @@ export default function OrderBook() {
         )}
       </View>
 
-      <Pressable style={styles.primary} onPress={() => router.push("/first-trade")}>
+      <Pressable style={styles.primary} onPress={() => router.push("/trade")}>
         <Text style={styles.primaryText}>New Simulated Order</Text>
       </Pressable>
 
@@ -102,7 +102,7 @@ export default function OrderBook() {
         <Text style={styles.secondaryText}>View Trade History</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={() => router.replace("/coach")}>
+      <Pressable style={styles.secondary} onPress={() => router.push("/coach-insights")}>
         <Text style={styles.secondaryText}>Back to Coach G Insights</Text>
       </Pressable>
     </ScrollView>
@@ -138,8 +138,26 @@ function money(value) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#020617" },
   content: { padding: 22, paddingTop: 70, paddingBottom: 100 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
   title: { color: "white", fontSize: 34, fontWeight: "900" },
   subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: {
+    color: "#67e8f9",
+    fontWeight: "900"
+  },
   summaryCard: {
     marginTop: 22,
     backgroundColor: "#0f172a",
@@ -175,26 +193,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginBottom: 12
   },
-headerRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12
-},
-
-dashboardButton: {
-  backgroundColor: "#1e293b",
-  borderColor: "#334155",
-  borderWidth: 1,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 14
-},
-
-dashboardButtonText: {
-  color: "#67e8f9",
-  fontWeight: "900"
-},
   body: { color: "#cbd5e1", marginTop: 8, lineHeight: 21 },
   orderRow: {
     flexDirection: "row",
