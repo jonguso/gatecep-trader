@@ -1,13 +1,17 @@
 import React, { useCallback, useState } from "react";
 import {
-  ScrollView,
-  Text,
-  View,
   Pressable,
-  StyleSheet
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
+
+import {
+  userGetItem,
+  userSetItem
+} from "../src/auth/userStorage";
 
 export default function RecommendationHistory() {
   const [history, setHistory] = useState([]);
@@ -19,7 +23,7 @@ export default function RecommendationHistory() {
   );
 
   async function loadHistory() {
-    const raw = await AsyncStorage.getItem("gatecepRecommendationHistory");
+    const raw = await userGetItem("recommendationHistory");
     setHistory(raw ? JSON.parse(raw) : []);
   }
 
@@ -35,16 +39,21 @@ export default function RecommendationHistory() {
     );
 
     setHistory(updated);
-
-    await AsyncStorage.setItem(
-      "gatecepRecommendationHistory",
-      JSON.stringify(updated)
-    );
+    await userSetItem("recommendationHistory", JSON.stringify(updated));
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Recommendation History</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Recommendation History</Text>
+
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.subtitle}>
         Review what Coach G recommended and track whether you followed it.
@@ -61,7 +70,7 @@ export default function RecommendationHistory() {
       ) : (
         <View style={styles.list}>
           {history.map((item) => (
-            <View key={item.id} style={styles.card}>
+            <View key={item.id || item.savedAt} style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>
@@ -69,37 +78,50 @@ export default function RecommendationHistory() {
                   </Text>
 
                   <Text style={styles.dateText}>
-                    {formatDate(item.date)}
+                    {formatDate(item.date || item.savedAt)}
                   </Text>
                 </View>
 
                 <Text style={styles.score}>
-                  {item.score}/100
+                  {item.score ? `${item.score}/100` : item.version || "Saved"}
                 </Text>
               </View>
 
               <Text style={styles.summary}>
-                {item.summary}
+                {item.summary ||
+                  `Goal: ${item.goal || "N/A"} • Scenario: ${
+                    item.scenario || "N/A"
+                  } • Amount: KES ${money(item.amount || 0)}`}
               </Text>
 
-              <Text style={styles.rating}>
-                Rating: {item.rating}
-              </Text>
+              {item.rating ? (
+                <Text style={styles.rating}>Rating: {item.rating}</Text>
+              ) : null}
 
-              <View style={styles.actionList}>
-                {item.actions?.map((action, index) => (
-                  <Text key={index} style={styles.actionText}>
-                    • {action}
-                  </Text>
-                ))}
-              </View>
+              {item.sectorPlan?.length ? (
+                <View style={styles.actionList}>
+                  {item.sectorPlan.map((sector, index) => (
+                    <Text key={`${sector.sector}-${index}`} style={styles.actionText}>
+                      • {sector.sector}: {sector.weight}% / KES{" "}
+                      {money(sector.amount)}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+
+              {item.actions?.length ? (
+                <View style={styles.actionList}>
+                  {item.actions.map((action, index) => (
+                    <Text key={index} style={styles.actionText}>
+                      • {action}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
 
               <View style={styles.statusBox}>
                 <Text style={styles.statusLabel}>Status</Text>
-
-                <Text style={styles.statusValue}>
-                  {item.status || "NEW"}
-                </Text>
+                <Text style={styles.statusValue}>{item.status || "NEW"}</Text>
               </View>
 
               <View style={styles.buttons}>
@@ -131,9 +153,9 @@ export default function RecommendationHistory() {
 
       <Pressable
         style={styles.primary}
-        onPress={() => router.push("/dashboard")}
+        onPress={() => router.replace("/(tabs)/dashboard")}
       >
-        <Text style={styles.primaryText}>Back to Checklist</Text>
+        <Text style={styles.primaryText}>Back to Dashboard</Text>
       </Pressable>
     </ScrollView>
   );
@@ -149,6 +171,13 @@ function formatDate(value) {
   });
 }
 
+function money(value) {
+  return Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -157,17 +186,36 @@ const styles = StyleSheet.create({
   content: {
     padding: 22,
     paddingTop: 70,
-    paddingBottom: 40
+    paddingBottom: 90
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
   },
   title: {
     color: "white",
-    fontSize: 32,
-    fontWeight: "900"
+    fontSize: 30,
+    fontWeight: "900",
+    flex: 1
   },
   subtitle: {
     color: "#94a3b8",
     marginTop: 10,
     lineHeight: 22
+  },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: {
+    color: "#67e8f9",
+    fontWeight: "900"
   },
   emptyCard: {
     marginTop: 26,
