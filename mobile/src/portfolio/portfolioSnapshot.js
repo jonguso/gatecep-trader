@@ -1,6 +1,21 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+/**
+ * =====================================================
+ * Portfolio Snapshot Store
+ * Version: 2.0.0
+ *
+ * Changes:
+ * - Migrated from global AsyncStorage
+ * - User-scoped snapshot storage
+ * - Multi-user safe
+ * =====================================================
+ */
 
-export const PORTFOLIO_SNAPSHOTS_KEY = "gatecepPortfolioSnapshots";
+import {
+  userGetItem,
+  userSetItem
+} from "../auth/userStorage";
+
+const PORTFOLIO_SNAPSHOTS_KEY = "portfolioSnapshots";
 
 export async function savePortfolioSnapshot({
   investedValue = 0,
@@ -13,10 +28,11 @@ export async function savePortfolioSnapshot({
 } = {}) {
   const today = new Date().toISOString().slice(0, 10);
 
-  const raw = await AsyncStorage.getItem(PORTFOLIO_SNAPSHOTS_KEY);
+  const raw = await userGetItem(PORTFOLIO_SNAPSHOTS_KEY);
   const existing = raw ? JSON.parse(raw) : [];
 
   const snapshot = {
+    id: `SNAP-${today}`,
     date: today,
     investedValue: Number(investedValue || 0),
     currentValue: Number(currentValue || 0),
@@ -29,19 +45,21 @@ export async function savePortfolioSnapshot({
     savedAt: new Date().toISOString()
   };
 
-  const withoutToday = existing.filter((item) => item.date !== today);
+  const withoutToday = Array.isArray(existing)
+    ? existing.filter((item) => item.date !== today)
+    : [];
 
   const next = [snapshot, ...withoutToday]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 365);
 
-  await AsyncStorage.setItem(PORTFOLIO_SNAPSHOTS_KEY, JSON.stringify(next));
+  await userSetItem(PORTFOLIO_SNAPSHOTS_KEY, JSON.stringify(next));
 
   return snapshot;
 }
 
 export async function loadPortfolioSnapshots() {
-  const raw = await AsyncStorage.getItem(PORTFOLIO_SNAPSHOTS_KEY);
+  const raw = await userGetItem(PORTFOLIO_SNAPSHOTS_KEY);
 
   if (!raw) return [];
 
@@ -53,5 +71,5 @@ export async function loadPortfolioSnapshots() {
 }
 
 export async function clearPortfolioSnapshots() {
-  await AsyncStorage.removeItem(PORTFOLIO_SNAPSHOTS_KEY);
+  await userSetItem(PORTFOLIO_SNAPSHOTS_KEY, JSON.stringify([]));
 }

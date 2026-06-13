@@ -8,7 +8,9 @@ import {
   TextInput,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import { userGetItem } from "../src/auth/userStorage";
 
 const API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
@@ -28,52 +30,61 @@ export default function FloatingCoachG() {
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
 
-async function buildCoachContext() {
-  const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
-  const cashRaw = await AsyncStorage.getItem("gatecepAvailableCash");
-  const profileRaw = await AsyncStorage.getItem("gatecepInvestorProfile");
-  const watchlistRaw = await AsyncStorage.getItem("gatecepWatchlist");
-  const latestDecisionRaw = await AsyncStorage.getItem("gatecepLatestCoachDecision");
+  async function buildCoachContext() {
+    const portfolio = await loadPortfolio({ revalue: true });
 
-  const portfolio = portfolioRaw ? JSON.parse(portfolioRaw) : [];
-  const cash = Number(cashRaw || 0);
-  const profile = profileRaw ? JSON.parse(profileRaw) : null;
-  const watchlist = watchlistRaw ? JSON.parse(watchlistRaw) : [];
-  const latestDecision = latestDecisionRaw ? JSON.parse(latestDecisionRaw) : null;
+    const cashRaw = await userGetItem("availableCash");
+    const profileRaw = await userGetItem("investorProfile");
+    const watchlistRaw = await userGetItem("watchlists");
+    const latestDecisionRaw = await userGetItem("latestCoachDecision");
+    const syncStatusRaw = await userGetItem("syncStatus");
+    const tradesRaw = await userGetItem("simulatedTrades");
 
-  const totalValue = portfolio.reduce(
-    (sum, item) => sum + Number(item.marketValue || item.value || 0),
-    0
-  );
+    const cash = Number(cashRaw || 0);
+    const profile = profileRaw ? JSON.parse(profileRaw) : null;
+    const watchlists = watchlistRaw ? JSON.parse(watchlistRaw) : {};
+    const latestDecision = latestDecisionRaw ? JSON.parse(latestDecisionRaw) : null;
+    const syncStatus = syncStatusRaw ? JSON.parse(syncStatusRaw) : null;
+    const trades = tradesRaw ? JSON.parse(tradesRaw) : [];
 
-  const sectorTotals = {};
+    const totalValue = portfolio.reduce(
+      (sum, item) => sum + Number(item.marketValue || item.value || 0),
+      0
+    );
 
-  portfolio.forEach((item) => {
-    const sector = item.sector || "Unknown";
-    sectorTotals[sector] =
-      (sectorTotals[sector] || 0) + Number(item.marketValue || item.value || 0);
-  });
+    const sectorTotals = {};
 
-  const largestSector =
-    Object.entries(sectorTotals).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    portfolio.forEach((item) => {
+      const sector = item.sector || "Unknown";
 
-  return {
-    cash,
-    totalValue,
-    holdingCount: portfolio.length,
-    largestSector,
-    profile: profile?.profile || profile,
-    watchlist,
-    latestDecision,
-    holdings: portfolio.map((item) => ({
-      symbol: item.symbol,
-      sector: item.sector,
-      quantity: item.quantity,
-      marketValue: item.marketValue || item.value,
-      profitLoss: item.profitLoss || 0
-    }))
-  };
-}
+      sectorTotals[sector] =
+        (sectorTotals[sector] || 0) +
+        Number(item.marketValue || item.value || 0);
+    });
+
+    const largestSector =
+      Object.entries(sectorTotals).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+    return {
+      cash,
+      totalValue,
+      holdingCount: portfolio.length,
+      largestSector,
+      profile: profile?.profile || profile,
+      watchlists,
+      latestDecision,
+      syncStatus,
+      recentTrades: trades.slice(0, 5),
+      holdings: portfolio.map((item) => ({
+        symbol: item.symbol,
+        sector: item.sector,
+        quantity: item.quantity,
+        marketValue: item.marketValue || item.value,
+        profitLoss: item.profitLoss || 0,
+        profitLossPct: item.profitLossPct || 0
+      }))
+    };
+  }
 
   async function askCoachG(promptText = question) {
     const finalQuestion = String(promptText || "").trim();
@@ -93,10 +104,10 @@ async function buildCoachContext() {
         headers: {
           "Content-Type": "application/json"
         },
-       body: JSON.stringify({
-  question: finalQuestion,
-  context: await buildCoachContext()
-})
+        body: JSON.stringify({
+          question: finalQuestion,
+          context: await buildCoachContext()
+        })
       });
 
       const data = await res.json();
@@ -207,7 +218,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     padding: 16
   },
-
   panel: {
     backgroundColor: "#0f172a",
     borderColor: "#22d3ee",
@@ -216,30 +226,25 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 24
   },
-
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 14
   },
-
   title: {
     color: "white",
     fontSize: 22,
     fontWeight: "900"
   },
-
   subtitle: {
     color: "#67e8f9",
     marginTop: 4
   },
-
   close: {
     color: "white",
     fontSize: 22,
     fontWeight: "900"
   },
-
   prompt: {
     backgroundColor: "#020617",
     borderColor: "#1e293b",
@@ -248,12 +253,10 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 10
   },
-
   promptText: {
     color: "#cbd5e1",
     fontWeight: "800"
   },
-
   input: {
     backgroundColor: "#020617",
     borderColor: "#334155",
@@ -263,20 +266,17 @@ const styles = StyleSheet.create({
     color: "white",
     marginTop: 14
   },
-
   askButton: {
     backgroundColor: "#0891b2",
     padding: 16,
     borderRadius: 14,
     marginTop: 12
   },
-
   askText: {
     color: "white",
     textAlign: "center",
     fontWeight: "900"
   },
-
   answerBox: {
     backgroundColor: "rgba(6,182,212,.10)",
     borderColor: "rgba(6,182,212,.35)",
@@ -285,14 +285,12 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 14
   },
-
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
     marginBottom: 8
   },
-
   metaChip: {
     color: "#67e8f9",
     backgroundColor: "#020617",
@@ -302,12 +300,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900"
   },
-
   answer: {
     color: "#cbd5e1",
     lineHeight: 21
   },
-
   floating: {
     position: "absolute",
     right: 22,
@@ -323,7 +319,6 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 8
   },
-
   floatingText: {
     color: "#020617",
     fontSize: 28,

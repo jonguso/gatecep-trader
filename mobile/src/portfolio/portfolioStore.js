@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   userGetItem,
   userSetItem
@@ -10,7 +9,6 @@ const API_URL =
   "http://localhost:4000";
 
 export const PORTFOLIO_KEY = "portfolio";
-export const LEGACY_PORTFOLIO_KEY = "gatecepManualPortfolio";
 
 export function normalizePortfolioHolding(row = {}) {
   const mastered = applySecurityMaster(row);
@@ -99,12 +97,7 @@ export async function savePortfolio(rows = []) {
 }
 
 export async function loadPortfolio({ revalue = true } = {}) {
-  const scopedRaw = await userGetItem(PORTFOLIO_KEY);
-
-  // temporary read-only fallback for old data
-  const legacyRaw = await AsyncStorage.getItem(LEGACY_PORTFOLIO_KEY);
-
-  const raw = scopedRaw || legacyRaw;
+  const raw = await userGetItem(PORTFOLIO_KEY);
 
   if (!raw) return [];
 
@@ -200,13 +193,18 @@ async function fetchMarketPriceMap() {
       ? json.data
       : Array.isArray(json?.prices)
       ? json.prices
+      : Array.isArray(json)
+      ? json
       : [];
 
     const map = new Map();
 
     list.forEach((item) => {
       const mastered = applySecurityMaster(item);
-      map.set(mastered.symbol, mastered);
+
+      if (mastered.symbol) {
+        map.set(mastered.symbol, mastered);
+      }
     });
 
     return map;

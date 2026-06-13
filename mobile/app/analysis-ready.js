@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import {
-  ScrollView,
-  Text,
-  View,
   Pressable,
-  StyleSheet
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+
+import { userGetItem } from "../src/auth/userStorage";
 
 export default function AnalysisReady() {
   const [broker, setBroker] = useState(null);
@@ -17,7 +18,7 @@ export default function AnalysisReady() {
   }, []);
 
   async function loadBroker() {
-    const raw = await AsyncStorage.getItem("gatecepBrokerProfile");
+    const raw = await userGetItem("brokerProfile");
 
     if (raw) {
       setBroker(JSON.parse(raw));
@@ -35,7 +36,9 @@ export default function AnalysisReady() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Broker Profile</Text>
-        <Text style={styles.cardText}>Broker: {broker?.broker || "N/A"}</Text>
+        <Text style={styles.cardText}>
+          Broker: {broker?.broker || broker?.name || broker?.brokerName || "N/A"}
+        </Text>
         <Text style={styles.cardText}>
           Client Number: {broker?.clientNumber || "Optional"}
         </Text>
@@ -55,25 +58,33 @@ export default function AnalysisReady() {
       </View>
 
       <View style={styles.notice}>
-        <Text style={styles.noticeTitle}>Advisory Only</Text>
+        <Text style={styles.noticeTitle}>Advisory + Simulation</Text>
         <Text style={styles.noticeText}>
-          Gatecep does not execute trades at this stage. Recommendations are for
-          investor guidance and broker-side decision support.
+          Gatecep can guide recommendations, create trade baskets, and simulate
+          orders. Real broker execution will come later through approved broker
+          integrations.
         </Text>
       </View>
 
       <Pressable
         style={styles.primary}
-        onPress={() => router.push("/dashboard")}
+        onPress={() => router.replace("/(tabs)/dashboard")}
       >
-        <Text style={styles.primaryText}>Return to Investor Home</Text>
+        <Text style={styles.primaryText}>Return to Dashboard</Text>
       </Pressable>
 
       <Pressable
         style={styles.secondary}
-        onPress={() => router.push("/dashboard")}
+        onPress={() => router.push("/coach-insights")}
       >
-        <Text style={styles.secondaryText}>View Customer Checklist</Text>
+        <Text style={styles.secondaryText}>Open Coach G Insights</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.secondary}
+        onPress={() => router.push("/portfolio-sync-center")}
+      >
+        <Text style={styles.secondaryText}>Open Portfolio Sync Center</Text>
       </Pressable>
     </ScrollView>
   );
@@ -96,7 +107,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 22,
     paddingTop: 70,
-    paddingBottom: 40
+    paddingBottom: 90
   },
   title: {
     color: "white",
@@ -144,7 +155,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 11,
     borderBottomColor: "#1e293b",
-    borderBottomWidth: 1
+    borderBottomWidth: 1,
+    gap: 12
   },
   actionLabel: {
     color: "#cbd5e1",
