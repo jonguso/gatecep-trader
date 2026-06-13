@@ -12,8 +12,9 @@ import * as DocumentPicker from "expo-document-picker";
 import * as XLSX from "xlsx";
 import * as FileSystem from "expo-file-system/legacy";
 import { router } from "expo-router";
-import { userSetItem } from "../src/auth/userStorage";
+
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
+import { userSetItem } from "../src/auth/userStorage";
 
 export default function TransactionsUpload() {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -54,13 +55,14 @@ export default function TransactionsUpload() {
 
       if (!normalized.length) {
         throw new Error(
-          "No valid transactions found. Expected Date, Symbol, Side, Quantity, Price, and Value columns."
+          "Could not detect transaction columns. Expected broker history columns such as Order Date, Security Code, Buy or Sell, Order Quantity, Order Price, and Order Status."
         );
       }
 
       setTransactions(normalized);
       setStatus(`${normalized.length} transactions detected.`);
     } catch (error) {
+      setTransactions([]);
       setStatus(`Upload failed: ${error.message}`);
       Alert.alert("Upload Failed", error.message);
     }
@@ -133,40 +135,95 @@ export default function TransactionsUpload() {
     return rows
       .map((row, index) => {
         const date =
-          readColumn(row, ["Date", "Trade Date", "Transaction Date", "date"]) ||
-          new Date().toISOString().slice(0, 10);
+          readColumn(row, [
+            "Date",
+            "Trade Date",
+            "Transaction Date",
+            "Order Date",
+            "date"
+          ]) || new Date().toISOString().slice(0, 10);
 
         const symbol = String(
-          readColumn(row, ["Symbol", "Security", "Ticker", "Code", "symbol"]) ||
-            ""
+          readColumn(row, [
+            "Symbol",
+            "Security",
+            "Ticker",
+            "Code",
+            "Counter",
+            "Scrip",
+            "Stock",
+            "Security Code",
+            "Instrument"
+          ]) || ""
         )
           .trim()
           .toUpperCase();
 
         const sideRaw = String(
-          readColumn(row, ["Side", "Type", "Action", "Transaction Type", "side"]) ||
-            ""
+          readColumn(row, [
+            "Side",
+            "Type",
+            "Action",
+            "Transaction Type",
+            "Transaction",
+            "Buy/Sell",
+            "Buy Sell",
+            "Buy or Sell",
+            "B/S",
+            "Order Side",
+            "Trade Type"
+          ]) || ""
         )
           .trim()
           .toUpperCase();
 
         const side =
-          sideRaw.includes("SELL") || sideRaw === "S"
-            ? "SELL"
-            : sideRaw.includes("BUY") || sideRaw === "B"
+          sideRaw === "B" || sideRaw.includes("BUY")
             ? "BUY"
+            : sideRaw === "S" || sideRaw.includes("SELL")
+            ? "SELL"
             : "";
 
         const quantity = cleanNumber(
-          readColumn(row, ["Quantity", "Qty", "Shares", "Units", "quantity"])
+          readColumn(row, [
+            "Quantity",
+            "Qty",
+            "Shares",
+            "Units",
+            "No. of Shares",
+            "No of Shares",
+            "Volume",
+            "Trade Quantity",
+            "Order Quantity",
+            "Traded Quantity",
+            "Total Traded Quantity"
+          ])
         );
 
         const price = cleanNumber(
-          readColumn(row, ["Price", "Unit Price", "Trade Price", "price"])
+          readColumn(row, [
+            "Price",
+            "Unit Price",
+            "Trade Price",
+            "Rate",
+            "Average Price",
+            "Avg Price",
+            "Execution Price",
+            "Order Price"
+          ])
         );
 
         const valueFromFile = cleanNumber(
-          readColumn(row, ["Value", "Amount", "Consideration", "Total", "value"])
+          readColumn(row, [
+            "Value",
+            "Amount",
+            "Consideration",
+            "Gross Amount",
+            "Net Amount",
+            "Total",
+            "Trade Value",
+            "Transaction Value"
+          ])
         );
 
         const value =
@@ -174,7 +231,14 @@ export default function TransactionsUpload() {
             ? valueFromFile
             : quantity * price;
 
-        if (!symbol || !side || !quantity || !price) {
+        const finalPrice =
+          price > 0
+            ? price
+            : quantity > 0 && value > 0
+            ? value / quantity
+            : 0;
+
+        if (!symbol || !side || quantity <= 0 || finalPrice <= 0) {
           return null;
         }
 
@@ -182,10 +246,12 @@ export default function TransactionsUpload() {
           id: `TX-${Date.now()}-${index}`,
           date,
           symbol,
+          name: readColumn(row, ["Security Name", "Company", "Name"]) || symbol,
           side,
           quantity,
-          price,
+          price: finalPrice,
           value,
+          status: readColumn(row, ["Order Status", "Status"]) || "UNKNOWN",
           source: "TRANSACTION_UPLOAD",
           uploadedAt: new Date().toISOString()
         };
@@ -203,11 +269,19 @@ export default function TransactionsUpload() {
     const keys = Object.keys(row);
 
     for (const key of keys) {
-      const normalizedKey = String(key).toLowerCase().replace(/\s+/g, "");
-      const match = names.some(
-        (name) =>
-          normalizedKey === String(name).toLowerCase().replace(/\s+/g, "")
-      );
+      const normalizedKey = String(key)
+        .toLowerCase()
+        .replace(/\s+/g, "")
+        .replace(/[./_-]/g, "");
+
+      const match = names.some((name) => {
+        const normalizedName = String(name)
+          .toLowerCase()
+          .replace(/\s+/g, "")
+          .replace(/[./_-]/g, "");
+
+        return normalizedKey === normalizedName;
+      });
 
       if (match && row[key] !== "") {
         return row[key];
@@ -235,7 +309,6 @@ export default function TransactionsUpload() {
     );
 
     Alert.alert("Transactions Saved", `${transactions.length} transactions saved.`);
-
     router.replace("/portfolio-sync-center");
   }
 
@@ -263,12 +336,15 @@ export default function TransactionsUpload() {
         <Text style={styles.cardTitle}>Upload File</Text>
 
         <Text style={styles.help}>
-          Supported columns: Date, Symbol, Side, Quantity, Price, Value.
+          Supported examples: Order Date, Security Code, Buy or Sell, Order
+          Quantity, Traded Quantity, Order Price, Order Status.
         </Text>
 
         <Pressable style={styles.secondary} onPress={pickFile}>
           <Text style={styles.secondaryText}>
-            {selectedFile ? `Selected: ${selectedFile.name}` : "Select CSV or Excel File"}
+            {selectedFile
+              ? `Selected: ${selectedFile.name}`
+              : "Select CSV or Excel File"}
           </Text>
         </Pressable>
 
@@ -287,10 +363,13 @@ export default function TransactionsUpload() {
         ) : (
           transactions.slice(0, 10).map((tx) => (
             <View key={tx.id} style={styles.row}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.symbol}>{tx.symbol}</Text>
                 <Text style={styles.small}>
                   {tx.date} • {tx.side} • Qty {tx.quantity}
+                </Text>
+                <Text style={styles.small}>
+                  {tx.name} • {tx.status}
                 </Text>
               </View>
 
