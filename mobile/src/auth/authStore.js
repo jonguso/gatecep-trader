@@ -12,7 +12,9 @@ export function buildUserId(username = "") {
 }
 
 export async function saveSession(user = {}) {
-  const userId = buildUserId(user.username || user.email || "demo");
+  const userId = buildUserId(
+    user.username || user.email || "demo"
+  );
 
   const session = {
     userId,
@@ -23,16 +25,40 @@ export async function saveSession(user = {}) {
     loggedInAt: new Date().toISOString()
   };
 
-  await AsyncStorage.setItem("gatecepSession", JSON.stringify(session));
-  await AsyncStorage.setItem("gatecepCurrentUserId", userId);
-  await AsyncStorage.setItem("gatecepIsLoggedIn", "true");
+  await AsyncStorage.setItem(
+    "gatecepSession",
+    JSON.stringify(session)
+  );
+
+  await AsyncStorage.setItem(
+    "gatecepCurrentUserId",
+    userId
+  );
+
+  await AsyncStorage.setItem(
+    "gatecepIsLoggedIn",
+    "true"
+  );
+
+  // legacy compatibility
+  await AsyncStorage.setItem(
+    "gatecepAuth",
+    JSON.stringify(session)
+  );
 
   return session;
 }
 
 export async function getCurrentSession() {
   const raw = await AsyncStorage.getItem("gatecepSession");
-  return raw ? JSON.parse(raw) : null;
+
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export async function getCurrentUserId() {
@@ -40,8 +66,21 @@ export async function getCurrentUserId() {
   return session?.userId || null;
 }
 
+export async function isLoggedIn() {
+  const session = await getCurrentSession();
+
+  return !!session?.loggedIn;
+}
+
 export async function logout() {
-  await AsyncStorage.removeItem("gatecepSession");
-  await AsyncStorage.removeItem("gatecepCurrentUserId");
-  await AsyncStorage.setItem("gatecepIsLoggedIn", "false");
+  await AsyncStorage.multiRemove([
+    "gatecepSession",
+    "gatecepCurrentUserId",
+    "gatecepAuth"
+  ]);
+
+  await AsyncStorage.setItem(
+    "gatecepIsLoggedIn",
+    "false"
+  );
 }

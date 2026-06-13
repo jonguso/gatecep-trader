@@ -10,5 +10,21 @@ export async function logout() {
 }
 
 export async function logoutAndClearDemoData() {
+  const userId = await AsyncStorage.getItem(
+    "gatecepCurrentUserId"
+  );
+
+  if (userId) {
+    const keys = await AsyncStorage.getAllKeys();
+
+    const userKeys = keys.filter((key) =>
+      key.startsWith(`gatecep:${userId}:`)
+    );
+
+    if (userKeys.length) {
+      await AsyncStorage.multiRemove(userKeys);
+    }
+  }
+
   await logout();
 }
