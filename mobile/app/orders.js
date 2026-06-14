@@ -15,13 +15,18 @@ import {
   cancelExecutionOrder,
   createBasketExecution,
   loadBasketExecution,
-  queueExecutionOrders,
+  markBrokerReceived,
+  markExecutionOrderFilled,
+  routeExecutionOrder,
   updateExecutionOrder
 } from "../src/trade/basketExecutionStore";
+import { ORDER_STATUS, isClosedOrder } from "../src/trade/orderLifecycle";
+
+const TABS = ["Review", "Queued", "Routed", "Closed"];
 
 export default function Orders() {
   const [execution, setExecution] = useState(null);
-  const [tab, setTab] = useState("Pending");
+  const [tab, setTab] = useState("Queued");
   const [query, setQuery] = useState("");
 
   useFocusEffect(
@@ -47,10 +52,28 @@ export default function Orders() {
 
     return orders
       .filter((order) => {
-        if (tab === "Pending") return order.status === "PENDING";
-        if (tab === "Queued") return order.status === "QUEUED";
-        if (tab === "Filled") return order.status === "FILLED";
-        if (tab === "Cancelled") return order.status === "CANCELLED";
+        const status = String(order.status || "").toUpperCase();
+
+        if (tab === "Review") {
+          return [ORDER_STATUS.DRAFT, ORDER_STATUS.REVIEW, ORDER_STATUS.PENDING].includes(status);
+        }
+
+        if (tab === "Queued") {
+          return status === ORDER_STATUS.QUEUED;
+        }
+
+        if (tab === "Routed") {
+          return [
+            ORDER_STATUS.ROUTED,
+            ORDER_STATUS.BROKER_RECEIVED,
+            ORDER_STATUS.PARTIAL_FILL
+          ].includes(status);
+        }
+
+        if (tab === "Closed") {
+          return isClosedOrder(status);
+        }
+
         return true;
       })
       .filter((order) => {
@@ -59,73 +82,83 @@ export default function Orders() {
         return (
           String(order.symbol || "").toLowerCase().includes(search) ||
           String(order.name || "").toLowerCase().includes(search) ||
-          String(order.side || "").toLowerCase().includes(search)
+          String(order.brokerName || "").toLowerCase().includes(search)
         );
       });
   }, [orders, tab, query]);
 
-  const pendingOrders = orders.filter((order) => order.status === "PENDING");
-  const queuedOrders = orders.filter((order) => order.status === "QUEUED");
-  const filledOrders = orders.filter((order) => order.status === "FILLED");
+  const counts = {
+    review: orders.filter((o) =>
+      [ORDER_STATUS.DRAFT, ORDER_STATUS.REVIEW, ORDER_STATUS.PENDING].includes(o.status)
+    ).length,
+    queued: orders.filter((o) => o.status === ORDER_STATUS.QUEUED).length,
+    routed: orders.filter((o) =>
+      [ORDER_STATUS.ROUTED, ORDER_STATUS.BROKER_RECEIVED, ORDER_STATUS.PARTIAL_FILL].includes(o.status)
+    ).length,
+    closed: orders.filter((o) => isClosedOrder(o.status)).length
+  };
 
-  async function updateOrder(order, patch) {
-    const updated = await updateExecutionOrder(order.id, patch);
-    setExecution(updated);
+  async function sendToBroker(order) {
+    const routed = await routeExecutionOrder(order.id, {
+      id: order.brokerId || "SIM",
+      name: order.brokerName || "Simulation Broker"
+    });
+
+    setExecution(routed);
+
+    setTimeout(async () => {
+      const received = await markBrokerReceived(order.id, {
+        brokerOrderId: `BRK-${Date.now()}-${order.symbol}`,
+        status: "BROKER_RECEIVED"
+      });
+
+      setExecution(received);
+    }, 400);
   }
 
-  async function cancelOrder(order) {
-    if (order.status !== "PENDING") {
-      Alert.alert("Cannot Cancel", "Only pending orders can be cancelled here.");
-      return;
-    }
-
-    const updated = await cancelExecutionOrder(order.id);
-    setExecution(updated);
-  }
-
-  async function confirmQueue() {
-    if (!pendingOrders.length) {
-      Alert.alert("No Pending Orders", "There are no pending orders to queue.");
-      return;
-    }
-
+  async function fillOrder(order) {
     Alert.alert(
-      "Queue Basket Orders",
-      `${pendingOrders.length} pending orders will be queued for execution.`,
+      "Mark Filled",
+      `Mark ${order.side} ${order.symbol} as broker-filled?`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Queue Orders",
+          text: "Mark Filled",
           onPress: async () => {
-            const updated = await queueExecutionOrders();
+            const updated = await markExecutionOrderFilled(order.id, {
+              symbol: order.symbol,
+              side: order.side,
+              quantity: order.quantity,
+              price: order.price,
+              filledAt: new Date().toISOString(),
+              source: "BROKER_CONFIRMATION"
+            });
+
             setExecution(updated);
-            router.push("/basket-execution");
           }
         }
       ]
     );
   }
 
+  async function cancelOrder(order) {
+    const updated = await cancelExecutionOrder(order.id);
+    setExecution(updated);
+  }
+
+  async function updateOrder(order, patch) {
+    const updated = await updateExecutionOrder(order.id, patch);
+    setExecution(updated);
+  }
+
   if (!execution || !orders.length) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Orders Review</Text>
-        <Text style={styles.subtitle}>
-          No basket orders found. Create a Coach G trade basket first.
-        </Text>
+        <Text style={styles.title}>Orders</Text>
+        <Text style={styles.subtitle}>No active orders found.</Text>
 
-        <Pressable
-          style={styles.primary}
-          onPress={() => router.push("/trade-basket")}
-        >
+        <Pressable style={styles.primary} onPress={() => router.push("/trade-basket")}>
           <Text style={styles.primaryText}>Open Trade Basket</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.secondary}
-          onPress={() => router.replace("/(tabs)/dashboard")}
-        >
-          <Text style={styles.secondaryText}>Dashboard</Text>
         </Pressable>
       </ScrollView>
     );
@@ -134,7 +167,7 @@ export default function Orders() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Orders Review</Text>
+        <Text style={styles.title}>Orders</Text>
 
         <Pressable
           style={styles.dashboardButton}
@@ -145,31 +178,20 @@ export default function Orders() {
       </View>
 
       <Text style={styles.subtitle}>
-        Review, modify, or cancel pending basket orders before queueing them for
-        execution.
+        GateCEP OMS for reviewing, queueing, routing, and tracking broker orders.
       </Text>
 
       <ActiveUserBanner />
 
       <View style={styles.summaryCard}>
-        <Metric label="Pending" value={String(pendingOrders.length)} />
-        <Metric label="Queued" value={String(queuedOrders.length)} />
-        <Metric label="Filled" value={String(filledOrders.length)} />
-        <Metric label="Total" value={String(orders.length)} />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Order Status</Text>
-        <Text style={styles.body}>
-          Basket: {execution.source || "COACH_G"} • Status: {execution.status}
-        </Text>
-        <Text style={styles.body}>
-          Review pending orders, adjust quantity or price, then confirm queue.
-        </Text>
+        <Metric label="Review" value={String(counts.review)} />
+        <Metric label="Queued" value={String(counts.queued)} />
+        <Metric label="Routed" value={String(counts.routed)} />
+        <Metric label="Closed" value={String(counts.closed)} />
       </View>
 
       <View style={styles.tabs}>
-        {["All", "Pending", "Queued", "Filled", "Cancelled"].map((item) => (
+        {TABS.map((item) => (
           <Pressable
             key={item}
             style={[styles.tab, tab === item && styles.tabActive]}
@@ -185,156 +207,134 @@ export default function Orders() {
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder="Search symbol, name, or side"
+        placeholder="Search symbol, broker, or company"
         placeholderTextColor="#64748b"
         style={styles.search}
       />
 
       {visibleOrders.length === 0 ? (
         <View style={styles.card}>
-          <Text style={styles.body}>No orders found for this filter.</Text>
+          <Text style={styles.body}>No orders found in {tab}.</Text>
         </View>
       ) : (
         visibleOrders.map((order) => (
           <OrderCard
             key={order.id}
             order={order}
-            onChange={(patch) => updateOrder(order, patch)}
+            tab={tab}
+            onSendToBroker={() => sendToBroker(order)}
+            onFill={() => fillOrder(order)}
             onCancel={() => cancelOrder(order)}
+            onUpdate={(patch) => updateOrder(order, patch)}
           />
         ))
       )}
 
-      <Pressable
-        style={[
-          styles.primary,
-          pendingOrders.length === 0 && styles.disabledButton
-        ]}
-        disabled={pendingOrders.length === 0}
-        onPress={confirmQueue}
-      >
-        <Text style={styles.primaryText}>
-          {pendingOrders.length > 0
-            ? `Confirm Queue (${pendingOrders.length})`
-            : "No Pending Orders"}
-        </Text>
+      <Pressable style={styles.secondary} onPress={() => router.push("/orders-review")}>
+        <Text style={styles.secondaryText}>Open Orders Review</Text>
       </Pressable>
 
-      <Pressable
-        style={styles.secondary}
-        onPress={() => router.push("/basket-execution")}
-      >
+      <Pressable style={styles.secondary} onPress={() => router.push("/basket-execution")}>
         <Text style={styles.secondaryText}>Open Basket Execution</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-function OrderCard({ order, onChange, onCancel }) {
-  const locked = ["QUEUED", "FILLED", "CANCELLED", "FAILED"].includes(
-    order.status
-  );
+function OrderCard({
+  order,
+  onSendToBroker,
+  onFill,
+  onCancel,
+  onUpdate
+}) {
+  const status = String(order.status || "").toUpperCase();
+  const canEdit = [ORDER_STATUS.DRAFT, ORDER_STATUS.REVIEW, ORDER_STATUS.PENDING].includes(status);
+  const canRoute = status === ORDER_STATUS.QUEUED;
+  const canFill = [
+    ORDER_STATUS.ROUTED,
+    ORDER_STATUS.BROKER_RECEIVED,
+    ORDER_STATUS.PARTIAL_FILL
+  ].includes(status);
+  const canCancel = !isClosedOrder(status);
 
-  const qty = String(order.quantity || "");
-  const price = String(order.price || "");
-  const amount =
-    Number(order.quantity || 0) * Number(order.price || 0);
+  const amount = Number(order.quantity || 0) * Number(order.price || 0);
 
   return (
     <View style={styles.orderCard}>
       <View style={styles.orderTop}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.symbol}>
             {order.side} {order.symbol}
           </Text>
-
           <Text style={styles.small}>
             {order.name || order.symbol} • {order.sector || "NSE"}
           </Text>
         </View>
 
-        <Text style={statusStyle(order.status)}>{order.status}</Text>
+        <Text style={statusStyle(status)}>{status}</Text>
       </View>
 
-      <Text style={styles.reason}>{order.reason}</Text>
+      <Text style={styles.reason}>
+        {order.message || order.reason || "Order awaiting action"}
+      </Text>
 
-      <View style={styles.sideRow}>
-        {["BUY", "SELL"].map((side) => (
-          <Pressable
-            key={side}
-            disabled={locked}
-            style={[
-              styles.sideChip,
-              order.side === side && styles.sideChipActive,
-              locked && styles.locked
-            ]}
-            onPress={() => onChange({ side })}
-          >
-            <Text
-              style={
-                order.side === side ? styles.sideTextActive : styles.sideText
-              }
-            >
-              {side}
-            </Text>
-          </Pressable>
-        ))}
+      <View style={styles.infoBox}>
+        <Text style={styles.infoText}>Qty {order.quantity}</Text>
+        <Text style={styles.infoText}>Price KES {money(order.price)}</Text>
+        <Text style={styles.infoText}>Value KES {money(amount)}</Text>
+        <Text style={styles.infoText}>
+          Broker {order.brokerName || "Not routed"}
+        </Text>
       </View>
 
-      <View style={styles.editGrid}>
-        <View style={styles.editBox}>
-          <Text style={styles.inputLabel}>Quantity</Text>
+      {canEdit && (
+        <View style={styles.editGrid}>
           <TextInput
-            value={qty}
-            editable={!locked}
+            value={String(order.quantity || "")}
             keyboardType="numeric"
             placeholder="Qty"
             placeholderTextColor="#64748b"
-            style={[styles.input, locked && styles.inputLocked]}
-            onChangeText={(value) =>
-              onChange({
-                quantity: cleanNumber(value),
-                gross: cleanNumber(value) * Number(order.price || 0),
-                amount: cleanNumber(value) * Number(order.price || 0)
-              })
-            }
+            style={styles.input}
+            onChangeText={(value) => {
+              const quantity = cleanNumber(value);
+              const gross = quantity * Number(order.price || 0);
+              onUpdate({ quantity, gross, amount: gross });
+            }}
           />
-        </View>
 
-        <View style={styles.editBox}>
-          <Text style={styles.inputLabel}>Limit Price</Text>
           <TextInput
-            value={price}
-            editable={!locked}
+            value={String(order.price || "")}
             keyboardType="numeric"
             placeholder="Price"
             placeholderTextColor="#64748b"
-            style={[styles.input, locked && styles.inputLocked]}
-            onChangeText={(value) =>
-              onChange({
-                price: cleanNumber(value),
-                gross: Number(order.quantity || 0) * cleanNumber(value),
-                amount: Number(order.quantity || 0) * cleanNumber(value)
-              })
-            }
+            style={styles.input}
+            onChangeText={(value) => {
+              const price = cleanNumber(value);
+              const gross = Number(order.quantity || 0) * price;
+              onUpdate({ price, gross, amount: gross });
+            }}
           />
         </View>
-      </View>
+      )}
 
-      <View style={styles.amountBox}>
-        <Text style={styles.amountLabel}>Estimated Value</Text>
-        <Text style={styles.amountValue}>KES {money(amount)}</Text>
-      </View>
-
-      {order.message ? (
-        <Text style={styles.message}>{order.message}</Text>
-      ) : null}
-
-      {order.status === "PENDING" ? (
-        <Pressable style={styles.cancelButton} onPress={onCancel}>
-          <Text style={styles.cancelText}>Cancel Pending Order</Text>
+      {canRoute && (
+        <Pressable style={styles.primarySmall} onPress={onSendToBroker}>
+          <Text style={styles.primaryText}>Send To Broker</Text>
         </Pressable>
-      ) : null}
+      )}
+
+      {canFill && (
+        <Pressable style={styles.primarySmall} onPress={onFill}>
+          <Text style={styles.primaryText}>Mark Broker Filled</Text>
+        </Pressable>
+      )}
+
+      {canCancel && (
+        <Pressable style={styles.cancelButton} onPress={onCancel}>
+          <Text style={styles.cancelText}>Cancel Order</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -359,10 +359,17 @@ function cleanNumber(value) {
 }
 
 function statusStyle(status) {
-  if (status === "FILLED") return styles.filled;
-  if (status === "QUEUED") return styles.queued;
-  if (status === "CANCELLED") return styles.cancelled;
-  if (status === "FAILED") return styles.failed;
+  if (status === ORDER_STATUS.FILLED) return styles.filled;
+  if (status === ORDER_STATUS.QUEUED) return styles.queued;
+  if (
+    status === ORDER_STATUS.ROUTED ||
+    status === ORDER_STATUS.BROKER_RECEIVED ||
+    status === ORDER_STATUS.PARTIAL_FILL
+  ) {
+    return styles.routed;
+  }
+  if (status === ORDER_STATUS.CANCELLED) return styles.cancelled;
+  if (status === ORDER_STATUS.REJECTED) return styles.failed;
   return styles.pending;
 }
 
@@ -382,7 +389,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12
   },
-  title: { color: "white", fontSize: 32, fontWeight: "900", flex: 1 },
+  title: { color: "white", fontSize: 34, fontWeight: "900", flex: 1 },
   subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
   dashboardButton: {
     backgroundColor: "#1e293b",
@@ -413,39 +420,18 @@ const styles = StyleSheet.create({
     padding: 14
   },
   metricLabel: { color: "#94a3b8", fontSize: 12 },
-  metricValue: {
-    color: "white",
-    fontWeight: "900",
-    fontSize: 18,
-    marginTop: 6
-  },
-  card: {
-    marginTop: 20,
-    backgroundColor: "#0f172a",
-    borderColor: "#1e293b",
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: 18
-  },
-  cardTitle: {
-    color: "#67e8f9",
-    fontSize: 18,
-    fontWeight: "900",
-    marginBottom: 12
-  },
-  body: { color: "#cbd5e1", marginTop: 8, lineHeight: 21 },
+  metricValue: { color: "white", fontWeight: "900", marginTop: 6 },
   tabs: {
     marginTop: 18,
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8
   },
   tab: {
+    flex: 1,
     backgroundColor: "#1e293b",
     borderColor: "#334155",
     borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 13,
+    paddingVertical: 11,
     borderRadius: 999
   },
   tabActive: {
@@ -455,12 +441,14 @@ const styles = StyleSheet.create({
   tabText: {
     color: "#cbd5e1",
     fontWeight: "800",
-    fontSize: 12
+    fontSize: 11,
+    textAlign: "center"
   },
   tabTextActive: {
     color: "white",
     fontWeight: "900",
-    fontSize: 12
+    fontSize: 11,
+    textAlign: "center"
   },
   search: {
     marginTop: 16,
@@ -471,6 +459,15 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16
   },
+  card: {
+    marginTop: 20,
+    backgroundColor: "#0f172a",
+    borderColor: "#1e293b",
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 18
+  },
+  body: { color: "#cbd5e1", lineHeight: 21 },
   orderCard: {
     marginTop: 18,
     backgroundColor: "#0f172a",
@@ -498,47 +495,26 @@ const styles = StyleSheet.create({
     marginTop: 12,
     lineHeight: 20
   },
-  sideRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16
-  },
-  sideChip: {
-    flex: 1,
+  infoBox: {
+    marginTop: 14,
     backgroundColor: "#020617",
     borderColor: "#334155",
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 13
+    borderRadius: 16,
+    padding: 14,
+    gap: 5
   },
-  sideChipActive: {
-    backgroundColor: "#9333ea",
-    borderColor: "#c084fc"
-  },
-  sideText: {
-    color: "#94a3b8",
-    textAlign: "center",
-    fontWeight: "900"
-  },
-  sideTextActive: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "900"
+  infoText: {
+    color: "#cbd5e1",
+    fontSize: 12
   },
   editGrid: {
     flexDirection: "row",
     gap: 10,
     marginTop: 16
   },
-  editBox: {
-    flex: 1
-  },
-  inputLabel: {
-    color: "#94a3b8",
-    fontSize: 12,
-    marginBottom: 6
-  },
   input: {
+    flex: 1,
     backgroundColor: "#020617",
     borderColor: "#334155",
     borderWidth: 1,
@@ -546,48 +522,23 @@ const styles = StyleSheet.create({
     padding: 14,
     color: "white"
   },
-  inputLocked: {
-    opacity: 0.55
-  },
-  locked: {
-    opacity: 0.55
-  },
-  amountBox: {
-    marginTop: 16,
-    backgroundColor: "#020617",
-    borderColor: "#334155",
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14
-  },
-  amountLabel: {
-    color: "#94a3b8",
-    fontSize: 12
-  },
-  amountValue: {
-    color: "white",
-    fontWeight: "900",
-    marginTop: 4
-  },
-  message: {
-    color: "#67e8f9",
-    marginTop: 10,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  pending: { color: "#fbbf24", fontWeight: "900", fontSize: 12 },
-  queued: { color: "#67e8f9", fontWeight: "900", fontSize: 12 },
-  filled: { color: "#86efac", fontWeight: "900", fontSize: 12 },
-  cancelled: { color: "#94a3b8", fontWeight: "900", fontSize: 12 },
-  failed: { color: "#fca5a5", fontWeight: "900", fontSize: 12 },
   primary: {
     marginTop: 22,
     backgroundColor: "#9333ea",
     padding: 18,
     borderRadius: 18
   },
-  primaryText: { color: "white", textAlign: "center", fontWeight: "900" },
-  disabledButton: { opacity: 0.45 },
+  primarySmall: {
+    marginTop: 16,
+    backgroundColor: "#9333ea",
+    padding: 14,
+    borderRadius: 16
+  },
+  primaryText: {
+    color: "white",
+    textAlign: "center",
+    fontWeight: "900"
+  },
   secondary: {
     marginTop: 14,
     backgroundColor: "#1e293b",
@@ -600,7 +551,7 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   cancelButton: {
-    marginTop: 16,
+    marginTop: 12,
     backgroundColor: "rgba(239,68,68,.12)",
     borderColor: "rgba(239,68,68,.35)",
     borderWidth: 1,
@@ -611,5 +562,11 @@ const styles = StyleSheet.create({
     color: "#fca5a5",
     textAlign: "center",
     fontWeight: "900"
-  }
+  },
+  pending: { color: "#fbbf24", fontWeight: "900", fontSize: 12 },
+  queued: { color: "#67e8f9", fontWeight: "900", fontSize: 12 },
+  routed: { color: "#c084fc", fontWeight: "900", fontSize: 12 },
+  filled: { color: "#86efac", fontWeight: "900", fontSize: 12 },
+  cancelled: { color: "#94a3b8", fontWeight: "900", fontSize: 12 },
+  failed: { color: "#fca5a5", fontWeight: "900", fontSize: 12 }
 });
