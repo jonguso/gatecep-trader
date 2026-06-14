@@ -10,13 +10,13 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import { createBasketExecution } from "../src/trade/basketExecutionStore";
 
 import { loadPortfolio } from "../src/portfolio/portfolioStore";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 import { buildCoachPortfolioReview } from "../src/portfolio/coachPortfolioReview";
 import { buildPerformanceAttribution } from "../src/portfolio/performanceAttribution";
 import { saveTradeBasket } from "../src/trade/tradeBasketStore";
-import { createBasketExecution } from "../src/trade/basketExecutionStore";
 import {
   userGetItem,
   userSetItem
@@ -223,12 +223,14 @@ export default function Coach() {
     }
 
     await saveTradeBasket(basketItems, "COACH_G_SIMULATION");
-    await createBasketExecution();
+await createBasketExecution({ forceNew: true });
+
+router.push("/orders-review");
 
     setShowResults(false);
     setShowSimulator(false);
 
-    router.push("/basket-execution");
+    router.push("/orders-review");
   }
 
   function buildBehaviorInsights() {
