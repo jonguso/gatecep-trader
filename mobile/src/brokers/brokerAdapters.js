@@ -1,8 +1,18 @@
 import * as simulationBrokerAdapter from "./simulationBrokerAdapter";
+import * as aibAdapter from "./aibAdapter";
+import * as abcAdapter from "./abcAdapter";
+import * as ncbaAdapter from "./ncbaAdapter";
+import * as faidaAdapter from "./faidaAdapter";
+import * as genghisAdapter from "./genghisAdapter";
 import { findBrokerById } from "./brokerRegistry";
 
 const ADAPTERS = {
-  simulation: simulationBrokerAdapter
+  simulation: simulationBrokerAdapter,
+  aib: aibAdapter,
+  abc: abcAdapter,
+  ncba: ncbaAdapter,
+  faida: faidaAdapter,
+  genghis: genghisAdapter
 };
 
 export function getBrokerAdapter(brokerId = "SIM") {
