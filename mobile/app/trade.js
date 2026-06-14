@@ -34,7 +34,7 @@ export default function Trade() {
   const [cash, setCash] = useState(0);
   const [selectedStock, setSelectedStock] = useState(STOCKS[0]);
   const [side, setSide] = useState("BUY");
-  const [quantity, setQuantity] = useState("1");
+  const [quantity, setQuantity] = useState("0");
   const [limitPrice, setLimitPrice] = useState(String(STOCKS[0].price));
   const [confirmedTrade, setConfirmedTrade] = useState(null);
   const [activeExecution, setActiveExecution] = useState(null);

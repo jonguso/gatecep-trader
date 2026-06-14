@@ -4,6 +4,12 @@ import { loadTradeBasket } from "./tradeBasketStore";
 const ACTIVE_BASKET_EXECUTION_KEY = "activeBasketExecution";
 
 export async function createBasketExecution() {
+  const existing = await loadBasketExecution();
+
+  if (existing?.orders?.length) {
+    return existing;
+  }
+
   const basket = await loadTradeBasket();
 
   if (!basket?.items?.length) {
@@ -12,54 +18,38 @@ export async function createBasketExecution() {
 
   const now = new Date().toISOString();
 
-  const orders = basket.items.map((item, index) => {
-    const price = Number(item.price || item.limitPrice || 0);
-    const amount = Number(item.amount || 0);
-
-    const quantity =
-      Number(item.quantity || 0) > 0
-        ? Number(item.quantity)
-        : price > 0 && amount > 0
-        ? Math.floor(amount / price)
-        : 0;
-
-    const gross = quantity * price;
-
-    return {
+  const orders = basket.items.map((item, index) =>
+    normalizeOrder({
       id: `EO-${Date.now()}-${index}`,
       basketItemId: item.id || `BI-${index}`,
-      symbol: String(item.symbol || "").toUpperCase(),
+      symbol: item.symbol,
       name: item.name || item.symbol,
       sector: item.sector || "NSE",
       side: item.side || "BUY",
-      amount: amount || gross,
-      quantity,
-      price,
-      gross,
+      amount: Number(item.amount || 0),
+      quantity: Number(item.quantity || 0),
+      price: Number(item.price || item.limitPrice || 0),
       reason: item.reason || "Coach G recommendation",
       status: "PENDING",
-      message: "Waiting for execution",
+      message: "Pending review",
       createdAt: now,
       updatedAt: now
-    };
-  });
+    })
+  );
 
-  const execution = {
+  const execution = normalizeExecution({
     id: `EXEC-${Date.now()}`,
     basketId: basket.id,
     source: basket.source || "COACH_G",
-    status: "PENDING",
+    status: "PENDING_REVIEW",
     totalOrders: orders.length,
     completedOrders: 0,
     failedOrders: 0,
-    totalAmount: orders.reduce(
-      (sum, order) => sum + Number(order.amount || order.gross || 0),
-      0
-    ),
+    cancelledOrders: 0,
     createdAt: now,
     updatedAt: now,
     orders
-  };
+  });
 
   await userSetItem(ACTIVE_BASKET_EXECUTION_KEY, JSON.stringify(execution));
 
@@ -117,33 +107,77 @@ export async function updateExecutionOrder(orderId, patch = {}) {
   });
 }
 
+export async function cancelExecutionOrder(orderId) {
+  return await updateExecutionOrder(orderId, {
+    status: "CANCELLED",
+    message: "Cancelled before queue"
+  });
+}
+
+export async function queueExecutionOrders() {
+  const execution = await loadBasketExecution();
+
+  if (!execution) return null;
+
+  const orders = execution.orders.map((order) => {
+    if (["FILLED", "CANCELLED", "FAILED"].includes(order.status)) {
+      return normalizeOrder(order);
+    }
+
+    return normalizeOrder({
+      ...order,
+      status: "QUEUED",
+      message: "Queued for basket execution",
+      queuedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+  });
+
+  return await saveBasketExecution({
+    ...execution,
+    status: "QUEUED",
+    orders
+  });
+}
+
 export function normalizeExecution(execution = {}) {
   const orders = Array.isArray(execution.orders)
     ? execution.orders.map(normalizeOrder)
     : [];
 
+  const activeOrders = orders.filter((order) => order.status !== "CANCELLED");
   const completedOrders = orders.filter((order) => order.status === "FILLED").length;
   const failedOrders = orders.filter((order) => order.status === "FAILED").length;
+  const cancelledOrders = orders.filter((order) => order.status === "CANCELLED").length;
+  const queuedOrders = orders.filter((order) => order.status === "QUEUED").length;
+  const pendingOrders = orders.filter((order) => order.status === "PENDING").length;
   const totalOrders = orders.length;
 
-  const status =
-    totalOrders > 0 && completedOrders === totalOrders
-      ? "COMPLETED"
-      : failedOrders > 0 && completedOrders > 0
-      ? "PARTIAL"
-      : orders.some((order) =>
-          ["QUEUED", "SUBMITTED", "IN_PROGRESS", "FILLED"].includes(order.status)
-        )
-      ? "IN_PROGRESS"
-      : execution.status || "PENDING";
+  let status = execution.status || "PENDING_REVIEW";
+
+  if (activeOrders.length > 0 && completedOrders === activeOrders.length) {
+    status = "COMPLETED";
+  } else if (failedOrders > 0 && completedOrders > 0) {
+    status = "PARTIAL";
+  } else if (queuedOrders > 0) {
+    status = "QUEUED";
+  } else if (pendingOrders > 0) {
+    status = "PENDING_REVIEW";
+  } else if (cancelledOrders === totalOrders && totalOrders > 0) {
+    status = "CANCELLED";
+  }
 
   return {
     ...execution,
     status,
     totalOrders,
+    activeOrders: activeOrders.length,
     completedOrders,
     failedOrders,
-    totalAmount: orders.reduce(
+    cancelledOrders,
+    pendingOrders,
+    queuedOrders,
+    totalAmount: activeOrders.reduce(
       (sum, order) => sum + Number(order.amount || order.gross || 0),
       0
     ),
@@ -163,7 +197,7 @@ export function normalizeOrder(order = {}) {
       ? Math.floor(amount / price)
       : 0;
 
-  const gross = Number(order.gross || quantity * price || 0);
+  const gross = quantity * price;
 
   return {
     ...order,
@@ -174,6 +208,6 @@ export function normalizeOrder(order = {}) {
     gross,
     amount: amount || gross,
     status: order.status || "PENDING",
-    message: order.message || "Waiting for execution"
+    message: order.message || "Pending review"
   };
 }
