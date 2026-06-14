@@ -10,12 +10,15 @@ import {
 import { router, useFocusEffect } from "expo-router";
 
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
+import { loadPortfolio, savePortfolio } from "../src/portfolio/portfolioStore";
+import { userGetItem, userSetItem } from "../src/auth/userStorage";
 import {
   clearBasketExecution,
   createBasketExecution,
   loadBasketExecution,
   saveBasketExecution
 } from "../src/trade/basketExecutionStore";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
 export default function BasketExecution() {
   const [execution, setExecution] = useState(null);
@@ -38,20 +41,197 @@ export default function BasketExecution() {
 
   const orders = execution?.orders || [];
 
-  const totalAmount = useMemo(() => {
-    return orders.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const preparedOrders = useMemo(() => {
+    return orders.map((order) => {
+      const price = Number(order.price || order.limitPrice || 0);
+      const amount = Number(order.amount || 0);
+      const quantity =
+        Number(order.quantity || 0) > 0
+          ? Number(order.quantity)
+          : price > 0 && amount > 0
+          ? Math.floor(amount / price)
+          : 0;
+
+      const gross = quantity * price;
+
+      return {
+        ...order,
+        price,
+        quantity,
+        gross,
+        amount: amount || gross
+      };
+    });
   }, [orders]);
 
+  const totalAmount = preparedOrders.reduce(
+    (sum, item) => sum + Number(item.amount || item.gross || 0),
+    0
+  );
+
+  const completed = preparedOrders.filter((x) => x.status === "FILLED").length;
+
   async function executeBasket() {
-    if (!orders.length) {
+    if (!preparedOrders.length) {
       Alert.alert("No Basket", "Create a trade basket first.");
       return;
     }
 
+    const cashRaw = await userGetItem("availableCash");
+    let cash = Number(cashRaw || 0);
+
+    const portfolio = await loadPortfolio({ revalue: false });
+    let nextPortfolio = [...portfolio];
+
+    const tradesRaw = await userGetItem("simulatedTrades");
+    const trades = tradesRaw ? JSON.parse(tradesRaw) : [];
+
+    const executable = preparedOrders.filter((order) => order.status !== "FILLED");
+
+    const totalRequired = executable.reduce((sum, order) => {
+      const gross = Number(order.gross || 0);
+      const fees = gross * 0.014;
+      return order.side === "SELL" ? sum : sum + gross + fees;
+    }, 0);
+
+    if (cash < totalRequired) {
+      Alert.alert(
+        "Insufficient Cash",
+        `Basket needs KES ${money(totalRequired)} but available cash is KES ${money(cash)}.`
+      );
+      return;
+    }
+
+    const filledOrders = executable.map((order) => {
+      const gross = Number(order.gross || 0);
+      const brokerFee = gross * 0.012;
+      const regulatoryFee = gross * 0.002;
+      const totalFees = brokerFee + regulatoryFee;
+      const totalCost =
+        order.side === "SELL" ? Math.max(gross - totalFees, 0) : gross + totalFees;
+
+      if (order.side === "BUY") {
+        const existingIndex = nextPortfolio.findIndex(
+          (item) => String(item.symbol).toUpperCase() === String(order.symbol).toUpperCase()
+        );
+
+        if (existingIndex >= 0) {
+          const existing = nextPortfolio[existingIndex];
+          const existingQty = Number(existing.quantity || 0);
+          const existingAvg = Number(existing.averagePrice || existing.averageCost || 0);
+          const existingCost = existingQty * existingAvg;
+
+          const newQty = existingQty + Number(order.quantity || 0);
+          const newCost = existingCost + totalCost;
+          const newAvg = newQty > 0 ? newCost / newQty : Number(order.price || 0);
+          const newMarketValue = newQty * Number(order.price || 0);
+
+          nextPortfolio[existingIndex] = {
+            ...existing,
+            quantity: newQty,
+            averagePrice: newAvg,
+            averageCost: newAvg,
+            costValue: newCost,
+            investedValue: newCost,
+            marketPrice: Number(order.price || 0),
+            price: Number(order.price || 0),
+            marketValue: newMarketValue,
+            value: newMarketValue,
+            profitLoss: newMarketValue - newCost,
+            profitLossPct: newCost > 0 ? ((newMarketValue - newCost) / newCost) * 100 : 0,
+            source: "BASKET_EXECUTION",
+            updatedAt: new Date().toISOString()
+          };
+        } else {
+          const avg = Number(order.quantity || 0) > 0 ? totalCost / Number(order.quantity || 0) : Number(order.price || 0);
+
+          nextPortfolio.push({
+            symbol: order.symbol,
+            name: order.name || order.symbol,
+            sector: order.sector || "NSE",
+            quantity: Number(order.quantity || 0),
+            averagePrice: avg,
+            averageCost: avg,
+            costValue: totalCost,
+            investedValue: totalCost,
+            marketPrice: Number(order.price || 0),
+            price: Number(order.price || 0),
+            marketValue: gross,
+            value: gross,
+            profitLoss: gross - totalCost,
+            profitLossPct: totalCost > 0 ? ((gross - totalCost) / totalCost) * 100 : 0,
+            source: "BASKET_EXECUTION",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+
+        cash -= totalCost;
+      }
+
+      const trade = {
+        id: `BASKET-TRD-${Date.now()}-${order.symbol}`,
+        symbol: order.symbol,
+        name: order.name || order.symbol,
+        sector: order.sector || "NSE",
+        side: order.side || "BUY",
+        quantity: Number(order.quantity || 0),
+        price: Number(order.price || 0),
+        gross,
+        brokerFee,
+        regulatoryFee,
+        totalFees,
+        totalCost,
+        cashAfter: cash,
+        tradedAt: new Date().toISOString(),
+        status: "SIMULATED_EXECUTED",
+        settlementStatus: "SETTLED",
+        source: "BASKET_EXECUTION"
+      };
+
+      trades.unshift(trade);
+
+      return {
+        ...order,
+        status: "FILLED",
+        message: "Executed through basket buy all",
+        trade,
+        filledAt: new Date().toISOString()
+      };
+    });
+
+    const updatedOrders = preparedOrders.map((order) => {
+      const filled = filledOrders.find((x) => x.id === order.id);
+      return filled || order;
+    });
+
+    const updatedExecution = {
+      ...execution,
+      status: "COMPLETED",
+      completedOrders: updatedOrders.filter((x) => x.status === "FILLED").length,
+      totalOrders: updatedOrders.length,
+      totalAmount,
+      orders: updatedOrders,
+      completedAt: new Date().toISOString()
+    };
+
+    await savePortfolio(nextPortfolio);
+    await userSetItem("availableCash", String(cash));
+    await userSetItem("statementUploaded", "true");
+    await userSetItem("simulatedTrades", JSON.stringify(trades));
+    await saveBasketExecution(updatedExecution);
+    await buildSyncStatus();
+
+    setExecution(updatedExecution);
+
+    Alert.alert("Basket Complete", "All basket orders were executed.");
+  }
+
+  async function queueForTradeScreen() {
     const queued = {
       ...execution,
       status: "IN_PROGRESS",
-      orders: orders.map((order) => ({
+      orders: preparedOrders.map((order) => ({
         ...order,
         status: order.status === "FILLED" ? "FILLED" : "QUEUED",
         message:
@@ -78,10 +258,7 @@ export default function BasketExecution() {
         <Text style={styles.title}>Basket Execution</Text>
         <Text style={styles.subtitle}>No active basket execution found.</Text>
 
-        <Pressable
-          style={styles.primary}
-          onPress={() => router.push("/trade-basket")}
-        >
+        <Pressable style={styles.primary} onPress={() => router.push("/trade-basket")}>
           <Text style={styles.primaryText}>Open Trade Basket</Text>
         </Pressable>
       </ScrollView>
@@ -110,7 +287,7 @@ export default function BasketExecution() {
       <View style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>Execution Progress</Text>
         <Text style={styles.summaryValue}>
-          {execution.completedOrders || 0}/{execution.totalOrders || orders.length}
+          {completed}/{preparedOrders.length}
         </Text>
         <Text style={styles.body}>
           Status: {execution.status} • Total KES {money(totalAmount)}
@@ -120,7 +297,7 @@ export default function BasketExecution() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Orders</Text>
 
-        {orders.map((order) => (
+        {preparedOrders.map((order) => (
           <View key={order.id} style={styles.orderRow}>
             <View style={styles.logoCircle}>
               <Text style={styles.logoText}>
@@ -131,18 +308,24 @@ export default function BasketExecution() {
             <View style={{ flex: 1 }}>
               <Text style={styles.symbol}>{order.symbol}</Text>
               <Text style={styles.bodySmall}>
-                {order.side} • KES {money(order.amount)}
+                {order.side || "BUY"} • Qty {order.quantity} • KES {money(order.amount)}
               </Text>
-              <Text style={styles.reason}>{order.message}</Text>
+              <Text style={styles.reason}>
+                Price KES {money(order.price)} • {order.message || "Ready"}
+              </Text>
             </View>
 
-            <Text style={statusStyle(order.status)}>{order.status}</Text>
+            <Text style={statusStyle(order.status)}>{order.status || "READY"}</Text>
           </View>
         ))}
       </View>
 
       <Pressable style={styles.primary} onPress={executeBasket}>
-        <Text style={styles.primaryText}>Execute Basket</Text>
+        <Text style={styles.primaryText}>Buy All Basket Orders</Text>
+      </Pressable>
+
+      <Pressable style={styles.secondary} onPress={queueForTradeScreen}>
+        <Text style={styles.secondaryText}>Review One by One in Trade Screen</Text>
       </Pressable>
 
       <Pressable style={styles.secondary} onPress={() => router.push("/trade")}>
