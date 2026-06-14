@@ -14,15 +14,15 @@ import ActiveUserBanner from "../src/components/ActiveUserBanner";
 import {
   createBasketExecution,
   loadBasketExecution,
-  markBrokerReceived,
   markExecutionOrderFilled,
-  routeExecutionOrder,
   updateExecutionOrder
 } from "../src/trade/basketExecutionStore";
 import { ORDER_STATUS } from "../src/trade/orderLifecycle";
+import { placeBrokerOrder } from "../src/brokers/brokerAdapters";
 
 const FLOW = [
   ORDER_STATUS.REVIEW,
+  ORDER_STATUS.BROKER_SELECTED,
   ORDER_STATUS.QUEUED,
   ORDER_STATUS.ROUTED,
   ORDER_STATUS.BROKER_RECEIVED,
@@ -75,16 +75,18 @@ export default function QueueManager() {
   }, [orders]);
 
   async function routeQueuedOrders() {
-    const queued = orders.filter((order) => order.status === ORDER_STATUS.QUEUED);
+    const queued = orders.filter((order) =>
+      [ORDER_STATUS.QUEUED, ORDER_STATUS.BROKER_SELECTED].includes(order.status)
+    );
 
     if (!queued.length) {
-      Alert.alert("No Queued Orders", "Queue orders before routing them.");
+      Alert.alert("No Queued Orders", "Queue or select broker orders before routing.");
       return;
     }
 
     Alert.alert(
       "Route Orders",
-      `${queued.length} queued orders will be routed to the selected broker.`,
+      `${queued.length} orders will be sent through the broker adapter layer.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -93,9 +95,34 @@ export default function QueueManager() {
             let latest = execution;
 
             for (const order of queued) {
-              latest = await routeExecutionOrder(order.id, {
-                id: order.brokerId || "SIM",
-                name: order.brokerName || "Simulation Broker"
+              latest = await updateExecutionOrder(order.id, {
+                status: ORDER_STATUS.ROUTED,
+                message: `Routing to ${order.brokerName || "Simulation Broker"}`,
+                routedAt: new Date().toISOString()
+              });
+
+              const brokerResponse = await placeBrokerOrder({
+                ...order,
+                brokerId: order.brokerId || "SIM",
+                brokerName: order.brokerName || "Simulation Broker"
+              });
+
+              latest = await updateExecutionOrder(order.id, {
+                brokerId: brokerResponse.brokerId || order.brokerId || "SIM",
+                brokerName:
+                  brokerResponse.brokerName ||
+                  order.brokerName ||
+                  "Simulation Broker",
+                brokerOrderId: brokerResponse.brokerOrderId,
+                brokerStatus: brokerResponse.status,
+                status: ORDER_STATUS.BROKER_RECEIVED,
+                message:
+                  brokerResponse.message ||
+                  "Broker received order through adapter.",
+                submittedAt: brokerResponse.submittedAt,
+                brokerReceivedAt: brokerResponse.receivedAt,
+                adapterResponse: brokerResponse,
+                updatedAt: new Date().toISOString()
               });
             }
 
@@ -106,33 +133,18 @@ export default function QueueManager() {
     );
   }
 
-  async function acknowledgeRoutedOrders() {
-    const routed = orders.filter((order) => order.status === ORDER_STATUS.ROUTED);
-
-    if (!routed.length) {
-      Alert.alert("No Routed Orders", "No routed orders are waiting for broker acknowledgement.");
-      return;
-    }
-
-    let latest = execution;
-
-    for (const order of routed) {
-      latest = await markBrokerReceived(order.id, {
-        brokerOrderId: `BRK-${Date.now()}-${order.symbol}`,
-        status: ORDER_STATUS.BROKER_RECEIVED
-      });
-    }
-
-    setExecution(latest);
-  }
-
   async function fillBrokerReceivedOrders() {
     const received = orders.filter((order) =>
-      [ORDER_STATUS.BROKER_RECEIVED, ORDER_STATUS.PARTIAL_FILL].includes(order.status)
+      [ORDER_STATUS.BROKER_RECEIVED, ORDER_STATUS.PARTIAL_FILL].includes(
+        order.status
+      )
     );
 
     if (!received.length) {
-      Alert.alert("No Broker Received Orders", "No broker received orders are ready to fill.");
+      Alert.alert(
+        "No Broker Received Orders",
+        "No broker received orders are ready to fill."
+      );
       return;
     }
 
@@ -152,6 +164,8 @@ export default function QueueManager() {
                 side: order.side,
                 quantity: order.quantity,
                 price: order.price,
+                brokerId: order.brokerId,
+                brokerName: order.brokerName,
                 brokerOrderId: order.brokerOrderId,
                 filledAt: new Date().toISOString(),
                 source: "BROKER_CONFIRMATION"
@@ -219,8 +233,8 @@ export default function QueueManager() {
       </View>
 
       <Text style={styles.subtitle}>
-        OMS control center for queued, routed, broker-received, partial, and
-        filled orders.
+        OMS control center using broker adapters for routing and broker
+        confirmation.
       </Text>
 
       <ActiveUserBanner />
@@ -242,27 +256,42 @@ export default function QueueManager() {
       </View>
 
       <View style={styles.actionGrid}>
-        <Pressable style={styles.actionButton} onPress={() => router.push("/orders-review")}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => router.push("/orders-review")}
+        >
           <Text style={styles.actionText}>Review Orders</Text>
         </Pressable>
 
-        <Pressable style={styles.actionButton} onPress={() => router.push("/orders")}>
-          <Text style={styles.actionText}>Open OMS Orders</Text>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => router.push("/broker-routing")}
+        >
+          <Text style={styles.actionText}>Broker Routing</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => router.push("/orders")}
+        >
+          <Text style={styles.actionText}>OMS Orders</Text>
         </Pressable>
 
         <Pressable style={styles.actionButton} onPress={routeQueuedOrders}>
           <Text style={styles.actionText}>Route Queued</Text>
         </Pressable>
 
-        <Pressable style={styles.actionButton} onPress={acknowledgeRoutedOrders}>
-          <Text style={styles.actionText}>Broker Ack</Text>
-        </Pressable>
-
-        <Pressable style={styles.actionButton} onPress={fillBrokerReceivedOrders}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={fillBrokerReceivedOrders}
+        >
           <Text style={styles.actionText}>Fill Received</Text>
         </Pressable>
 
-        <Pressable style={styles.actionButton} onPress={() => router.push("/basket-execution")}>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => router.push("/basket-execution")}
+        >
           <Text style={styles.actionText}>Basket Execution</Text>
         </Pressable>
       </View>
@@ -296,6 +325,12 @@ export default function QueueManager() {
                   Broker: {order.brokerName || "Not routed"}
                 </Text>
 
+                {order.brokerOrderId ? (
+                  <Text style={styles.small}>
+                    Broker Order: {order.brokerOrderId}
+                  </Text>
+                ) : null}
+
                 <Text style={styles.reason}>
                   {order.message || "Waiting for next lifecycle action"}
                 </Text>
@@ -327,6 +362,7 @@ function statusStyle(status) {
   if (status === ORDER_STATUS.ROUTED) return styles.routed;
   if (status === ORDER_STATUS.BROKER_RECEIVED) return styles.received;
   if (status === ORDER_STATUS.PARTIAL_FILL) return styles.partial;
+  if (status === ORDER_STATUS.BROKER_SELECTED) return styles.selected;
   return styles.pending;
 }
 
@@ -499,6 +535,7 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   pending: { color: "#fbbf24", fontWeight: "900", fontSize: 12 },
+  selected: { color: "#86efac", fontWeight: "900", fontSize: 12 },
   queued: { color: "#67e8f9", fontWeight: "900", fontSize: 12 },
   routed: { color: "#c084fc", fontWeight: "900", fontSize: 12 },
   received: { color: "#38bdf8", fontWeight: "900", fontSize: 12 },
