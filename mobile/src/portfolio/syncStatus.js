@@ -5,7 +5,9 @@ export async function buildSyncStatus() {
   const holdings = await loadPortfolio({ revalue: true });
 
   const cashRaw = await userGetItem("availableCash");
-  const brokerRaw = await userGetItem("brokerProfile");
+  const defaultBrokerRaw = await userGetItem("defaultBrokerProfile");
+  const legacyBrokerRaw = await userGetItem("brokerProfile");
+
   const brokerSkippedRaw = await userGetItem("brokerProfileSkipped");
   const txRaw = await userGetItem("transactionHistory");
 
@@ -16,6 +18,7 @@ export async function buildSyncStatus() {
   const statementSummaryRaw = await userGetItem("statementSummary");
   const txSummaryRaw = await userGetItem("transactionUploadSummary");
 
+  const brokerRaw = defaultBrokerRaw || legacyBrokerRaw;
   const brokerProfile = brokerRaw ? JSON.parse(brokerRaw) : null;
   const transactions = txRaw ? JSON.parse(txRaw) : [];
 

@@ -21,14 +21,26 @@ export default function ActiveUserBanner() {
   );
 
   async function load() {
-    const currentSession = await getCurrentSession();
-    const profileRaw = await userGetItem("investorProfile");
-    const brokerRaw = await userGetItem("brokerProfile");
+  const currentSession = await getCurrentSession();
+  const profileRaw = await userGetItem("investorProfile");
 
-    setSession(currentSession);
-    setProfile(profileRaw ? JSON.parse(profileRaw) : null);
-    setBroker(brokerRaw ? JSON.parse(brokerRaw) : null);
-  }
+  const defaultBrokerRaw = await userGetItem("defaultBrokerProfile");
+  const legacyBrokerRaw = await userGetItem("brokerProfile");
+
+  setSession(currentSession);
+
+  setProfile(
+    profileRaw ? JSON.parse(profileRaw) : null
+  );
+
+  const brokerRaw = defaultBrokerRaw || legacyBrokerRaw;
+
+  const brokerProfile = brokerRaw
+    ? JSON.parse(brokerRaw)
+    : null;
+
+  setBroker(brokerProfile);
+}
 
   return (
     <Pressable

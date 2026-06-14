@@ -245,3 +245,24 @@ export function normalizeOrder(order = {}) {
     message: order.message || "Pending review"
   };
 }
+
+export async function deleteExecutionOrder(orderId) {
+  const execution = await loadBasketExecution();
+
+  if (!execution) return null;
+
+  const orders = execution.orders.filter((order) => order.id !== orderId);
+
+  return await saveBasketExecution({
+    ...execution,
+    orders
+  });
+}
+
+export async function queueSingleOrder(orderId) {
+  return await updateExecutionOrder(orderId, {
+    status: ORDER_STATUS.QUEUED,
+    message: "Queued for broker routing",
+    queuedAt: new Date().toISOString()
+  });
+}

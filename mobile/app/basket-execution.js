@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,15 +9,13 @@ import {
 import { router, useFocusEffect } from "expo-router";
 
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
-import { loadPortfolio, savePortfolio } from "../src/portfolio/portfolioStore";
-import { userGetItem, userSetItem } from "../src/auth/userStorage";
 import {
   clearBasketExecution,
   createBasketExecution,
-  loadBasketExecution,
-  saveBasketExecution
+  getActiveExecutionOrders,
+  loadBasketExecution
 } from "../src/trade/basketExecutionStore";
-import { buildSyncStatus } from "../src/portfolio/syncStatus";
+import { ORDER_STATUS } from "../src/trade/orderLifecycle";
 
 export default function BasketExecution() {
   const [execution, setExecution] = useState(null);
@@ -39,227 +36,57 @@ export default function BasketExecution() {
     setExecution(saved);
   }
 
-  const orders = execution?.orders || [];
+  const activeOrders = useMemo(() => {
+    return getActiveExecutionOrders(execution || {}).filter((order) =>
+      [
+        ORDER_STATUS.QUEUED,
+        ORDER_STATUS.ROUTED,
+        ORDER_STATUS.BROKER_RECEIVED,
+        ORDER_STATUS.PARTIAL_FILL
+      ].includes(order.status)
+    );
+  }, [execution]);
 
-  const preparedOrders = useMemo(() => {
-    return orders.map((order) => {
-      const price = Number(order.price || order.limitPrice || 0);
-      const amount = Number(order.amount || 0);
-      const quantity =
-        Number(order.quantity || 0) > 0
-          ? Number(order.quantity)
-          : price > 0 && amount > 0
-          ? Math.floor(amount / price)
-          : 0;
+  const closedOrders = execution?.orders?.filter((order) =>
+    [
+      ORDER_STATUS.FILLED,
+      ORDER_STATUS.CANCELLED,
+      ORDER_STATUS.REJECTED,
+      ORDER_STATUS.EXPIRED
+    ].includes(order.status)
+  ) || [];
 
-      const gross = quantity * price;
-
-      return {
-        ...order,
-        price,
-        quantity,
-        gross,
-        amount: amount || gross
-      };
-    });
-  }, [orders]);
-
-  const totalAmount = preparedOrders.reduce(
+  const totalAmount = activeOrders.reduce(
     (sum, item) => sum + Number(item.amount || item.gross || 0),
     0
   );
 
-  const completed = preparedOrders.filter((x) => x.status === "FILLED").length;
-
-  async function executeBasket() {
-    if (!preparedOrders.length) {
-      Alert.alert("No Basket", "Create a trade basket first.");
-      return;
-    }
-
-    const cashRaw = await userGetItem("availableCash");
-    let cash = Number(cashRaw || 0);
-
-    const portfolio = await loadPortfolio({ revalue: false });
-    let nextPortfolio = [...portfolio];
-
-    const tradesRaw = await userGetItem("simulatedTrades");
-    const trades = tradesRaw ? JSON.parse(tradesRaw) : [];
-
-    const executable = preparedOrders.filter((order) => order.status !== "FILLED");
-
-    const totalRequired = executable.reduce((sum, order) => {
-      const gross = Number(order.gross || 0);
-      const fees = gross * 0.014;
-      return order.side === "SELL" ? sum : sum + gross + fees;
-    }, 0);
-
-    if (cash < totalRequired) {
-      Alert.alert(
-        "Insufficient Cash",
-        `Basket needs KES ${money(totalRequired)} but available cash is KES ${money(cash)}.`
-      );
-      return;
-    }
-
-    const filledOrders = executable.map((order) => {
-      const gross = Number(order.gross || 0);
-      const brokerFee = gross * 0.012;
-      const regulatoryFee = gross * 0.002;
-      const totalFees = brokerFee + regulatoryFee;
-      const totalCost =
-        order.side === "SELL" ? Math.max(gross - totalFees, 0) : gross + totalFees;
-
-      if (order.side === "BUY") {
-        const existingIndex = nextPortfolio.findIndex(
-          (item) => String(item.symbol).toUpperCase() === String(order.symbol).toUpperCase()
-        );
-
-        if (existingIndex >= 0) {
-          const existing = nextPortfolio[existingIndex];
-          const existingQty = Number(existing.quantity || 0);
-          const existingAvg = Number(existing.averagePrice || existing.averageCost || 0);
-          const existingCost = existingQty * existingAvg;
-
-          const newQty = existingQty + Number(order.quantity || 0);
-          const newCost = existingCost + totalCost;
-          const newAvg = newQty > 0 ? newCost / newQty : Number(order.price || 0);
-          const newMarketValue = newQty * Number(order.price || 0);
-
-          nextPortfolio[existingIndex] = {
-            ...existing,
-            quantity: newQty,
-            averagePrice: newAvg,
-            averageCost: newAvg,
-            costValue: newCost,
-            investedValue: newCost,
-            marketPrice: Number(order.price || 0),
-            price: Number(order.price || 0),
-            marketValue: newMarketValue,
-            value: newMarketValue,
-            profitLoss: newMarketValue - newCost,
-            profitLossPct: newCost > 0 ? ((newMarketValue - newCost) / newCost) * 100 : 0,
-            source: "BASKET_EXECUTION",
-            updatedAt: new Date().toISOString()
-          };
-        } else {
-          const avg = Number(order.quantity || 0) > 0 ? totalCost / Number(order.quantity || 0) : Number(order.price || 0);
-
-          nextPortfolio.push({
-            symbol: order.symbol,
-            name: order.name || order.symbol,
-            sector: order.sector || "NSE",
-            quantity: Number(order.quantity || 0),
-            averagePrice: avg,
-            averageCost: avg,
-            costValue: totalCost,
-            investedValue: totalCost,
-            marketPrice: Number(order.price || 0),
-            price: Number(order.price || 0),
-            marketValue: gross,
-            value: gross,
-            profitLoss: gross - totalCost,
-            profitLossPct: totalCost > 0 ? ((gross - totalCost) / totalCost) * 100 : 0,
-            source: "BASKET_EXECUTION",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-        }
-
-        cash -= totalCost;
-      }
-
-      const trade = {
-        id: `BASKET-TRD-${Date.now()}-${order.symbol}`,
-        symbol: order.symbol,
-        name: order.name || order.symbol,
-        sector: order.sector || "NSE",
-        side: order.side || "BUY",
-        quantity: Number(order.quantity || 0),
-        price: Number(order.price || 0),
-        gross,
-        brokerFee,
-        regulatoryFee,
-        totalFees,
-        totalCost,
-        cashAfter: cash,
-        tradedAt: new Date().toISOString(),
-        status: "SIMULATED_EXECUTED",
-        settlementStatus: "SETTLED",
-        source: "BASKET_EXECUTION"
-      };
-
-      trades.unshift(trade);
-
-      return {
-        ...order,
-        status: "FILLED",
-        message: "Executed through basket buy all",
-        trade,
-        filledAt: new Date().toISOString()
-      };
-    });
-
-    const updatedOrders = preparedOrders.map((order) => {
-      const filled = filledOrders.find((x) => x.id === order.id);
-      return filled || order;
-    });
-
-    const updatedExecution = {
-      ...execution,
-      status: "COMPLETED",
-      completedOrders: updatedOrders.filter((x) => x.status === "FILLED").length,
-      totalOrders: updatedOrders.length,
-      totalAmount,
-      orders: updatedOrders,
-      completedAt: new Date().toISOString()
-    };
-
-    await savePortfolio(nextPortfolio);
-    await userSetItem("availableCash", String(cash));
-    await userSetItem("statementUploaded", "true");
-    await userSetItem("simulatedTrades", JSON.stringify(trades));
-    await saveBasketExecution(updatedExecution);
-    await buildSyncStatus();
-
-    setExecution(updatedExecution);
-
-    Alert.alert("Basket Complete", "All basket orders were executed.");
-  }
-
-  async function queueForTradeScreen() {
-    const queued = {
-      ...execution,
-      status: "IN_PROGRESS",
-      orders: preparedOrders.map((order) => ({
-        ...order,
-        status: order.status === "FILLED" ? "FILLED" : "QUEUED",
-        message:
-          order.status === "FILLED"
-            ? "Already filled"
-            : "Queued for trade screen"
-      }))
-    };
-
-    const saved = await saveBasketExecution(queued);
-    setExecution(saved);
-
-    router.push("/trade");
-  }
+  const isComplete =
+    execution?.orders?.length > 0 && activeOrders.length === 0;
 
   async function clearExecution() {
     await clearBasketExecution();
     setExecution(null);
   }
 
-  if (!execution || !orders.length) {
+  if (!execution || !execution.orders?.length) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <Text style={styles.title}>Basket Execution</Text>
         <Text style={styles.subtitle}>No active basket execution found.</Text>
 
-        <Pressable style={styles.primary} onPress={() => router.push("/trade-basket")}>
-          <Text style={styles.primaryText}>Open Trade Basket</Text>
+        <Pressable
+          style={styles.primary}
+          onPress={() => router.push("/orders-review")}
+        >
+          <Text style={styles.primaryText}>Open Orders Review</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.secondary}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.secondaryText}>Dashboard</Text>
         </Pressable>
       </ScrollView>
     );
@@ -279,57 +106,110 @@ export default function BasketExecution() {
       </View>
 
       <Text style={styles.subtitle}>
-        Execute Coach G basket orders and track progress.
+        Track queued and broker-routed basket orders. Filled orders move to
+        portfolio and trade history.
       </Text>
 
       <ActiveUserBanner />
 
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Execution Progress</Text>
-        <Text style={styles.summaryValue}>
-          {completed}/{preparedOrders.length}
+        <Text style={styles.summaryLabel}>Active Execution Orders</Text>
+        <Text style={styles.summaryValue}>{activeOrders.length}</Text>
+        <Text style={styles.body}>
+          Status: {execution.status} • Active Value KES {money(totalAmount)}
         </Text>
         <Text style={styles.body}>
-          Status: {execution.status} • Total KES {money(totalAmount)}
+          Closed Orders: {closedOrders.length}
         </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Orders</Text>
+        <Text style={styles.cardTitle}>
+          {isComplete ? "Execution Complete" : "Active Orders"}
+        </Text>
 
-        {preparedOrders.map((order) => (
-          <View key={order.id} style={styles.orderRow}>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoText}>
-                {String(order.symbol || "?").slice(0, 2)}
+        {isComplete ? (
+          <>
+            <Text style={styles.body}>
+              No active execution orders remain. Filled orders should now be
+              reflected in portfolio and trade history.
+            </Text>
+
+            <Pressable
+              style={styles.secondary}
+              onPress={() => router.push("/portfolio")}
+            >
+              <Text style={styles.secondaryText}>Open Portfolio</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.secondary}
+              onPress={() => router.push("/trade-history")}
+            >
+              <Text style={styles.secondaryText}>Open Trade History</Text>
+            </Pressable>
+          </>
+        ) : (
+          activeOrders.map((order) => (
+            <View key={order.id} style={styles.orderRow}>
+              <View style={styles.logoCircle}>
+                <Text style={styles.logoText}>
+                  {String(order.symbol || "?").slice(0, 2)}
+                </Text>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.symbol}>{order.symbol}</Text>
+
+                <Text style={styles.bodySmall}>
+                  {order.side || "BUY"} • Qty {order.quantity} • KES{" "}
+                  {money(order.amount || order.gross)}
+                </Text>
+
+                <Text style={styles.reason}>
+                  Price KES {money(order.price)} •{" "}
+                  {order.brokerName || "Broker not assigned"}
+                </Text>
+
+                <Text style={styles.reason}>
+                  {order.message || "Awaiting lifecycle action"}
+                </Text>
+              </View>
+
+              <Text style={statusStyle(order.status)}>
+                {order.status}
               </Text>
             </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={styles.symbol}>{order.symbol}</Text>
-              <Text style={styles.bodySmall}>
-                {order.side || "BUY"} • Qty {order.quantity} • KES {money(order.amount)}
-              </Text>
-              <Text style={styles.reason}>
-                Price KES {money(order.price)} • {order.message || "Ready"}
-              </Text>
-            </View>
-
-            <Text style={statusStyle(order.status)}>{order.status || "READY"}</Text>
-          </View>
-        ))}
+          ))
+        )}
       </View>
 
-      <Pressable style={styles.primary} onPress={executeBasket}>
-        <Text style={styles.primaryText}>Buy All Basket Orders</Text>
+      <Pressable
+        style={styles.primary}
+        onPress={() => router.push("/broker-routing")}
+      >
+        <Text style={styles.primaryText}>Open Broker Routing</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={queueForTradeScreen}>
-        <Text style={styles.secondaryText}>Review One by One in Trade Screen</Text>
+      <Pressable
+        style={styles.secondary}
+        onPress={() => router.push("/queue-manager")}
+      >
+        <Text style={styles.secondaryText}>Open Queue Manager</Text>
       </Pressable>
 
-      <Pressable style={styles.secondary} onPress={() => router.push("/trade")}>
-        <Text style={styles.secondaryText}>Open Trade Screen</Text>
+      <Pressable
+        style={styles.secondary}
+        onPress={() => router.push("/orders")}
+      >
+        <Text style={styles.secondaryText}>Open OMS Orders</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.secondary}
+        onPress={() => router.push("/orders-review")}
+      >
+        <Text style={styles.secondaryText}>Open Orders Review</Text>
       </Pressable>
 
       <Pressable style={styles.secondary} onPress={clearExecution}>
@@ -340,9 +220,10 @@ export default function BasketExecution() {
 }
 
 function statusStyle(status) {
-  if (status === "FILLED") return styles.filled;
-  if (status === "FAILED") return styles.failed;
-  if (status === "QUEUED" || status === "SUBMITTED") return styles.queued;
+  if (status === ORDER_STATUS.QUEUED) return styles.queued;
+  if (status === ORDER_STATUS.ROUTED) return styles.routed;
+  if (status === ORDER_STATUS.BROKER_RECEIVED) return styles.received;
+  if (status === ORDER_STATUS.PARTIAL_FILL) return styles.partial;
   return styles.pending;
 }
 
@@ -427,8 +308,9 @@ const styles = StyleSheet.create({
   reason: { color: "#94a3b8", marginTop: 4, fontSize: 12 },
   pending: { color: "#94a3b8", fontWeight: "900", fontSize: 12 },
   queued: { color: "#67e8f9", fontWeight: "900", fontSize: 12 },
-  filled: { color: "#86efac", fontWeight: "900", fontSize: 12 },
-  failed: { color: "#fca5a5", fontWeight: "900", fontSize: 12 },
+  routed: { color: "#c084fc", fontWeight: "900", fontSize: 12 },
+  received: { color: "#38bdf8", fontWeight: "900", fontSize: 12 },
+  partial: { color: "#fde68a", fontWeight: "900", fontSize: 12 },
   primary: {
     marginTop: 20,
     backgroundColor: "#9333ea",

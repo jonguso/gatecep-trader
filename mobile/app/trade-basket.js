@@ -65,7 +65,7 @@ export default function TradeBasket() {
       return;
     }
 
-    router.push("/basket-execution");
+    router.push("/orders-review");
   }
 
   return (
