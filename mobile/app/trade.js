@@ -15,8 +15,10 @@ import { loadPortfolio, savePortfolio } from "../src/portfolio/portfolioStore";
 import { userGetItem, userSetItem } from "../src/auth/userStorage";
 import {
   loadBasketExecution,
+  saveBasketExecution,
   updateExecutionOrder
 } from "../src/trade/basketExecutionStore";
+import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
 const STOCKS = [
   { symbol: "SCOM", name: "Safaricom", sector: "Telecom", price: 30.6, reason: "Beginner-friendly telecom and mobile money exposure." },
@@ -60,31 +62,45 @@ export default function Trade() {
     }
   }
 
+  function normalizeBasketOrder(order) {
+    const price = Number(order?.price || order?.limitPrice || 0);
+    const amount = Number(order?.amount || 0);
+
+    const qty =
+      Number(order?.quantity || 0) > 0
+        ? Number(order.quantity)
+        : price > 0 && amount > 0
+        ? Math.floor(amount / price)
+        : 1;
+
+    return {
+      ...order,
+      side: order?.side || "BUY",
+      price,
+      quantity: qty,
+      gross: qty * price,
+      amount: amount || qty * price
+    };
+  }
+
   function loadOrderIntoTicket(order) {
     if (!order) return;
 
+    const normalized = normalizeBasketOrder(order);
+
     const stock =
-      STOCKS.find((item) => item.symbol === order.symbol) || {
-        symbol: order.symbol,
-        name: order.name || order.symbol,
-        sector: "NSE",
-        price: Number(order.price || 0),
-        reason: order.reason || "Coach G basket order"
+      STOCKS.find((item) => item.symbol === normalized.symbol) || {
+        symbol: normalized.symbol,
+        name: normalized.name || normalized.symbol,
+        sector: normalized.sector || "NSE",
+        price: normalized.price,
+        reason: normalized.reason || "Coach G basket order"
       };
 
-    const price = Number(order.price || stock.price || 0);
-
-    const qty =
-      Number(order.quantity || 0) > 0
-        ? Number(order.quantity)
-        : Number(order.amount || 0) > 0 && price > 0
-        ? Math.floor(Number(order.amount) / price)
-        : 1;
-
     setSelectedStock(stock);
-    setSide(order.side || "BUY");
-    setQuantity(String(qty || 1));
-    setLimitPrice(String(price || stock.price || 0));
+    setSide(normalized.side);
+    setQuantity(String(normalized.quantity || 1));
+    setLimitPrice(String(normalized.price || stock.price || 0));
     setConfirmedTrade(null);
   }
 
@@ -95,53 +111,18 @@ export default function Trade() {
   }
 
   const estimate = useMemo(() => {
-    const qty = Number(quantity || 0);
-    const price = Number(limitPrice || selectedStock.price || 0);
-    const gross = qty * price;
-
-    const brokerFee = gross * 0.012;
-    const regulatoryFee = gross * 0.002;
-    const totalFees = brokerFee + regulatoryFee;
-
-    const totalCost =
-      side === "BUY" ? gross + totalFees : Math.max(gross - totalFees, 0);
-
-    const remainingCash = side === "BUY" ? cash - totalCost : cash + totalCost;
-
-    return {
-      qty,
-      price,
-      gross,
-      brokerFee,
-      regulatoryFee,
-      totalFees,
-      totalCost,
-      remainingCash
-    };
+    return buildEstimate({
+      side,
+      quantity: Number(quantity || 0),
+      price: Number(limitPrice || selectedStock.price || 0),
+      cash
+    });
   }, [quantity, limitPrice, selectedStock, side, cash]);
 
-  async function confirmTrade() {
-    if (!estimate.qty || estimate.qty <= 0) {
-      Alert.alert("Invalid Quantity", "Enter a valid quantity.");
-      return;
-    }
-
-    if (!estimate.price || estimate.price <= 0) {
-      Alert.alert("Invalid Price", "Enter a valid limit price.");
-      return;
-    }
-
-    if (side === "BUY" && estimate.remainingCash < 0) {
-      Alert.alert(
-        "Insufficient Cash",
-        `You need KES ${money(estimate.totalCost)} but only have KES ${money(cash)}.`
-      );
-      return;
-    }
-
+  async function getBrokerProfile() {
     const brokerRaw = await userGetItem("defaultBrokerProfile");
 
-    const brokerProfile = brokerRaw
+    return brokerRaw
       ? JSON.parse(brokerRaw)
       : {
           broker: "AIB-AXYS",
@@ -151,30 +132,24 @@ export default function Trade() {
           defaultBroker: true,
           connectionMode: "SIMULATION"
         };
+  }
 
-    const validation = validateOrder({
-      side,
-      symbol: selectedStock.symbol,
-      quantity: estimate.qty,
-      price: estimate.price,
-      cash,
-      totalCost: estimate.totalCost,
-      portfolio,
-      brokerProfile
-    });
-
-    if (!validation.ok) {
-      Alert.alert("Order Blocked", validation.errors.join("\n"));
-      return;
-    }
-
-    let nextPortfolio = [...portfolio];
+  function applyTradeToPortfolio({
+    currentPortfolio,
+    stock,
+    tradeSide,
+    qty,
+    price,
+    totalCost,
+    gross
+  }) {
+    const nextPortfolio = [...currentPortfolio];
 
     const existingIndex = nextPortfolio.findIndex(
-      (item) => String(item.symbol).toUpperCase() === selectedStock.symbol
+      (item) => String(item.symbol).toUpperCase() === stock.symbol
     );
 
-    if (side === "BUY") {
+    if (tradeSide === "BUY") {
       if (existingIndex >= 0) {
         const existing = nextPortfolio[existingIndex];
 
@@ -184,10 +159,10 @@ export default function Trade() {
         );
         const existingCostValue = existingQty * existingAvgPrice;
 
-        const newQty = existingQty + estimate.qty;
-        const newCostValue = existingCostValue + Number(estimate.totalCost || 0);
-        const newAveragePrice = newQty > 0 ? newCostValue / newQty : 0;
-        const newMarketValue = newQty * estimate.price;
+        const newQty = existingQty + qty;
+        const newCostValue = existingCostValue + totalCost;
+        const newAveragePrice = newQty > 0 ? newCostValue / newQty : price;
+        const newMarketValue = newQty * price;
 
         nextPortfolio[existingIndex] = {
           ...existing,
@@ -196,8 +171,8 @@ export default function Trade() {
           averageCost: newAveragePrice,
           costValue: newCostValue,
           investedValue: newCostValue,
-          marketPrice: estimate.price,
-          price: estimate.price,
+          marketPrice: price,
+          price,
           marketValue: newMarketValue,
           value: newMarketValue,
           profitLoss: newMarketValue - newCostValue,
@@ -209,28 +184,24 @@ export default function Trade() {
           updatedAt: new Date().toISOString()
         };
       } else {
-        const averagePrice =
-          estimate.qty > 0 ? estimate.totalCost / estimate.qty : estimate.price;
+        const averagePrice = qty > 0 ? totalCost / qty : price;
 
         nextPortfolio.push({
-          symbol: selectedStock.symbol,
-          name: selectedStock.name,
-          sector: selectedStock.sector,
-          quantity: estimate.qty,
+          symbol: stock.symbol,
+          name: stock.name,
+          sector: stock.sector,
+          quantity: qty,
           averagePrice,
           averageCost: averagePrice,
-          costValue: estimate.totalCost,
-          investedValue: estimate.totalCost,
-          marketPrice: estimate.price,
-          price: estimate.price,
-          marketValue: estimate.gross,
-          value: estimate.gross,
-          profitLoss: estimate.gross - estimate.totalCost,
+          costValue: totalCost,
+          investedValue: totalCost,
+          marketPrice: price,
+          price,
+          marketValue: gross,
+          value: gross,
+          profitLoss: gross - totalCost,
           profitLossPct:
-            estimate.totalCost > 0
-              ? ((estimate.gross - estimate.totalCost) / estimate.totalCost) *
-                100
-              : 0,
+            totalCost > 0 ? ((gross - totalCost) / totalCost) * 100 : 0,
           source: "TRADE_SIMULATION",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -238,24 +209,19 @@ export default function Trade() {
       }
     }
 
-    if (side === "SELL") {
+    if (tradeSide === "SELL") {
       if (existingIndex < 0) {
-        Alert.alert("No Holding", `You do not hold ${selectedStock.symbol}.`);
-        return;
+        throw new Error(`You do not hold ${stock.symbol}.`);
       }
 
       const existing = nextPortfolio[existingIndex];
       const existingQty = Number(existing.quantity || 0);
 
-      if (estimate.qty > existingQty) {
-        Alert.alert(
-          "Too Many Shares",
-          `You only hold ${existingQty} shares of ${selectedStock.symbol}.`
-        );
-        return;
+      if (qty > existingQty) {
+        throw new Error(`You only hold ${existingQty} shares of ${stock.symbol}.`);
       }
 
-      const remainingQty = existingQty - estimate.qty;
+      const remainingQty = existingQty - qty;
 
       if (remainingQty <= 0) {
         nextPortfolio.splice(existingIndex, 1);
@@ -263,43 +229,31 @@ export default function Trade() {
         nextPortfolio[existingIndex] = {
           ...existing,
           quantity: remainingQty,
-          marketPrice: estimate.price,
-          price: estimate.price,
-          marketValue: remainingQty * estimate.price,
-          value: remainingQty * estimate.price,
+          marketPrice: price,
+          price,
+          marketValue: remainingQty * price,
+          value: remainingQty * price,
           source: "TRADE_SIMULATION",
           updatedAt: new Date().toISOString()
         };
       }
     }
 
-    const trade = {
-      symbol: selectedStock.symbol,
-      name: selectedStock.name,
-      sector: selectedStock.sector,
-      side,
-      quantity: estimate.qty,
-      price: estimate.price,
-      gross: estimate.gross,
-      brokerFee: estimate.brokerFee,
-      regulatoryFee: estimate.regulatoryFee,
-      totalFees: estimate.totalFees,
-      totalCost: estimate.totalCost,
-      cashBefore: cash,
-      cashAfter: estimate.remainingCash,
-      tradedAt: new Date().toISOString(),
-      status: "SIMULATED_EXECUTED",
-      orderType: "MARKET",
-      settlementStatus: "SETTLED"
-    };
+    return nextPortfolio;
+  }
 
+  async function persistTrade({
+    trade,
+    nextPortfolio,
+    nextCash
+  }) {
     const tradeRaw = await userGetItem("simulatedTrades");
     const trades = tradeRaw ? JSON.parse(tradeRaw) : [];
 
     trades.unshift(trade);
 
     await savePortfolio(nextPortfolio);
-    await userSetItem("availableCash", String(estimate.remainingCash));
+    await userSetItem("availableCash", String(nextCash));
     await userSetItem("statementUploaded", "true");
     await userSetItem("simulatedTrades", JSON.stringify(trades));
     await userSetItem("firstTradeCompleted", "true");
@@ -317,16 +271,85 @@ export default function Trade() {
       })
     );
 
-    await markBasketOrderFilled(trade);
+    await buildSyncStatus();
+  }
 
-    setPortfolio(nextPortfolio);
-    setCash(estimate.remainingCash);
-    setConfirmedTrade(trade);
+  async function confirmTrade() {
+    try {
+      if (!estimate.qty || estimate.qty <= 0) {
+        Alert.alert("Invalid Quantity", "Enter a valid quantity.");
+        return;
+      }
 
-    Alert.alert(
-      "Trade Complete",
-      `${side} ${estimate.qty} ${selectedStock.symbol} simulated.`
-    );
+      if (!estimate.price || estimate.price <= 0) {
+        Alert.alert("Invalid Price", "Enter a valid limit price.");
+        return;
+      }
+
+      if (side === "BUY" && estimate.remainingCash < 0) {
+        Alert.alert(
+          "Insufficient Cash",
+          `You need KES ${money(estimate.totalCost)} but only have KES ${money(cash)}.`
+        );
+        return;
+      }
+
+      const brokerProfile = await getBrokerProfile();
+
+      const validation = validateOrder({
+        side,
+        symbol: selectedStock.symbol,
+        quantity: estimate.qty,
+        price: estimate.price,
+        cash,
+        totalCost: estimate.totalCost,
+        portfolio,
+        brokerProfile
+      });
+
+      if (!validation.ok) {
+        Alert.alert("Order Blocked", validation.errors.join("\n"));
+        return;
+      }
+
+      const nextPortfolio = applyTradeToPortfolio({
+        currentPortfolio: portfolio,
+        stock: selectedStock,
+        tradeSide: side,
+        qty: estimate.qty,
+        price: estimate.price,
+        totalCost: estimate.totalCost,
+        gross: estimate.gross
+      });
+
+      const trade = buildTrade({
+        stock: selectedStock,
+        tradeSide: side,
+        estimate,
+        cashBefore: cash,
+        cashAfter: estimate.remainingCash,
+        source: "TRADE_SIMULATION"
+      });
+
+      await persistTrade({
+        trade,
+        nextPortfolio,
+        nextCash: estimate.remainingCash
+      });
+
+      await markBasketOrderFilled(trade);
+
+      setPortfolio(nextPortfolio);
+      setCash(estimate.remainingCash);
+      setConfirmedTrade(trade);
+
+      Alert.alert(
+        "Trade Complete",
+        `${side} ${estimate.qty} ${selectedStock.symbol} simulated.`
+      );
+    } catch (error) {
+      Alert.alert("Trade Failed", error.message || "Trade could not be completed.");
+    }
   }
 
   async function markBasketOrderFilled(trade) {
@@ -334,7 +357,8 @@ export default function Trade() {
 
     const currentOrder = activeExecution.orders.find(
       (order) =>
-        order.symbol === selectedStock.symbol && order.status !== "FILLED"
+        String(order.symbol).toUpperCase() === selectedStock.symbol &&
+        order.status !== "FILLED"
     );
 
     if (!currentOrder) return;
@@ -358,9 +382,172 @@ export default function Trade() {
     }
   }
 
+  async function executeEntireBasket() {
+    if (!activeExecution?.orders?.length) {
+      Alert.alert("No Basket", "No active basket execution found.");
+      return;
+    }
+
+    const pendingOrders = activeExecution.orders
+      .filter((order) => order.status !== "FILLED")
+      .map(normalizeBasketOrder)
+      .filter((order) => order.quantity > 0 && order.price > 0);
+
+    if (!pendingOrders.length) {
+      Alert.alert("Basket Complete", "There are no pending basket orders.");
+      return;
+    }
+
+    Alert.alert(
+      "Buy All Basket Orders",
+      `${pendingOrders.length} basket orders will be executed using available cash.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Execute All",
+          onPress: async () => {
+            await runBasketExecution(pendingOrders);
+          }
+        }
+      ]
+    );
+  }
+
+  async function runBasketExecution(pendingOrders) {
+    try {
+      const brokerProfile = await getBrokerProfile();
+
+      let workingPortfolio = [...portfolio];
+      let workingCash = Number(cash || 0);
+
+      const tradeRaw = await userGetItem("simulatedTrades");
+      const trades = tradeRaw ? JSON.parse(tradeRaw) : [];
+
+      const updatedOrders = activeExecution.orders.map(normalizeBasketOrder);
+
+      for (const order of pendingOrders) {
+        const stock =
+          STOCKS.find((item) => item.symbol === order.symbol) || {
+            symbol: order.symbol,
+            name: order.name || order.symbol,
+            sector: order.sector || "NSE",
+            price: order.price,
+            reason: order.reason || "Coach G basket order"
+          };
+
+        const itemEstimate = buildEstimate({
+          side: order.side || "BUY",
+          quantity: order.quantity,
+          price: order.price,
+          cash: workingCash
+        });
+
+        const validation = validateOrder({
+          side: order.side || "BUY",
+          symbol: stock.symbol,
+          quantity: itemEstimate.qty,
+          price: itemEstimate.price,
+          cash: workingCash,
+          totalCost: itemEstimate.totalCost,
+          portfolio: workingPortfolio,
+          brokerProfile
+        });
+
+        if (!validation.ok) {
+          throw new Error(`${stock.symbol}: ${validation.errors.join(", ")}`);
+        }
+
+        if ((order.side || "BUY") === "BUY" && itemEstimate.remainingCash < 0) {
+          throw new Error(
+            `${stock.symbol}: insufficient cash. Required KES ${money(
+              itemEstimate.totalCost
+            )}.`
+          );
+        }
+
+        workingPortfolio = applyTradeToPortfolio({
+          currentPortfolio: workingPortfolio,
+          stock,
+          tradeSide: order.side || "BUY",
+          qty: itemEstimate.qty,
+          price: itemEstimate.price,
+          totalCost: itemEstimate.totalCost,
+          gross: itemEstimate.gross
+        });
+
+        const trade = buildTrade({
+          stock,
+          tradeSide: order.side || "BUY",
+          estimate: itemEstimate,
+          cashBefore: workingCash,
+          cashAfter: itemEstimate.remainingCash,
+          source: "BASKET_EXECUTION"
+        });
+
+        trades.unshift(trade);
+        workingCash = itemEstimate.remainingCash;
+
+        const index = updatedOrders.findIndex((item) => item.id === order.id);
+
+        if (index >= 0) {
+          updatedOrders[index] = {
+            ...updatedOrders[index],
+            status: "FILLED",
+            message: "Executed through Buy All",
+            trade,
+            filledAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        }
+      }
+
+      const completedOrders = updatedOrders.filter(
+        (order) => order.status === "FILLED"
+      ).length;
+
+      const updatedExecution = {
+        ...activeExecution,
+        status:
+          completedOrders === updatedOrders.length ? "COMPLETED" : "IN_PROGRESS",
+        completedOrders,
+        failedOrders: updatedOrders.filter((order) => order.status === "FAILED")
+          .length,
+        totalOrders: updatedOrders.length,
+        orders: updatedOrders,
+        updatedAt: new Date().toISOString(),
+        completedAt:
+          completedOrders === updatedOrders.length
+            ? new Date().toISOString()
+            : activeExecution.completedAt
+      };
+
+      await savePortfolio(workingPortfolio);
+      await userSetItem("availableCash", String(workingCash));
+      await userSetItem("statementUploaded", "true");
+      await userSetItem("simulatedTrades", JSON.stringify(trades));
+      await saveBasketExecution(updatedExecution);
+      await buildSyncStatus();
+
+      setPortfolio(workingPortfolio);
+      setCash(workingCash);
+      setActiveExecution(updatedExecution);
+      setConfirmedTrade(null);
+
+      Alert.alert(
+        "Basket Complete",
+        `${pendingOrders.length} basket orders executed successfully.`
+      );
+    } catch (error) {
+      Alert.alert("Basket Execution Failed", error.message);
+    }
+  }
+
   const basketRemaining =
     activeExecution?.orders?.filter((order) => order.status !== "FILLED")
       .length || 0;
+
+  const normalizedExecutionOrders =
+    activeExecution?.orders?.map(normalizeBasketOrder) || [];
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -382,12 +569,36 @@ export default function Trade() {
       {activeExecution ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Active Basket Execution</Text>
+
           <Text style={styles.body}>
             {activeExecution.source} • {activeExecution.status}
           </Text>
-          <Text style={styles.body}>
-            Remaining orders: {basketRemaining}
-          </Text>
+
+          <Text style={styles.body}>Remaining orders: {basketRemaining}</Text>
+
+          {normalizedExecutionOrders.slice(0, 5).map((order) => (
+            <View key={order.id} style={styles.basketMiniRow}>
+              <View>
+                <Text style={styles.basketSymbol}>{order.symbol}</Text>
+                <Text style={styles.small}>
+                  {order.side} • Qty {order.quantity} • KES{" "}
+                  {money(order.amount || order.gross)}
+                </Text>
+              </View>
+
+              <Text style={order.status === "FILLED" ? styles.greenText : styles.cyanText}>
+                {order.status}
+              </Text>
+            </View>
+          ))}
+
+          {basketRemaining > 1 ? (
+            <Pressable style={styles.primary} onPress={executeEntireBasket}>
+              <Text style={styles.primaryText}>
+                Buy All Basket Orders ({basketRemaining})
+              </Text>
+            </Pressable>
+          ) : null}
 
           <Pressable
             style={styles.secondary}
@@ -563,12 +774,70 @@ export default function Trade() {
 
       <Pressable
         style={styles.backButton}
-        onPress={() => router.replace("/broker-status")}
+        onPress={() => router.replace("/basket-execution")}
       >
-        <Text style={styles.backText}>Back to Broker Readiness</Text>
+        <Text style={styles.backText}>Back to Basket Execution</Text>
       </Pressable>
     </ScrollView>
   );
+}
+
+function buildEstimate({ side, quantity, price, cash }) {
+  const qty = Number(quantity || 0);
+  const tradePrice = Number(price || 0);
+  const gross = qty * tradePrice;
+
+  const brokerFee = gross * 0.012;
+  const regulatoryFee = gross * 0.002;
+  const totalFees = brokerFee + regulatoryFee;
+
+  const totalCost =
+    side === "BUY" ? gross + totalFees : Math.max(gross - totalFees, 0);
+
+  const remainingCash =
+    side === "BUY" ? Number(cash || 0) - totalCost : Number(cash || 0) + totalCost;
+
+  return {
+    qty,
+    price: tradePrice,
+    gross,
+    brokerFee,
+    regulatoryFee,
+    totalFees,
+    totalCost,
+    remainingCash
+  };
+}
+
+function buildTrade({
+  stock,
+  tradeSide,
+  estimate,
+  cashBefore,
+  cashAfter,
+  source
+}) {
+  return {
+    id: `TRD-${Date.now()}-${stock.symbol}`,
+    symbol: stock.symbol,
+    name: stock.name,
+    sector: stock.sector,
+    side: tradeSide,
+    quantity: estimate.qty,
+    price: estimate.price,
+    gross: estimate.gross,
+    brokerFee: estimate.brokerFee,
+    regulatoryFee: estimate.regulatoryFee,
+    totalFees: estimate.totalFees,
+    totalCost: estimate.totalCost,
+    cashBefore,
+    cashAfter,
+    tradedAt: new Date().toISOString(),
+    status: "SIMULATED_EXECUTED",
+    orderType: "MARKET",
+    settlementStatus: "SETTLED",
+    source
+  };
 }
 
 function Metric({ label, value }) {
@@ -635,6 +904,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900",
     marginBottom: 12
+  },
+  basketMiniRow: {
+    marginTop: 10,
+    paddingVertical: 10,
+    borderBottomColor: "#1e293b",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  basketSymbol: {
+    color: "white",
+    fontWeight: "900"
   },
   stockRow: {
     marginTop: 12,
@@ -744,5 +1026,7 @@ const styles = StyleSheet.create({
   },
   dashboardButtonText: { color: "#67e8f9", fontWeight: "900" },
   green: { color: "#86efac" },
-  red: { color: "#fca5a5" }
+  red: { color: "#fca5a5" },
+  greenText: { color: "#86efac", fontWeight: "900" },
+  cyanText: { color: "#67e8f9", fontWeight: "900" }
 });

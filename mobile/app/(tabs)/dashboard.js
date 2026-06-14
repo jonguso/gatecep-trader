@@ -319,31 +319,30 @@ sectors[sector].securities.push(h);
   ].filter((item) => !item.done);
 
   async function openCoach() {
-    await userSetItem(
-  "coachContext",
-  JSON.stringify({
-    largestSector: largestSector?.sector || "N/A",
-    risk,
-    cash,
-    currentValue,
-    investedValue,
-    netGainLoss,
-    gainLossPct,
-    diversification,
-    sectorCount,
-    sectorRows,
-    healthScore: health.score,
-    healthRating: health.rating,
-    healthComponents: health.components,
-    healthStrengths: health.strengths,
-    healthWatchlist: health.watchlist,
-    timestamp: new Date().toISOString()
-  })
-);
-<ActiveUserBanner />
+  await userSetItem(
+    "coachContext",
+    JSON.stringify({
+      largestSector: largestSector?.sector || "N/A",
+      risk,
+      cash,
+      currentValue,
+      investedValue,
+      netGainLoss,
+      gainLossPct,
+      diversification,
+      sectorCount,
+      sectorRows,
+      healthScore: health.score,
+      healthRating: health.rating,
+      healthComponents: health.components,
+      healthStrengths: health.strengths,
+      healthWatchlist: health.watchlist,
+      timestamp: new Date().toISOString()
+    })
+  );
 
-    router.push("/coach-insights");
-  }
+  router.push("/coach-insights");
+}
 
   if (loading) {
     return (
@@ -370,7 +369,13 @@ sectors[sector].securities.push(h);
   <Text style={styles.bell}>🔔</Text>
 </Pressable>
  </View>       
-      <Text style={styles.subtitle}>Gatecep investor command center</Text>
+      <Text style={styles.subtitle}>
+  Gatecep investor command center
+</Text>
+
+<Text style={styles.small}>
+  Version {APP_VERSION}
+</Text>
       <Text style={styles.userLine}>
   Logged in as {session?.username || session?.userId || "Guest"}
 </Text>
