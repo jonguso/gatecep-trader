@@ -1,12 +1,16 @@
 import { userGetItem, userSetItem } from "../auth/userStorage";
 import { loadTradeBasket } from "./tradeBasketStore";
+import {
+  ORDER_STATUS,
+  isActiveOrder
+} from "./orderLifecycle";
 
 const ACTIVE_BASKET_EXECUTION_KEY = "activeBasketExecution";
 
-export async function createBasketExecution() {
+export async function createBasketExecution({ forceNew = false } = {}) {
   const existing = await loadBasketExecution();
 
-  if (existing?.orders?.length) {
+  if (!forceNew && existing?.orders?.some((order) => isActiveOrder(order.status))) {
     return existing;
   }
 
@@ -30,8 +34,8 @@ export async function createBasketExecution() {
       quantity: Number(item.quantity || 0),
       price: Number(item.price || item.limitPrice || 0),
       reason: item.reason || "Coach G recommendation",
-      status: "PENDING",
-      message: "Pending review",
+      status: ORDER_STATUS.REVIEW,
+      message: "Pending review before queue",
       createdAt: now,
       updatedAt: now
     })
@@ -41,11 +45,7 @@ export async function createBasketExecution() {
     id: `EXEC-${Date.now()}`,
     basketId: basket.id,
     source: basket.source || "COACH_G",
-    status: "PENDING_REVIEW",
-    totalOrders: orders.length,
-    completedOrders: 0,
-    failedOrders: 0,
-    cancelledOrders: 0,
+    status: ORDER_STATUS.REVIEW,
     createdAt: now,
     updatedAt: now,
     orders
@@ -109,8 +109,8 @@ export async function updateExecutionOrder(orderId, patch = {}) {
 
 export async function cancelExecutionOrder(orderId) {
   return await updateExecutionOrder(orderId, {
-    status: "CANCELLED",
-    message: "Cancelled before queue"
+    status: ORDER_STATUS.CANCELLED,
+    message: "Cancelled before routing"
   });
 }
 
@@ -120,14 +120,12 @@ export async function queueExecutionOrders() {
   if (!execution) return null;
 
   const orders = execution.orders.map((order) => {
-    if (["FILLED", "CANCELLED", "FAILED"].includes(order.status)) {
-      return normalizeOrder(order);
-    }
+    if (!isActiveOrder(order.status)) return normalizeOrder(order);
 
     return normalizeOrder({
       ...order,
-      status: "QUEUED",
-      message: "Queued for basket execution",
+      status: ORDER_STATUS.QUEUED,
+      message: "Queued for broker routing",
       queuedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -135,9 +133,41 @@ export async function queueExecutionOrders() {
 
   return await saveBasketExecution({
     ...execution,
-    status: "QUEUED",
     orders
   });
+}
+
+export async function routeExecutionOrder(orderId, broker = {}) {
+  return await updateExecutionOrder(orderId, {
+    brokerId: broker.id || broker.brokerId || "SIM",
+    brokerName: broker.name || broker.brokerName || "Simulation Broker",
+    status: ORDER_STATUS.ROUTED,
+    message: "Routed to broker",
+    routedAt: new Date().toISOString()
+  });
+}
+
+export async function markBrokerReceived(orderId, brokerPayload = {}) {
+  return await updateExecutionOrder(orderId, {
+    brokerOrderId: brokerPayload.brokerOrderId || brokerPayload.id || null,
+    brokerStatus: brokerPayload.status || ORDER_STATUS.BROKER_RECEIVED,
+    status: ORDER_STATUS.BROKER_RECEIVED,
+    message: "Broker received order",
+    brokerReceivedAt: new Date().toISOString()
+  });
+}
+
+export async function markExecutionOrderFilled(orderId, trade = {}) {
+  return await updateExecutionOrder(orderId, {
+    status: ORDER_STATUS.FILLED,
+    message: "Filled by broker/simulation",
+    trade,
+    filledAt: new Date().toISOString()
+  });
+}
+
+export function getActiveExecutionOrders(execution = {}) {
+  return (execution.orders || []).filter((order) => isActiveOrder(order.status));
 }
 
 export function normalizeExecution(execution = {}) {
@@ -145,38 +175,42 @@ export function normalizeExecution(execution = {}) {
     ? execution.orders.map(normalizeOrder)
     : [];
 
-  const activeOrders = orders.filter((order) => order.status !== "CANCELLED");
-  const completedOrders = orders.filter((order) => order.status === "FILLED").length;
-  const failedOrders = orders.filter((order) => order.status === "FAILED").length;
-  const cancelledOrders = orders.filter((order) => order.status === "CANCELLED").length;
-  const queuedOrders = orders.filter((order) => order.status === "QUEUED").length;
-  const pendingOrders = orders.filter((order) => order.status === "PENDING").length;
-  const totalOrders = orders.length;
+  const activeOrders = orders.filter((order) => isActiveOrder(order.status));
+  const completedOrders = orders.filter((order) => order.status === ORDER_STATUS.FILLED).length;
+  const cancelledOrders = orders.filter((order) => order.status === ORDER_STATUS.CANCELLED).length;
+  const rejectedOrders = orders.filter((order) => order.status === ORDER_STATUS.REJECTED).length;
+  const failedOrders = rejectedOrders;
+  const queuedOrders = orders.filter((order) => order.status === ORDER_STATUS.QUEUED).length;
+  const routedOrders = orders.filter((order) =>
+    [ORDER_STATUS.ROUTED, ORDER_STATUS.BROKER_RECEIVED, ORDER_STATUS.PARTIAL_FILL].includes(order.status)
+  ).length;
+  const reviewOrders = orders.filter((order) =>
+    [ORDER_STATUS.REVIEW, ORDER_STATUS.PENDING, ORDER_STATUS.DRAFT].includes(order.status)
+  ).length;
 
-  let status = execution.status || "PENDING_REVIEW";
+  let status = execution.status || ORDER_STATUS.REVIEW;
 
-  if (activeOrders.length > 0 && completedOrders === activeOrders.length) {
-    status = "COMPLETED";
-  } else if (failedOrders > 0 && completedOrders > 0) {
-    status = "PARTIAL";
+  if (orders.length > 0 && activeOrders.length === 0) {
+    status = ORDER_STATUS.FILLED;
+  } else if (routedOrders > 0) {
+    status = ORDER_STATUS.ROUTED;
   } else if (queuedOrders > 0) {
-    status = "QUEUED";
-  } else if (pendingOrders > 0) {
-    status = "PENDING_REVIEW";
-  } else if (cancelledOrders === totalOrders && totalOrders > 0) {
-    status = "CANCELLED";
+    status = ORDER_STATUS.QUEUED;
+  } else if (reviewOrders > 0) {
+    status = ORDER_STATUS.REVIEW;
   }
 
   return {
     ...execution,
     status,
-    totalOrders,
+    totalOrders: orders.length,
     activeOrders: activeOrders.length,
     completedOrders,
-    failedOrders,
     cancelledOrders,
-    pendingOrders,
+    failedOrders,
     queuedOrders,
+    routedOrders,
+    reviewOrders,
     totalAmount: activeOrders.reduce(
       (sum, order) => sum + Number(order.amount || order.gross || 0),
       0
@@ -207,7 +241,7 @@ export function normalizeOrder(order = {}) {
     quantity,
     gross,
     amount: amount || gross,
-    status: order.status || "PENDING",
+    status: String(order.status || ORDER_STATUS.REVIEW).toUpperCase(),
     message: order.message || "Pending review"
   };
 }
