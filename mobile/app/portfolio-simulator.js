@@ -37,7 +37,7 @@ export default function PortfolioSimulator() {
   }, []);
 
   async function load() {
-    const portfolioRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
+    const portfolioRaw = await userGetItem("ManualPortfolio");
     const cashRaw = userGetItem("availableCash");
 
     if (portfolioRaw) {
@@ -104,7 +104,7 @@ export default function PortfolioSimulator() {
       return;
     }
 
-    const raw = await AsyncStorage.getItem("gatecepSavedScenarios");
+    const raw = await userGetItem("SavedScenarios");
     const saved = raw ? JSON.parse(raw) : [];
 
     saved.unshift({
@@ -112,7 +112,7 @@ export default function PortfolioSimulator() {
       savedAt: new Date().toISOString()
     });
 
-    await AsyncStorage.setItem("gatecepSavedScenarios", JSON.stringify(saved));
+    await userGetItem("SavedScenarios", JSON.stringify(saved));
 
     Alert.alert("Saved", "Scenario saved to your profile.");
   }

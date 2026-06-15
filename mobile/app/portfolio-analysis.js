@@ -10,7 +10,13 @@ import {
   View
 } from "react-native";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
+import { loadPortfolio as loadSavedPortfolio } from "../src/portfolio/portfolioStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  userGetItem,
+  userSetItem,
+  userRemoveItem
+} from "../src/auth/userStorage";
 import { router } from "expo-router";
 
 const COLORS = [
@@ -46,9 +52,9 @@ export default function PortfolioAnalysis() {
     try {
       setLoading(true);
 
-      const brokerRaw = await AsyncStorage.getItem("gatecepBrokerProfile");
-      const manualRaw = await AsyncStorage.getItem("gatecepManualPortfolio");
-      const uploadRaw = await AsyncStorage.getItem("gatecepLatestUpload");
+      const brokerRaw = await userGetItem("BrokerProfile");
+      const manualRaw = await userGetItem("ManualPortfolio");
+      const uploadRaw = await userGetItem("LatestUpload");
 
       const brokerData = brokerRaw ? JSON.parse(brokerRaw) : null;
       const manualData = manualRaw ? JSON.parse(manualRaw) : [];
@@ -250,11 +256,11 @@ export default function PortfolioAnalysis() {
       ]
     };
 
-    const raw = await AsyncStorage.getItem("gatecepRecommendationHistory");
+    const raw = await userGetItem("RecommendationHistory");
     const history = raw ? JSON.parse(raw) : [];
 
-    await AsyncStorage.setItem(
-      "gatecepRecommendationHistory",
+    await userSetItem(
+      "RecommendationHistory",
       JSON.stringify([recommendation, ...history])
     );
 
