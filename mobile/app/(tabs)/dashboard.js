@@ -64,13 +64,19 @@ export default function Dashboard() {
   });
 
   useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [])
-  );
+  useCallback(() => {
+    setSelectedSector(null);
+    load();
+  }, [])
+);
 
   async function load() {
     setLoading(true);
+
+    setSession(null);
+     setHoldings([]);
+     setSnapshots([]);
+    setTopSignals([]);
  
     const currentSession = await getCurrentSession();
 setSession(currentSession);     
@@ -379,8 +385,8 @@ sectors[sector].securities.push(h);
       <Text style={styles.userLine}>
   Logged in as {session?.username || session?.userId || "Guest"}
 </Text>
-      <Text style={styles.timestamp}>Updated {lastUpdated}</Text>
-      <ActiveUserBanner />
+      <Text style={styles.timestamp}>Updated {lastUpdated}</Text>    
+<ActiveUserBanner />
       <View style={styles.summaryOuter}>
         <View style={styles.summaryTopPlain}>
           <PlainMetric
@@ -657,8 +663,9 @@ sectors[sector].securities.push(h);
       </View>
 
       <SectorModal sector={selectedSector} onClose={() => setSelectedSector(null)} />
+      
+<FloatingCoachG />
 
-      <FloatingCoachG />
     </ScrollView>
   );
 }
