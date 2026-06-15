@@ -175,18 +175,31 @@ export default function Coach() {
     const history = raw ? JSON.parse(raw) : [];
 
     history.unshift({
-      id: `REC-${Date.now()}`,
-      savedAt: new Date().toISOString(),
-      portfolioValue: value,
-      largestSector,
-      amount,
-      goal,
-      scenario,
-      intensity,
-      sectorPlan,
-      status: "SAVED_NOT_EXECUTED",
-      version: "3.8.1"
-    });
+  id: `REC-${Date.now()}`,
+  savedAt: new Date().toISOString(),
+
+  portfolioValue: value,
+  largestSector,
+
+  amount,
+  goal,
+  scenario,
+  intensity,
+
+  sectorPlan,
+
+  status: "SAVED",
+  executionStatus: "NOT_STARTED",
+
+  executionLifecycle: [
+    {
+      status: "SAVED",
+      timestamp: new Date().toISOString()
+    }
+  ],
+
+  version: "3.8.1"
+});
 
     await userSetItem("recommendationHistory", JSON.stringify(history));
     setRecommendationHistory(history);
@@ -222,15 +235,17 @@ export default function Coach() {
       return;
     }
 
-    await saveTradeBasket(basketItems, "COACH_G_SIMULATION");
-await createBasketExecution({ forceNew: true });
+    await saveTradeBasket(
+  basketItems,
+  "COACH_G_SIMULATION"
+);
 
-router.push("/orders-review");
+await createBasketExecution();
 
-    setShowResults(false);
-    setShowSimulator(false);
+setShowResults(false);
+setShowSimulator(false);
 
-    router.push("/orders-review");
+router.push("/execution-wizard");
   }
 
   function buildBehaviorInsights() {
