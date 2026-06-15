@@ -783,18 +783,7 @@ function SimulatorModal({
                       </Pressable>
                     ))}
                 </View>
-
-                <Pressable
-                  style={styles.secondary}
-                  onPress={async () => {
-                    await saveRecommendation();
-                    setShowResults(false);
-                    onClose();
-                  }}
-                >
-                  <Text style={styles.primaryText}>Save Strategy To Profile</Text>
-                </Pressable>
-
+                
                 <Pressable
                   style={styles.primary}
                   onPress={createTradeBasketFromRecommendation}

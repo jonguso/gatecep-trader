@@ -48,11 +48,9 @@ export default function OrdersReview() {
 
     return orders
       .filter((order) =>
-        [
-          ORDER_STATUS.DRAFT,
-          ORDER_STATUS.REVIEW,
-          ORDER_STATUS.PENDING
-        ].includes(order.status)
+        [ORDER_STATUS.DRAFT, ORDER_STATUS.REVIEW, ORDER_STATUS.PENDING].includes(
+          order.status
+        )
       )
       .filter((order) => {
         if (!search) return true;
@@ -76,21 +74,17 @@ export default function OrdersReview() {
   }
 
   async function deleteOrder(order) {
-    Alert.alert(
-      "Delete Order",
-      `Remove ${order.symbol} from this basket?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            const updated = await deleteExecutionOrder(order.id);
-            setExecution(updated);
-          }
+    Alert.alert("Delete Order", `Remove ${order.symbol} from this basket?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          const updated = await deleteExecutionOrder(order.id);
+          setExecution(updated);
         }
-      ]
-    );
+      }
+    ]);
   }
 
   async function queueOrder(order) {
@@ -98,23 +92,23 @@ export default function OrdersReview() {
     setExecution(updated);
   }
 
-  async function queueAll() {
+  async function prepareHandoff() {
     if (!reviewOrders.length) {
-      Alert.alert("No Orders", "There are no review orders to queue.");
+      Alert.alert("No Orders", "There are no review orders to submit.");
       return;
     }
 
     Alert.alert(
-      "Queue All Orders",
-      `${reviewOrders.length} orders will be queued for broker routing.`,
+      "Prepare Order Handoff",
+      `${reviewOrders.length} orders will be prepared for broker execution.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Queue All",
+          text: "Continue",
           onPress: async () => {
             const updated = await queueExecutionOrders();
             setExecution(updated);
-            router.push("/orders");
+            router.push("/order-handoff");
           }
         }
       ]
@@ -161,8 +155,7 @@ export default function OrdersReview() {
       </View>
 
       <Text style={styles.subtitle}>
-        Review and modify pending basket orders before queueing them for broker
-        routing.
+        Review and modify basket orders before preparing broker handoff.
       </Text>
 
       <ActiveUserBanner />
@@ -170,7 +163,7 @@ export default function OrdersReview() {
       <View style={styles.summaryCard}>
         <Metric label="Review Orders" value={String(reviewOrders.length)} />
         <Metric label="Basket Orders" value={String(orders.length)} />
-        <Metric label="Total Value" value={`KES ${money(totalAmount)}`} />
+        <Metric label="Estimated Value" value={`KES ${money(totalAmount)}`} />
         <Metric label="Status" value={execution.status} />
       </View>
 
@@ -185,16 +178,17 @@ export default function OrdersReview() {
       {reviewOrders.length === 0 ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>No Review Orders</Text>
+
           <Text style={styles.body}>
-            All orders have either been queued, routed, filled, cancelled, or
-            removed.
+            All orders have already been prepared, submitted, filled, cancelled,
+            or removed.
           </Text>
 
           <Pressable
-            style={styles.secondary}
-            onPress={() => router.push("/orders")}
+            style={styles.primary}
+            onPress={() => router.push("/order-handoff")}
           >
-            <Text style={styles.secondaryText}>Open Orders</Text>
+            <Text style={styles.primaryText}>Open Order Handoff</Text>
           </Pressable>
         </View>
       ) : (
@@ -210,32 +204,15 @@ export default function OrdersReview() {
       )}
 
       <Pressable
-        style={[
-          styles.primary,
-          reviewOrders.length === 0 && styles.disabledButton
-        ]}
+        style={[styles.primary, reviewOrders.length === 0 && styles.disabledButton]}
         disabled={reviewOrders.length === 0}
-        onPress={queueAll}
+        onPress={prepareHandoff}
       >
         <Text style={styles.primaryText}>
           {reviewOrders.length > 0
-            ? `Queue All Orders (${reviewOrders.length})`
-            : "No Orders to Queue"}
+            ? `Continue to Order Handoff (${reviewOrders.length})`
+            : "No Orders to Submit"}
         </Text>
-      </Pressable>
-
-      <Pressable
-        style={styles.secondary}
-        onPress={() => router.push("/basket-execution")}
-      >
-        <Text style={styles.secondaryText}>Open Basket Execution</Text>
-      </Pressable>
-
-      <Pressable
-        style={styles.secondary}
-        onPress={() => router.push("/orders")}
-      >
-        <Text style={styles.secondaryText}>Open Orders</Text>
       </Pressable>
     </ScrollView>
   );
@@ -249,7 +226,7 @@ function ReviewOrderCard({ order, onChange, onDelete, onQueue }) {
   return (
     <View style={styles.orderCard}>
       <View style={styles.orderTop}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.symbol}>
             {order.side} {order.symbol}
           </Text>
@@ -262,22 +239,19 @@ function ReviewOrderCard({ order, onChange, onDelete, onQueue }) {
         <Text style={styles.status}>{order.status}</Text>
       </View>
 
-      <Text style={styles.reason}>{order.reason}</Text>
+      <Text style={styles.reason}>
+        {order.reason || "Coach G recommended order"}
+      </Text>
 
       <View style={styles.sideRow}>
         {["BUY", "SELL"].map((side) => (
           <Pressable
             key={side}
-            style={[
-              styles.sideChip,
-              order.side === side && styles.sideChipActive
-            ]}
+            style={[styles.sideChip, order.side === side && styles.sideChipActive]}
             onPress={() => onChange({ side })}
           >
             <Text
-              style={
-                order.side === side ? styles.sideTextActive : styles.sideText
-              }
+              style={order.side === side ? styles.sideTextActive : styles.sideText}
             >
               {side}
             </Text>
@@ -288,6 +262,7 @@ function ReviewOrderCard({ order, onChange, onDelete, onQueue }) {
       <View style={styles.editGrid}>
         <View style={styles.editBox}>
           <Text style={styles.inputLabel}>Quantity</Text>
+
           <TextInput
             value={qty}
             keyboardType="numeric"
@@ -309,6 +284,7 @@ function ReviewOrderCard({ order, onChange, onDelete, onQueue }) {
 
         <View style={styles.editBox}>
           <Text style={styles.inputLabel}>Limit Price</Text>
+
           <TextInput
             value={price}
             keyboardType="numeric"
@@ -336,7 +312,7 @@ function ReviewOrderCard({ order, onChange, onDelete, onQueue }) {
 
       <View style={styles.buttonRow}>
         <Pressable style={styles.queueButton} onPress={onQueue}>
-          <Text style={styles.queueText}>Queue</Text>
+          <Text style={styles.queueText}>Prepare This Order</Text>
         </Pressable>
 
         <Pressable style={styles.deleteButton} onPress={onDelete}>
@@ -554,7 +530,8 @@ const styles = StyleSheet.create({
   queueText: {
     color: "white",
     textAlign: "center",
-    fontWeight: "900"
+    fontWeight: "900",
+    fontSize: 12
   },
   deleteButton: {
     flex: 1,
@@ -567,7 +544,8 @@ const styles = StyleSheet.create({
   deleteText: {
     color: "#fca5a5",
     textAlign: "center",
-    fontWeight: "900"
+    fontWeight: "900",
+    fontSize: 12
   },
   primary: {
     marginTop: 22,

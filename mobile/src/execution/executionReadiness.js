@@ -20,14 +20,13 @@ export async function calculateExecutionReadiness() {
     null;
 
   const checks = {
-    investorProfile: !!profile,
-    brokerLinked: !!defaultBroker,
-    cdsPresent: !!defaultBroker?.cdsNumber,
-    clientNumberPresent: !!defaultBroker?.clientNumber,
-    basketExists: (basket?.items?.length || 0) > 0,
-    cashAvailable: cash > 0,
-    holdingsLoaded: portfolio.length > 0
-  };
+  investorProfile: !!profile,
+  brokerLinked: !!defaultBroker,
+  clientNumberPresent: !!defaultBroker?.clientNumber,
+  basketExists: (basket?.items?.length || 0) > 0,
+  cashAvailable: cash > 0,
+  holdingsLoaded: portfolio.length > 0
+};
 
   const totalChecks = Object.keys(checks).length;
 

@@ -77,6 +77,12 @@ export default function BrokerAccounts() {
       .map((item) => item.id);
   }, [accounts]);
 
+  const availableBrokers = useMemo(() => {
+  return AVAILABLE_BROKERS.filter(
+    (broker) => !connectedIds.includes(broker.id)
+  );
+}, [connectedIds]);
+
   const defaultBroker = accounts.find((item) => item.defaultBroker);
 
   function startConnect(broker) {
@@ -262,7 +268,9 @@ export default function BrokerAccounts() {
             style={styles.input}
           />
 
-          <Text style={styles.label}>CDS Number</Text>
+          <Text style={styles.label}>
+  CDS Number (Optional)
+</Text>
           <TextInput
             value={form.cdsNumber}
             onChangeText={(value) => setForm({ ...form, cdsNumber: value })}
@@ -286,7 +294,6 @@ export default function BrokerAccounts() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Connected Brokers</Text>
-
         {accounts.length === 0 ? (
           <Text style={styles.body}>
             No brokers connected yet. Add a broker profile below.
@@ -314,13 +321,9 @@ export default function BrokerAccounts() {
               </View>
 
               <Text style={styles.detail}>
-                Account: {account.accountNumber || "Optional"}
-              </Text>
-
-              <Text style={styles.detail}>
-                CDS: {account.cdsNumber || "Optional"}
-              </Text>
-
+  CDS: {account.cdsNumber || "Not Provided"}
+</Text>
+        
               <Text style={styles.detail}>
                 API Mode: {account.apiMode || "PENDING_BROKER_API"}
               </Text>
@@ -355,50 +358,38 @@ export default function BrokerAccounts() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Available Brokers</Text>
+  <Text style={styles.cardTitle}>Available Brokers</Text>
 
-        {AVAILABLE_BROKERS.map((broker) => {
-          const connected = connectedIds.includes(broker.id);
+  {availableBrokers.length === 0 ? (
+    <Text style={styles.body}>
+      All supported brokers are already connected.
+    </Text>
+  ) : (
+    availableBrokers.map((broker) => (
+      <View key={broker.id} style={styles.availableRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.brokerName}>{broker.name}</Text>
+          <Text style={styles.small}>{broker.bestFor}</Text>
+        </View>
 
-          return (
-            <View key={broker.id} style={styles.availableRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.brokerName}>{broker.name}</Text>
-                <Text style={styles.small}>{broker.bestFor}</Text>
-              </View>
-
-              <Pressable
-                style={connected ? styles.connectedButton : styles.connectButton}
-                onPress={() => startConnect(broker)}
-              >
-                <Text
-                  style={
-                    connected
-                      ? styles.connectedButtonText
-                      : styles.connectButtonText
-                  }
-                >
-                  {connected ? "Edit" : "Connect"}
-                </Text>
-              </Pressable>
-            </View>
-          );
-        })}
+        <Pressable
+          style={styles.connectButton}
+          onPress={() => startConnect(broker)}
+        >
+          <Text style={styles.connectButtonText}>Connect</Text>
+        </Pressable>
       </View>
-
+    ))
+  )}
+</View>
+         
       <Pressable
-        style={styles.primary}
-        onPress={() => router.push("/broker-routing")}
-      >
-        <Text style={styles.primaryText}>Open Broker Routing</Text>
-      </Pressable>
+  style={styles.primary}
+  onPress={() => router.replace("/execution-wizard")}
+>
+  <Text style={styles.primaryText}>Return to Execution Wizard</Text>
+</Pressable>
 
-      <Pressable
-        style={styles.secondary}
-        onPress={() => router.push("/queue-manager")}
-      >
-        <Text style={styles.secondaryText}>Open Queue Manager</Text>
-      </Pressable>
     </ScrollView>
   );
 }
