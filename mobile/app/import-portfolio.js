@@ -62,7 +62,7 @@ export default function ImportPortfolio() {
 
       if (!draftRows.length) {
         throw new Error(
-          `No valuation rows detected. File columns found: ${Object.keys(
+          `No valuation rows detected. Columns found: ${Object.keys(
             rows[0] || {}
           ).join(", ")}`
         );
@@ -99,29 +99,79 @@ export default function ImportPortfolio() {
 
     if (name.endsWith(".csv")) {
       const text = await readFileText(file);
-
-      const workbook = XLSX.read(text, {
-        type: "string"
-      });
-
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-      return XLSX.utils.sheet_to_json(sheet, {
-        defval: ""
-      });
+      const workbook = XLSX.read(text, { type: "string" });
+      return extractRows(workbook);
     }
 
     const base64 = await readFileBase64(file);
+    const workbook = XLSX.read(base64, { type: "base64" });
+    return extractRows(workbook);
+  }
 
-    const workbook = XLSX.read(base64, {
-      type: "base64"
-    });
-
+  function extractRows(workbook) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-    return XLSX.utils.sheet_to_json(sheet, {
-      defval: ""
+    const matrix = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: "",
+      blankrows: false
     });
+
+    const headerIndex = findHeaderRowIndex(matrix);
+
+    if (headerIndex < 0) {
+      return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    }
+
+    const headers = matrix[headerIndex].map((item) => String(item || "").trim());
+
+    return matrix
+      .slice(headerIndex + 1)
+      .map((row) => {
+        const obj = {};
+
+        headers.forEach((header, index) => {
+          if (header) {
+            obj[header] = row[index] ?? "";
+          }
+        });
+
+        return obj;
+      })
+      .filter((row) => {
+        const values = Object.values(row).map((v) => String(v || "").trim());
+        return values.some(Boolean);
+      });
+  }
+
+  function findHeaderRowIndex(matrix = []) {
+    const requiredHints = [
+      "symbol",
+      "security",
+      "counter",
+      "quantity",
+      "qty",
+      "shares",
+      "units",
+      "balance",
+      "marketvalue",
+      "valuation",
+      "value"
+    ];
+
+    for (let i = 0; i < Math.min(matrix.length, 25); i += 1) {
+      const normalized = matrix[i].map(normalizeKey).join("|");
+
+      const matches = requiredHints.filter((hint) =>
+        normalized.includes(hint)
+      ).length;
+
+      if (matches >= 2) {
+        return i;
+      }
+    }
+
+    return -1;
   }
 
   async function readFileText(file) {
@@ -158,66 +208,56 @@ export default function ImportPortfolio() {
   }
 
   function normalizeHolding(row) {
-    const keys = Object.keys(row);
-
-    const findValue = (names) => {
-      for (const name of names) {
-        const foundKey = keys.find(
-          (key) =>
-            String(key).trim().toLowerCase() ===
-            String(name).trim().toLowerCase()
-        );
-
-        if (foundKey) return row[foundKey];
-      }
-
-      const normalizedNames = names.map((name) =>
-        String(name).toLowerCase().replace(/\s+/g, "").replace(/[./_-]/g, "")
-      );
-
-      const foundLooseKey = keys.find((key) =>
-        normalizedNames.includes(
-          String(key).toLowerCase().replace(/\s+/g, "").replace(/[./_-]/g, "")
-        )
-      );
-
-      return foundLooseKey ? row[foundLooseKey] : "";
-    };
-
-    const symbol = findValue([
+    const symbol = findValue(row, [
       "Symbol",
       "Security",
       "Security Code",
       "Counter",
+      "Code",
+      "Ticker",
       "Share",
+      "Share Code",
       "Stock",
-      "Instrument"
+      "Instrument",
+      "Security Name"
     ]);
 
-    const name = findValue([
+    const name = findValue(row, [
       "Name",
       "Security Name",
       "Company",
       "Company Name",
-      "Description"
+      "Description",
+      "Instrument Name"
     ]);
 
-    const sector = findValue(["Sector", "Industry", "Category"]);
+    const sector = findValue(row, [
+      "Sector",
+      "Industry",
+      "Category",
+      "Segment"
+    ]);
 
     const quantity = cleanNumber(
-      findValue([
+      findValue(row, [
         "Quantity",
         "Qty",
         "Shares",
         "Units",
         "Balance",
+        "Free Balance",
+        "Total Balance",
+        "Available Balance",
         "Holding",
-        "Holdings"
+        "Holdings",
+        "Qty Held",
+        "No. of Shares",
+        "Number of Shares"
       ])
     );
 
     const averagePrice = cleanNumber(
-      findValue([
+      findValue(row, [
         "Average Price",
         "Avg Price",
         "Avg.Price",
@@ -225,43 +265,64 @@ export default function ImportPortfolio() {
         "WAP",
         "Cost Price",
         "Book Price",
-        "Purchase Price"
+        "Purchase Price",
+        "Buying Price",
+        "Avg Cost"
       ])
     );
 
     const marketPrice = cleanNumber(
-      findValue([
+      findValue(row, [
         "Market Price",
         "Current Price",
         "Price",
         "Last Price",
-        "Closing Price"
+        "Closing Price",
+        "Unit Price",
+        "Market Rate"
       ])
     );
 
     const marketValue = cleanNumber(
-      findValue([
+      findValue(row, [
         "Market Value",
         "Current Value",
         "Value",
         "Valuation",
-        "Holding Value"
+        "Holding Value",
+        "Portfolio Value",
+        "Current Valuation",
+        "Market Valuation",
+        "Total Value",
+        "Amount"
       ])
     );
 
     const profitLoss = cleanNumber(
-      findValue([
+      findValue(row, [
         "Profit Loss",
         "Profit/Loss",
         "Profit / Loss",
         "P/L",
         "Gain Loss",
+        "Gain/Loss",
         "Unrealized P/L",
-        "Unrealized Profit Loss"
+        "Unrealized Profit Loss",
+        "Capital Gain"
       ])
     );
 
-    if (!symbol || !quantity) return null;
+    const cleanSymbol = String(symbol || "").trim().toUpperCase();
+
+    if (
+      !cleanSymbol ||
+      cleanSymbol === "N/A" ||
+      cleanSymbol === "TOTAL" ||
+      cleanSymbol.includes("TOTAL") ||
+      quantity <= 0
+    ) {
+      return null;
+    }
 
     const finalMarketPrice =
       marketPrice ||
@@ -271,15 +332,19 @@ export default function ImportPortfolio() {
       marketValue ||
       (quantity > 0 && finalMarketPrice > 0 ? quantity * finalMarketPrice : 0);
 
+    if (finalMarketValue <= 0 && finalMarketPrice <= 0) {
+      return null;
+    }
+
     return applySecurityMaster({
-      symbol: String(symbol).trim().toUpperCase(),
-      name: String(name || symbol).trim(),
+      symbol: cleanSymbol,
+      name: String(name || cleanSymbol).trim(),
       sector: String(sector || "Unknown").trim(),
       quantity,
       averagePrice,
       averageCost: averagePrice,
       marketPrice: finalMarketPrice,
-      price: Number(finalMarketPrice || 0),
+      price: finalMarketPrice,
       marketValue: finalMarketValue,
       value: finalMarketValue,
       profitLoss: Number.isFinite(profitLoss) ? profitLoss : 0,
@@ -308,11 +373,11 @@ export default function ImportPortfolio() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Recommended Columns</Text>
-        <Text style={styles.body}>• Security / Symbol</Text>
-        <Text style={styles.body}>• Quantity</Text>
+        <Text style={styles.body}>• Security / Symbol / Counter</Text>
+        <Text style={styles.body}>• Quantity / Units / Shares</Text>
         <Text style={styles.body}>• Weighted Average Price</Text>
         <Text style={styles.body}>• Market Price</Text>
-        <Text style={styles.body}>• Market Value</Text>
+        <Text style={styles.body}>• Market Value / Valuation</Text>
         <Text style={styles.body}>• Profit / Loss</Text>
       </View>
 
@@ -332,6 +397,38 @@ export default function ImportPortfolio() {
       ) : null}
     </ScrollView>
   );
+}
+
+function findValue(row, names = []) {
+  const keys = Object.keys(row || {});
+
+  for (const name of names) {
+    const found = keys.find((key) => normalizeKey(key) === normalizeKey(name));
+
+    if (found) {
+      return row[found];
+    }
+  }
+
+  for (const name of names) {
+    const found = keys.find((key) =>
+      normalizeKey(key).includes(normalizeKey(name))
+    );
+
+    if (found) {
+      return row[found];
+    }
+  }
+
+  return "";
+}
+
+function normalizeKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[./_#()-]/g, "")
+    .trim();
 }
 
 function cleanNumber(value) {

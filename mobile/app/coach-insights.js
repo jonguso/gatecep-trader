@@ -11,6 +11,11 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { createBasketExecution } from "../src/trade/basketExecutionStore";
+import {
+  RECOMMENDATION_STATUS,
+  saveRecommendationRecord,
+  updateRecommendationStatus
+} from "../src/coach/recommendationLifecycleStore";
 
 import { loadPortfolio } from "../src/portfolio/portfolioStore";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
@@ -170,42 +175,27 @@ export default function Coach() {
     setSectorPlan(plan);
   }
 
-  async function saveRecommendation() {
-    const raw = await userGetItem("recommendationHistory");
-    const history = raw ? JSON.parse(raw) : [];
+ async function saveRecommendation() {
+  const record = await saveRecommendationRecord({
+    portfolioValue: value,
+    largestSector,
+    amount,
+    goal,
+    scenario,
+    intensity,
+    sectorPlan,
+    status: RECOMMENDATION_STATUS.SAVED,
+    executionStatus: "NOT_STARTED",
+    version: "3.8.1"
+  });
 
-    history.unshift({
-  id: `REC-${Date.now()}`,
-  savedAt: new Date().toISOString(),
+  const historyRaw = await userGetItem("recommendationHistory");
+  setRecommendationHistory(historyRaw ? JSON.parse(historyRaw) : []);
 
-  portfolioValue: value,
-  largestSector,
+  Alert.alert("Saved", "Coach G strategy saved to your profile.");
 
-  amount,
-  goal,
-  scenario,
-  intensity,
-
-  sectorPlan,
-
-  status: "SAVED",
-  executionStatus: "NOT_STARTED",
-
-  executionLifecycle: [
-    {
-      status: "SAVED",
-      timestamp: new Date().toISOString()
-    }
-  ],
-
-  version: "3.8.1"
-});
-
-    await userSetItem("recommendationHistory", JSON.stringify(history));
-    setRecommendationHistory(history);
-
-    Alert.alert("Saved", "Coach G strategy saved to your profile.");
-  }
+  return record;
+}
 
   async function createTradeBasketFromRecommendation() {
     const actionableSectors = sectorPlan.filter((item) => !item.reserve);
@@ -242,6 +232,18 @@ export default function Coach() {
 
 await createBasketExecution();
 
+if (latestStrategy?.id) {
+  await updateRecommendationStatus(
+    latestStrategy.id,
+    RECOMMENDATION_STATUS.BASKET_CREATED,
+    {
+      executionStatus: "BASKET_CREATED",
+      basketCreatedAt: new Date().toISOString(),
+      basketCount: basketItems.length,
+      message: "Trade basket created from Coach G recommendation."
+    }
+  );
+}
 setShowResults(false);
 setShowSimulator(false);
 

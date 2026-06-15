@@ -9,12 +9,18 @@ import {
   TextInput,
   View
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import {
   savePortfolio,
   normalizePortfolioHolding
 } from "../src/portfolio/portfolioStore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  userGetItem,
+  userSetItem,
+  userRemoveItem
+} from "../src/auth/userStorage";
+
 
 export default function ReviewPortfolioImport() {
   const [fileInfo, setFileInfo] = useState(null);
@@ -27,8 +33,11 @@ export default function ReviewPortfolioImport() {
   }, []);
 
   async function loadDraft() {
-    const pendingRaw = await AsyncStorage.getItem("gatecepPendingPortfolioImport");
-    const draftRaw = await AsyncStorage.getItem("gatecepImportedPortfolioDraft");
+    const pendingRaw = await userGetItem("PendingPortfolioImport");
+    const scopedRaw = await userGetItem("importedPortfolioDraft");
+    const legacyRaw = await AsyncStorage.getItem("gatecepImportedPortfolioDraft");
+
+    const draftRaw = scopedRaw || legacyRaw;
 
     if (pendingRaw) {
       setFileInfo(JSON.parse(pendingRaw));
@@ -74,8 +83,8 @@ export default function ReviewPortfolioImport() {
 
     setRows(copy);
 
-    await AsyncStorage.setItem(
-      "gatecepImportedPortfolioDraft",
+    await userSetItem(
+      "ImportedPortfolioDraft",
       JSON.stringify(copy)
     );
 
@@ -100,8 +109,8 @@ export default function ReviewPortfolioImport() {
 
     setRows(next);
 
-    await AsyncStorage.setItem(
-      "gatecepImportedPortfolioDraft",
+    await userSetItem(
+      "ImportedPortfolioDraft",
       JSON.stringify(next)
     );
 
@@ -113,8 +122,8 @@ export default function ReviewPortfolioImport() {
 
     setRows(copy);
 
-    await AsyncStorage.setItem(
-      "gatecepImportedPortfolioDraft",
+    await userSetItem(
+      "ImportedPortfolioDraft",
       JSON.stringify(copy)
     );
 
@@ -178,10 +187,11 @@ export default function ReviewPortfolioImport() {
 
     await savePortfolio(portfolio);
 
+    await userSetItem("statementUploaded", "true");
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
 
-    await AsyncStorage.setItem(
-      "gatecepLatestUpload",
+    await userSetItem(
+      "LatestUpload",
       JSON.stringify({
         uploadedAt: new Date().toISOString(),
         valuation: {
@@ -195,6 +205,7 @@ export default function ReviewPortfolioImport() {
       })
     );
 
+    await userRemoveItem("importedPortfolioDraft");
     await AsyncStorage.removeItem("gatecepImportedPortfolioDraft");
 
     Alert.alert("Portfolio Saved", "Your holdings have been saved.");
