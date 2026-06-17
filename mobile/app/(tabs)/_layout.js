@@ -22,13 +22,13 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="dashboard" options={{ title: "Dashboard" }} />
-      <Tabs.Screen name="markets" options={{ title: "Markets" }} />
-      <Tabs.Screen name="news" options={{ title: "News" }} />
-      <Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
-      <Tabs.Screen name="menu" options={{ title: "Menu" }} />
+<Tabs.Screen name="markets" options={{ title: "Markets" }} />
+<Tabs.Screen name="trading" options={{ title: "Trading" }} />
+<Tabs.Screen name="calendar" options={{ title: "Calendar" }} />
+<Tabs.Screen name="news" options={{ title: "News" }} />
 
-      <Tabs.Screen name="coach" options={{ href: null }} />
-      <Tabs.Screen name="funds" options={{ href: null }} />
+<Tabs.Screen name="coach" options={{ href: null }} />
+<Tabs.Screen name="funds" options={{ href: null }} />
     </Tabs>
   );
 }
