@@ -265,7 +265,7 @@ export default function QueueManager() {
 
         <Pressable
           style={styles.actionButton}
-          onPress={() => router.push("/broker-routing")}
+          onPress={() => router.push("/trading")}
         >
           <Text style={styles.actionText}>Broker Routing</Text>
         </Pressable>

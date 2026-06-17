@@ -143,7 +143,7 @@ export default function ExecutionAudit() {
 
       <Pressable
         style={styles.secondary}
-        onPress={() => router.push("/queue-manager")}
+        onPress={() => router.push("/trading")}
       >
         <Text style={styles.secondaryText}>Open Queue Manager</Text>
       </Pressable>

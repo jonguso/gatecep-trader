@@ -168,7 +168,7 @@ export default function BrokerRouting() {
             }
 
             setExecution(latest);
-            router.push("/queue-manager");
+            router.push("/trading");
           }
         }
       ]
@@ -291,9 +291,9 @@ export default function BrokerRouting() {
 
       <Pressable
         style={styles.secondary}
-        onPress={() => router.push("/queue-manager")}
+        onPress={() => router.push("/trading")}
       >
-        <Text style={styles.secondaryText}>Open Queue Manager</Text>
+        <Text style={styles.secondaryText}>Open Trading</Text>
       </Pressable>
 
       <Pressable

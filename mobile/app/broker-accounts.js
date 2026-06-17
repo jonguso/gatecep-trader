@@ -385,9 +385,9 @@ export default function BrokerAccounts() {
          
       <Pressable
   style={styles.primary}
-  onPress={() => router.replace("/execution-wizard")}
+  onPress={() => router.replace("/trading")}
 >
-  <Text style={styles.primaryText}>Return to Execution Wizard</Text>
+  <Text style={styles.primaryText}>Return to Trading</Text>
 </Pressable>
 
     </ScrollView>

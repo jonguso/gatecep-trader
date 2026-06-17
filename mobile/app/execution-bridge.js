@@ -81,7 +81,7 @@ export default function ExecutionBridge() {
       <Pressable
         style={styles.secondary}
         onPress={() =>
-          router.push("/queue-manager")
+          router.push("/trading")
         }
       >
         <Text style={styles.secondaryText}>

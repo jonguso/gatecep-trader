@@ -247,7 +247,7 @@ if (latestStrategy?.id) {
 setShowResults(false);
 setShowSimulator(false);
 
-router.push("/execution-wizard");
+router.push("/trading");
   }
 
   function buildBehaviorInsights() {

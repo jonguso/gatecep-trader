@@ -6,181 +6,209 @@ import {
   Text,
   View
 } from "react-native";
-import { router } from "expo-router";
+
+const FILTERS = [
+  "This Month",
+  "Next 6 Months",
+  "Last 12 Months"
+];
 
 const EVENTS = [
   {
-    symbol: "BAT",
-    company: "BAT Kenya",
-    type: "Dividend Payment",
-    date: "2026-07-15",
-    detail: "Estimated final dividend payment date."
-  },
-  {
-    symbol: "SCBK",
-    company: "Standard Chartered Bank Kenya",
-    type: "Book Closure",
-    date: "2026-06-28",
-    detail: "Register closes for dividend eligibility."
-  },
-  {
-    symbol: "KCB",
-    company: "KCB Group PLC",
-    type: "AGM",
-    date: "2026-08-10",
-    detail: "Annual general meeting event placeholder."
-  },
-  {
+    type: "DIVIDEND",
+    company: "Safaricom",
     symbol: "SCOM",
-    company: "Safaricom PLC",
-    type: "Results Announcement",
-    date: "2026-08-22",
-    detail: "Expected market update / results event placeholder."
+    date: "2026-08-30",
+    title: "Final Dividend Payment"
   },
   {
+    type: "AGM",
+    company: "KCB Group",
+    symbol: "KCB",
+    date: "2026-07-12",
+    title: "Annual General Meeting"
+  },
+  {
+    type: "BOOK_CLOSURE",
+    company: "EABL",
     symbol: "EABL",
-    company: "East African Breweries PLC",
-    type: "Dividend Watch",
-    date: "2026-09-05",
-    detail: "Coach G dividend monitoring event."
+    date: "2026-07-25",
+    title: "Dividend Book Closure"
+  },
+  {
+    type: "RIGHTS",
+    company: "Co-op Bank",
+    symbol: "COOP",
+    date: "2026-09-10",
+    title: "Rights Issue Opens"
   }
 ];
 
-export default function Calendar() {
-  const [filter, setFilter] = useState("All");
+export default function CalendarScreen() {
+  const [filter, setFilter] = useState("This Month");
 
   const events = useMemo(() => {
-    return EVENTS.filter((item) => filter === "All" || item.type === filter)
-      .slice()
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    return EVENTS;
   }, [filter]);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>NSE Calendar</Text>
-
-        <Pressable
-          style={styles.dashboardButton}
-          onPress={() => router.replace("/(tabs)/dashboard")}
-        >
-          <Text style={styles.dashboardButtonText}>Dashboard</Text>
-        </Pressable>
-      </View>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+    >
+      <Text style={styles.title}>Market Calendar</Text>
 
       <Text style={styles.subtitle}>
-        Book closures, dividend payments, AGMs, and results dates.
+        Dividends, AGMs, book closures, rights issues, and corporate actions.
       </Text>
 
-      <View style={styles.chips}>
-        {[
-          "All",
-          "Dividend Payment",
-          "Book Closure",
-          "AGM",
-          "Results Announcement",
-          "Dividend Watch"
-        ].map((item) => (
+      <View style={styles.filterRow}>
+        {FILTERS.map((item) => (
           <Pressable
             key={item}
-            style={[styles.chip, filter === item && styles.chipActive]}
+            style={[
+              styles.filterChip,
+              filter === item && styles.filterChipActive
+            ]}
             onPress={() => setFilter(item)}
           >
-            <Text style={filter === item ? styles.chipTextActive : styles.chipText}>
+            <Text
+              style={
+                filter === item
+                  ? styles.filterTextActive
+                  : styles.filterText
+              }
+            >
               {item}
             </Text>
           </Pressable>
         ))}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Upcoming Market Events</Text>
-
-        {events.map((item) => (
-          <Pressable
-            key={`${item.symbol}-${item.type}-${item.date}`}
-            style={styles.eventRow}
-            onPress={() => router.push(`/security/${item.symbol}`)}
-          >
-            <View style={styles.dateBox}>
-              <Text style={styles.month}>
-                {new Date(item.date).toLocaleString(undefined, { month: "short" })}
-              </Text>
-              <Text style={styles.day}>{new Date(item.date).getDate()}</Text>
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={styles.symbol}>{item.symbol}</Text>
-              <Text style={styles.eventTitle}>{item.type}</Text>
-              <Text style={styles.company}>{item.company}</Text>
-              <Text style={styles.detail}>{item.detail}</Text>
-            </View>
-          </Pressable>
-        ))}
-
-        {events.length === 0 ? (
-          <Text style={styles.empty}>No calendar events found.</Text>
-        ) : null}
+      <View style={styles.summaryCard}>
+        <Metric label="Events" value={String(events.length)} />
+        <Metric label="Dividends" value="1" />
+        <Metric label="AGMs" value="1" />
+        <Metric label="Actions" value="2" />
       </View>
 
-      <View style={styles.note}>
-        <Text style={styles.noteTitle}>POC Note</Text>
-        <Text style={styles.noteText}>
-          These are starter events for the proof of concept. Later this page can
-          connect to NSE announcements, licensed market feeds, broker corporate
-          actions, or issuer investor relations updates.
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Upcoming Events</Text>
+
+        {events.map((event, index) => (
+          <View key={`${event.symbol}-${index}`} style={styles.eventCard}>
+            <View style={styles.eventTop}>
+              <Text style={styles.eventType}>{event.type}</Text>
+              <Text style={styles.eventDate}>{event.date}</Text>
+            </View>
+
+            <Text style={styles.company}>
+              {event.symbol} · {event.company}
+            </Text>
+
+            <Text style={styles.eventTitle}>
+              {event.title}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+          Coach G Dividend Planner
+        </Text>
+
+        <Text style={styles.body}>
+          Upcoming versions will estimate expected dividend income from your
+          actual holdings and broker-linked portfolios.
         </Text>
       </View>
     </ScrollView>
   );
 }
 
+function Metric({ label, value }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#020617" },
-  content: { padding: 22, paddingTop: 70, paddingBottom: 110 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12
+  screen: {
+    flex: 1,
+    backgroundColor: "#020617"
   },
-  title: { color: "white", fontSize: 31, fontWeight: "900" },
-  subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
-  dashboardButton: {
-    backgroundColor: "#1e293b",
-    borderColor: "#334155",
-    borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14
+  content: {
+    padding: 22,
+    paddingTop: 70,
+    paddingBottom: 120
   },
-  dashboardButtonText: { color: "#67e8f9", fontWeight: "900" },
-  chips: {
+  title: {
+    color: "white",
+    fontSize: 34,
+    fontWeight: "900"
+  },
+  subtitle: {
+    color: "#94a3b8",
+    marginTop: 8,
+    lineHeight: 22
+  },
+  filterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
     marginTop: 18
   },
-  chip: {
+  filterChip: {
     backgroundColor: "#1e293b",
-    borderColor: "#334155",
-    borderWidth: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 13,
-    borderRadius: 999
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14
   },
-  chipActive: {
-    backgroundColor: "rgba(147,51,234,.25)",
-    borderColor: "#9333ea"
+  filterChipActive: {
+    backgroundColor: "#9333ea"
   },
-  chipText: { color: "#cbd5e1", fontWeight: "800", fontSize: 12 },
-  chipTextActive: { color: "white", fontWeight: "900", fontSize: 12 },
-  card: {
-    marginTop: 18,
+  filterText: {
+    color: "#94a3b8",
+    fontWeight: "900"
+  },
+  filterTextActive: {
+    color: "white",
+    fontWeight: "900"
+  },
+  summaryCard: {
+    marginTop: 20,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  metric: {
+    flex: 1,
+    minWidth: 140,
     backgroundColor: "#0f172a",
-    borderColor: "#1e293b",
+    borderRadius: 18,
     borderWidth: 1,
+    borderColor: "#1e293b",
+    padding: 14
+  },
+  metricLabel: {
+    color: "#94a3b8",
+    fontSize: 12
+  },
+  metricValue: {
+    color: "white",
+    fontWeight: "900",
+    marginTop: 6
+  },
+  card: {
+    marginTop: 20,
+    backgroundColor: "#0f172a",
     borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#1e293b",
     padding: 18
   },
   cardTitle: {
@@ -189,38 +217,36 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginBottom: 12
   },
-  eventRow: {
-    flexDirection: "row",
-    gap: 14,
-    borderBottomColor: "#1e293b",
-    borderBottomWidth: 1,
-    paddingVertical: 14
-  },
-  dateBox: {
-    width: 58,
-    height: 62,
-    borderRadius: 18,
-    backgroundColor: "#1e293b",
+  eventCard: {
+    backgroundColor: "#020617",
     borderColor: "#334155",
     borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center"
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12
   },
-  month: { color: "#67e8f9", fontWeight: "900", fontSize: 12 },
-  day: { color: "white", fontWeight: "900", fontSize: 22, marginTop: 2 },
-  symbol: { color: "#67e8f9", fontWeight: "900" },
-  eventTitle: { color: "white", fontWeight: "900", marginTop: 4 },
-  company: { color: "#94a3b8", marginTop: 3 },
-  detail: { color: "#cbd5e1", marginTop: 5, lineHeight: 19, fontSize: 12 },
-  note: {
-    marginTop: 18,
-    backgroundColor: "rgba(6,182,212,.10)",
-    borderColor: "rgba(6,182,212,.35)",
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 16
+  eventTop: {
+    flexDirection: "row",
+    justifyContent: "space-between"
   },
-  noteTitle: { color: "#67e8f9", fontWeight: "900" },
-  noteText: { color: "#cbd5e1", marginTop: 8, lineHeight: 20 },
-  empty: { color: "#94a3b8", marginTop: 14 }
+  eventType: {
+    color: "#fbbf24",
+    fontWeight: "900"
+  },
+  eventDate: {
+    color: "#94a3b8"
+  },
+  company: {
+    color: "white",
+    fontWeight: "900",
+    marginTop: 8
+  },
+  eventTitle: {
+    color: "#cbd5e1",
+    marginTop: 6
+  },
+  body: {
+    color: "#cbd5e1",
+    lineHeight: 22
+  }
 });

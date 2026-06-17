@@ -186,14 +186,14 @@ export default function BasketExecution() {
 
       <Pressable
         style={styles.primary}
-        onPress={() => router.push("/broker-routing")}
+        onPress={() => router.push("/trading")}
       >
         <Text style={styles.primaryText}>Open Broker Routing</Text>
       </Pressable>
 
       <Pressable
         style={styles.secondary}
-        onPress={() => router.push("/queue-manager")}
+        onPress={() => router.push("/trading")}
       >
         <Text style={styles.secondaryText}>Open Queue Manager</Text>
       </Pressable>

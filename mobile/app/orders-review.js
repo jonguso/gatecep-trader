@@ -108,7 +108,7 @@ export default function OrdersReview() {
           onPress: async () => {
             const updated = await queueExecutionOrders();
             setExecution(updated);
-            router.push("/order-handoff");
+            router.push("/trading")
           }
         }
       ]
@@ -186,9 +186,9 @@ export default function OrdersReview() {
 
           <Pressable
             style={styles.primary}
-            onPress={() => router.push("/order-handoff")}
+            onPress={() => router.push("/trading")}
           >
-            <Text style={styles.primaryText}>Open Order Handoff</Text>
+            <Text style={styles.primaryText}>Open Trading</Text>
           </Pressable>
         </View>
       ) : (
