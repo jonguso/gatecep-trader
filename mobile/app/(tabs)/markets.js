@@ -1,497 +1,624 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { userGetItem } from "../../src/auth/userStorage";
+import React, { useMemo, useState, useCallback } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from "react-native";
-
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:4000";
+import ActiveUserBanner from "../../src/components/ActiveUserBanner";
+import { generateSparkline }
+from "../../src/markets/sparkline";
+import {
+  MARKET_TABS,
+  INDEX_ROWS,
+  getMarketSummary,
+  getRowsForTab
+} from "../../src/markets/marketHubData";
 
 export default function Markets() {
-  const [stocks, setStocks] = useState([]);
-  const [filter, setFilter] = useState("nse");
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState("");
+  const [tab, setTab] = useState("Summary");
+  const [search, setSearch] = useState("");
+  const [showIndices, setShowIndices] = useState(false);
+  const [showWatchlist, setShowWatchlist] = useState(false);
+  const [watchlist, setWatchlist] = useState([]);
 
-  useEffect(() => {
-    loadMarket();
-  }, []);
+  const summary = useMemo(() => getMarketSummary(), []);
 
-  async function loadMarket() {
-    try {
-      setLoading(true);
+  const rows = useMemo(() => {
+    const data = getRowsForTab(tab);
 
-      const res = await fetch(`${API_URL}/prices`);
-      const data = await res.json();
-
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data.data)
-        ? data.data
-        : Array.isArray(data.prices)
-        ? data.prices
-        : [];
-
-      setStocks(list);
-      setLastUpdated(new Date().toLocaleString());
-    } catch (error) {
-      setStocks(fallbackStocks);
-      setLastUpdated(new Date().toLocaleString());
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const visibleStocks = useMemo(() => {
-    if (filter === "gainers") {
-      return stocks
-        .filter((x) => Number(x.changePct || 0) > 0)
-        .sort((a, b) => Number(b.changePct || 0) - Number(a.changePct || 0));
+    if (!search.trim()) {
+      return data;
     }
 
-    if (filter === "losers") {
-      return stocks
-        .filter((x) => Number(x.changePct || 0) < 0)
-        .sort((a, b) => Number(a.changePct || 0) - Number(b.changePct || 0));
-    }
-
-    if (filter === "movers") {
-      return [...stocks].sort(
-        (a, b) => Number(b.turnover || 0) - Number(a.turnover || 0)
-      );
-    }
-
-    return stocks;
-  }, [stocks, filter]);
-
-  const topGainer = [...stocks]
-    .filter((x) => Number(x.changePct || 0) > 0)
-    .sort((a, b) => Number(b.changePct || 0) - Number(a.changePct || 0))[0];
-
-  const topLoser = [...stocks]
-    .filter((x) => Number(x.changePct || 0) < 0)
-    .sort((a, b) => Number(a.changePct || 0) - Number(b.changePct || 0))[0];
-
-  const totalTurnover = stocks.reduce(
-    (sum, x) => sum + Number(x.turnover || 0),
-    0
-  );
-
-  const hotStock =
-    [...stocks].sort(
-      (a, b) => Number(b.turnover || 0) - Number(a.turnover || 0)
-    )[0]?.symbol || "N/A";
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#67e8f9" />
-        <Text style={styles.loading}>Loading NSE market...</Text>
-      </View>
+    return data.filter(
+      (row) =>
+        row.symbol.toLowerCase().includes(search.toLowerCase()) ||
+        row.name.toLowerCase().includes(search.toLowerCase())
     );
-  }
+  }, [tab, search]);
+
+  useFocusEffect(
+  useCallback(() => {
+    loadWatchlist();
+  }, [])
+);
+
+async function loadWatchlist() {
+  const raw = await userGetItem("marketWatchlist");
+
+  const saved = raw
+    ? JSON.parse(raw)
+    : ["SCOM", "EABL", "EQTY", "COOP"];
+
+  setWatchlist(saved);
+}
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-            <View style={styles.headerRow}>
-  <Text style={styles.title}>Markets</Text>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+    >
+      <Text style={styles.title}>Markets</Text>
 
-  <Pressable
-    style={styles.dashboardButton}
-    onPress={() => router.replace("/(tabs)/dashboard")}
-  >
-    <Text style={styles.dashboardButtonText}>Dashboard</Text>
-  </Pressable>
-</View>
-      <Text style={styles.subtitle}>NSE live market feed powered by Coach G</Text>
+      <Text style={styles.subtitle}>
+        Market intelligence center
+      </Text>
 
-      <Text style={styles.updated}>Updated {lastUpdated}</Text>
+      <ActiveUserBanner />
 
-      <View style={styles.summaryGrid}>
-        <MarketMetric
-          label="Top Gainer"
-          value={topGainer?.symbol || "N/A"}
-          sub={`${pct(topGainer?.changePct)}%`}
-          color="#86efac"
-        />
-
-        <MarketMetric
-          label="Top Loser"
-          value={topLoser?.symbol || "N/A"}
-          sub={`${pct(topLoser?.changePct)}%`}
-          color="#fca5a5"
-        />
-
-        <MarketMetric
-          label="Turnover"
-          value={`KES ${money(totalTurnover)}`}
-          sub="Market activity"
-          color="#67e8f9"
-        />
-
-        <MarketMetric
-          label="Hot Stock"
-          value={hotStock}
-          sub="Highest turnover"
-          color="#c084fc"
-        />
-      </View>
-
-      <View style={styles.filterRow}>
-        {[
-          ["gainers", "Gainers"],
-          ["losers", "Losers"],
-          ["movers", "Movers"],
-          ["nse", "NSE"]
-        ].map(([key, label]) => (
+      <View style={styles.tabRow}>
+        {MARKET_TABS.map((item) => (
           <Pressable
-            key={key}
-            style={[styles.filterChip, filter === key && styles.filterChipActive]}
-            onPress={() => setFilter(key)}
+            key={item}
+            style={[
+              styles.tabButton,
+              tab === item && styles.activeTab
+            ]}
+            onPress={() => setTab(item)}
           >
             <Text
               style={
-                filter === key ? styles.filterTextActive : styles.filterText
+                tab === item
+                  ? styles.activeTabText
+                  : styles.tabText
               }
             >
-              {label}
+              {item}
             </Text>
           </Pressable>
         ))}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-  {filter === "nse" ? "NSE Market Feed" : "Filtered Market Feed"}
-</Text>
+      {tab === "Summary" && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>
+            Market Summary
+          </Text>
 
-        {visibleStocks.map((item, index) => {
-          const change = Number(item.change || 0);
-          const changePct = Number(item.changePct || 0);
-          const positive = changePct >= 0;
+          <View style={styles.summaryStrip}>
+  <SummaryBox label="Turnover" value={`KES ${money(summary.turnover)}`} />
+  <SummaryBox label="Volume" value={summary.volume.toLocaleString()} />
+  <SummaryBox label="Deals" value={summary.deals.toLocaleString()} />
+  <SummaryBox label="Gainers" value={summary.gainers} positive />
+  <SummaryBox label="Decliners" value={summary.decliners} negative />
+  <SummaryBox label="Foreign" value={summary.foreignActivity} />
+</View>
+        </View>
+      )}
 
-      return (
-  <Pressable
-    key={`${item.symbol}-${index}`}
-    style={styles.stockRow}
-    onPress={() => router.push(`/security/${item.symbol}`)}
-  >
+       {tab !== "Summary" && (
+        <>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search stock..."
+            placeholderTextColor="#64748b"
+            style={styles.search}
+          />
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>
+              {tab}
+            </Text>
+
+            {rows.map((row) => (
+              <View
+                key={row.symbol}
+                style={styles.stockRow}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.symbol}>
+                    {row.symbol}
+                  </Text>
+
+                  <Text style={styles.company}>
+                    {row.name}
+                  </Text>
+                </View>
+
+                <View>
+                  <Text style={styles.price}>
+                    {Number(row.price).toFixed(2)}
+                  </Text>
+
+                  <Text
+                    style={
+                      row.changePct >= 0
+                        ? styles.positive
+                        : styles.negative
+                    }
+                  >
+                    {row.changePct >= 0 ? "+" : ""}
+                    {row.changePct.toFixed(2)}%
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      <Pressable
+        style={styles.expandCard}
+        onPress={() =>
+          setShowIndices(!showIndices)
+        }
+      >
+        <Text style={styles.expandTitle}>
+          {showIndices ? "−" : "+"} Indices
+        </Text>
+      </Pressable>
+
+      {showIndices && (
+  <View style={styles.card}>
+    {INDEX_ROWS.map((item) => (
+      <View
+        key={item.symbol}
+        style={[
+  styles.indexCard,
+  item.changePct >= 0
+    ? styles.indexPositive
+    : styles.indexNegative
+]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.symbol}>
+            {item.symbol}
+          </Text>
+
+          <Text style={styles.company}>
+            {item.name}
+          </Text>
+
+          <Text
+            style={
+              item.changePct >= 0
+                ? styles.positive
+                : styles.negative
+            }
+          >
+            {item.changePct >= 0 ? "+" : ""}
+            {item.changePct.toFixed(2)}%
+          </Text>
+        </View>
+
+        <View style={{ alignItems: "flex-end" }}>
+          <Text style={styles.price}>
+            {item.value}
+          </Text>
+
+          <Text
+            style={
+              item.changePct >= 0
+                ? styles.positive
+                : styles.negative
+            }
+          >
+            {item.change >= 0 ? "+" : ""}
+            {item.change}
+          </Text>
+        </View>
+      </View>
+    ))}
+  </View>
+)}
+
+      <Pressable
+  style={styles.expandCard}
+  onPress={() => setShowWatchlist(!showWatchlist)}
+>
+  <View style={styles.expandHeader}>
+    <Text style={styles.expandTitle}>
+      {showWatchlist ? "−" : "+"} Watchlist
+    </Text>
+
+    {showWatchlist ? (
+      <Pressable
+        style={styles.manageBtn}
+        onPress={() => router.push("/watchlist")}
+      >
+        <Text style={styles.manageText}>Manage</Text>
+      </Pressable>
+    ) : null}
+  </View>
+</Pressable>
+
+{showWatchlist && (
+  <View style={styles.card}>
+    {watchlist.length === 0 ? (
+      <Text style={styles.body}>
+        No securities selected.
+      </Text>
+    ) : (
+     watchlist.map((symbol) => {
+  const stock =
+    getRowsForTab("Equities").find(
+      (item) => item.symbol === symbol
+    ) || {};
+
+  return (
+    <View
+  key={symbol}
+  style={styles.watchlistCard}
+>
+  <View style={styles.watchlistLeft}>
     <View style={styles.logoCircle}>
       <Text style={styles.logoText}>
-        {String(item.symbol || "?").slice(0, 2)}
+        {symbol.substring(0, 1)}
       </Text>
     </View>
 
-    <View style={styles.stockLeft}>
-      <Text style={styles.symbol}>{item.symbol}</Text>
-
-      <Text style={styles.name}>
-        {item.name || item.companyName || item.symbol}
+    <View style={{ flex: 1 }}>
+      <Text style={styles.symbol}>
+        {symbol}
       </Text>
 
-      <Text style={styles.sector}>{item.sector || "NSE"}</Text>
-    </View>
-
-    <View style={styles.stockRight}>
-      <Text style={styles.price}>
-        KES {money(item.price || item.lastPrice)}
+      <Text style={styles.company}>
+        {stock.name || "NSE Counter"}
       </Text>
 
-      <Text style={positive ? styles.green : styles.red}>
-        {positive ? "▲" : "▼"} {pct(changePct)}%
-      </Text>
-
-      <Text style={styles.turnover}>
-        KES {money(item.turnover || item.value || 0)}
+      <Text style={styles.volumeText}>
+        Vol {Number(stock.volume || 0).toLocaleString()}
       </Text>
     </View>
-  </Pressable>
-);
-        })}
+  </View>
 
-        {visibleStocks.length === 0 && (
-          <Text style={styles.empty}>No securities found for this filter.</Text>
-        )}
-      </View>
+  <View style={styles.watchlistRight}>
+    <Text style={styles.price}>
+      {Number(stock.price || 0).toFixed(2)}
+    </Text>
+
+    <Text
+      style={
+        Number(stock.changePct || 0) >= 0
+          ? styles.positive
+          : styles.negative
+      }
+    >
+      {Number(stock.changePct || 0) >= 0 ? "+" : ""}
+      {Number(stock.changePct || 0).toFixed(2)}%
+    </Text>
+
+   <Text
+  style={[
+    styles.sparkline,
+    Number(stock.changePct || 0) >= 0
+      ? styles.positive
+      : styles.negative
+  ]}
+>
+  {generateSparkline(
+    Number(stock.changePct || 0)
+  )}
+</Text>
+   
+  </View>
+</View>
+   );
+})
+
+    )}
+  </View>
+)}
+
     </ScrollView>
   );
 }
 
-function MarketMetric({ label, value, sub, color }) {
+function SummaryBox({ label, value, positive, negative }) {
   return (
-    <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, { color }]}>{value}</Text>
-      <Text style={styles.metricSub}>{sub}</Text>
+    <View style={styles.summaryBox}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.summaryValue,
+          positive && styles.positive,
+          negative && styles.negative
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
 
-function money(v) {
-  return Number(v || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+function Metric({ label, value }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>
+        {label}
+      </Text>
+
+      <Text style={styles.metricValue}>
+        {value}
+      </Text>
+    </View>
+  );
 }
 
-function pct(v) {
-  return Number(v || 0).toFixed(2);
+function money(value) {
+  return Number(value || 0).toLocaleString();
 }
-
-const fallbackStocks = [
-  {
-    symbol: "SCOM",
-    name: "Safaricom",
-    sector: "Telecom",
-    price: 30.6,
-    change: 0.75,
-    changePct: 2.53,
-    turnover: 128520000
-  },
-  {
-    symbol: "KCB",
-    name: "KCB Group",
-    sector: "Banking",
-    price: 67.75,
-    change: -2.35,
-    changePct: -3.34,
-    turnover: 60297500
-  },
-  {
-    symbol: "BAT",
-    name: "BAT Kenya",
-    sector: "Mfg. and Allied",
-    price: 520,
-    change: -17.25,
-    changePct: -3.22,
-    turnover: 21320000
-  },
-  {
-    symbol: "EABL",
-    name: "East African Breweries",
-    sector: "Mfg. and Allied",
-    price: 248,
-    change: -6.25,
-    changePct: -2.45,
-    turnover: 32240000
-  },
-  {
-    symbol: "ABSA",
-    name: "Absa Bank Kenya",
-    sector: "Banking",
-    price: 29,
-    change: -2.78,
-    changePct: -8.77,
-    turnover: 22040000
-  },
-  {
-    symbol: "KPLC",
-    name: "Kenya Power",
-    sector: "Energy and Petroleum",
-    price: 16.1,
-    change: -0.78,
-    changePct: -4.6,
-    turnover: 15778000
-  }
-];
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#020617"
   },
+
   content: {
-    padding: 20,
-    paddingTop: 60,
+    padding: 22,
+    paddingTop: 70,
     paddingBottom: 120
   },
-  center: {
-    flex: 1,
-    backgroundColor: "#020617",
-    justifyContent: "center",
-    alignItems: "center"
-  },
-  loading: {
-    color: "#cbd5e1",
-    marginTop: 12
-  },
+
   title: {
     color: "white",
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: "900"
   },
+
   subtitle: {
     color: "#94a3b8",
     marginTop: 8
   },
-  updated: {
-    color: "#64748b",
-    marginTop: 6,
-    fontSize: 12
-  },
-  summaryGrid: {
+
+  tabRow: {
     marginTop: 20,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+
+  tabButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#1e293b"
+  },
+
+  activeTab: {
+    backgroundColor: "#9333ea"
+  },
+
+  tabText: {
+    color: "#94a3b8",
+    fontWeight: "900"
+  },
+
+  activeTabText: {
+    color: "white",
+    fontWeight: "900"
+  },
+
+  card: {
+    marginTop: 16,
+    backgroundColor: "#0f172a",
+    borderRadius: 20,
+    padding: 16
+  },
+
+  cardTitle: {
+    color: "#67e8f9",
+    fontWeight: "900",
+    fontSize: 18,
+    marginBottom: 12
+  },
+
+  metricGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10
   },
+
   metric: {
     width: "47%",
-    backgroundColor: "#0f172a",
-    borderRadius: 16,
-    padding: 14
+    backgroundColor: "#020617",
+    borderRadius: 14,
+    padding: 12
   },
+
   metricLabel: {
     color: "#94a3b8",
     fontSize: 12
   },
+
   metricValue: {
-    marginTop: 8,
-    fontWeight: "900",
-    fontSize: 15
-  },
-  metricSub: {
-    color: "#94a3b8",
-    marginTop: 4,
-    fontSize: 11
-  },
-  filterRow: {
-    marginTop: 18,
-    flexDirection: "row",
-    gap: 8
-  },
-  filterChip: {
-    backgroundColor: "#1e293b",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderColor: "#334155",
-    borderWidth: 1
-  },
-  filterChipActive: {
-    backgroundColor: "rgba(147,51,234,.25)",
-    borderColor: "#9333ea"
-  },
-  filterText: {
-    color: "#cbd5e1",
-    fontWeight: "800",
-    fontSize: 12
-  },
-  filterTextActive: {
     color: "white",
     fontWeight: "900",
-    fontSize: 12
+    marginTop: 4
   },
-  card: {
-    marginTop: 18,
+
+  search: {
+    marginTop: 16,
     backgroundColor: "#0f172a",
-    borderColor: "#1e293b",
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 16
-  },
-  cardTitle: {
-    color: "#67e8f9",
-    fontWeight: "900",
-    fontSize: 16,
-    marginBottom: 10
+    borderRadius: 14,
+    padding: 14,
+    color: "white"
   },
 
   stockRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingVertical: 14,
-  borderBottomColor: "#1e293b",
-  borderBottomWidth: 1
-},
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e293b"
+  },
 
-  stockLeft: {
-    flex: 1
-  },
-  stockRight: {
-    alignItems: "flex-end",
-    minWidth: 105
-  },
   symbol: {
     color: "white",
-    fontWeight: "900",
-    fontSize: 16
+    fontWeight: "900"
   },
-  name: {
-    color: "#cbd5e1",
-    marginTop: 4
-  },
-  sector: {
+
+  company: {
     color: "#94a3b8",
-    marginTop: 3,
     fontSize: 12
   },
+
   price: {
+    color: "white",
+    fontWeight: "900",
+    textAlign: "right"
+  },
+
+  positive: {
+    color: "#86efac",
+    fontWeight: "900"
+  },
+
+  negative: {
+    color: "#fca5a5",
+    fontWeight: "900"
+  },
+
+  expandCard: {
+    marginTop: 16,
+    backgroundColor: "#1e293b",
+    borderRadius: 16,
+    padding: 16
+  },
+
+  expandTitle: {
     color: "white",
     fontWeight: "900"
   },
-  green: {
-    color: "#86efac",
-    marginTop: 4,
-    fontWeight: "900"
+
+  manageBtn: {
+    backgroundColor: "#9333ea",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10
   },
-  red: {
-    color: "#fca5a5",
-    marginTop: 4,
-    fontWeight: "900"
-  },
-  turnover: {
-    color: "#94a3b8",
-    marginTop: 4,
-    fontSize: 11
-  },
-headerRow: {
+
+expandHeader: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center"
+},
+
+indexCard: {
   flexDirection: "row",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: 12
+  paddingVertical: 14,
+  borderBottomWidth: 1,
+  borderBottomColor: "#1e293b"
 },
 
-dashboardButton: {
-  backgroundColor: "#1e293b",
-  borderColor: "#334155",
+watchlistCard: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  paddingVertical: 14,
+  borderBottomWidth: 1,
+  borderBottomColor: "#1e293b"
+},
+
+summaryStrip: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8
+},
+
+summaryBox: {
+  width: "31%",
+  backgroundColor: "#020617",
+  borderColor: "#1e293b",
   borderWidth: 1,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 14
+  borderRadius: 14,
+  paddingVertical: 12,
+  paddingHorizontal: 10
 },
 
-dashboardButtonText: {
-  color: "#67e8f9",
-  fontWeight: "900"
+summaryLabel: {
+  color: "#94a3b8",
+  fontSize: 11,
+  fontWeight: "800"
 },
-  empty: {
-    color: "#94a3b8",
-    marginTop: 16
+
+summaryValue: {
+  color: "white",
+  fontWeight: "900",
+  marginTop: 6,
+  fontSize: 13
+},
+
+  manageText: {
+    color: "white",
+    fontWeight: "900"
   },
 
+watchlistLeft: {
+  flexDirection: "row",
+  alignItems: "center",
+  flex: 1
+},
+
+watchlistRight: {
+  alignItems: "flex-end"
+},
+
 logoCircle: {
-  width: 44,
-  height: 44,
-  borderRadius: 22,
-  backgroundColor: "#1e293b",
-  borderColor: "#334155",
-  borderWidth: 1,
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: "#9333ea",
   justifyContent: "center",
   alignItems: "center",
   marginRight: 12
 },
 
 logoText: {
-  color: "#67e8f9",
-  fontWeight: "900",
-  fontSize: 13
+  color: "white",
+  fontWeight: "900"
 },
+
+volumeText: {
+  color: "#64748b",
+  fontSize: 11,
+  marginTop: 4
+},
+
+sparkline: {
+  color: "#22c55e",
+  fontSize: 12,
+  marginTop: 4
+},
+
+indexPositive: {
+  borderLeftWidth: 4,
+  borderLeftColor: "#22c55e"
+},
+
+indexNegative: {
+  borderLeftWidth: 4,
+  borderLeftColor: "#ef4444"
+}
 
 });

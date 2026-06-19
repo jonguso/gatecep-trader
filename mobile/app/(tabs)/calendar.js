@@ -7,76 +7,55 @@ import {
   View
 } from "react-native";
 
-const FILTERS = [
-  "This Month",
-  "Next 6 Months",
-  "Last 12 Months"
-];
+import ActiveUserBanner from "../../src/components/ActiveUserBanner";
 
-const EVENTS = [
-  {
-    type: "DIVIDEND",
-    company: "Safaricom",
-    symbol: "SCOM",
-    date: "2026-08-30",
-    title: "Final Dividend Payment"
-  },
-  {
-    type: "AGM",
-    company: "KCB Group",
-    symbol: "KCB",
-    date: "2026-07-12",
-    title: "Annual General Meeting"
-  },
-  {
-    type: "BOOK_CLOSURE",
-    company: "EABL",
-    symbol: "EABL",
-    date: "2026-07-25",
-    title: "Dividend Book Closure"
-  },
-  {
-    type: "RIGHTS",
-    company: "Co-op Bank",
-    symbol: "COOP",
-    date: "2026-09-10",
-    title: "Rights Issue Opens"
-  }
-];
+import {
+  CALENDAR_TABS,
+  getCalendarEvents,
+  getCalendarSummary
+} from "../../src/calendar/calendarHubData";
 
-export default function CalendarScreen() {
-  const [filter, setFilter] = useState("This Month");
+export default function Calendar() {
+  const [tab, setTab] = useState("This Month");
 
-  const events = useMemo(() => {
-    return EVENTS;
-  }, [filter]);
+  const events = useMemo(
+    () => getCalendarEvents(tab),
+    [tab]
+  );
+
+  const summary = useMemo(
+    () => getCalendarSummary(events),
+    [events]
+  );
 
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.title}>Market Calendar</Text>
+      <Text style={styles.title}>Calendar</Text>
 
       <Text style={styles.subtitle}>
-        Dividends, AGMs, book closures, rights issues, and corporate actions.
+        Dividends, AGMs, earnings, treasury bills and market events
       </Text>
 
-      <View style={styles.filterRow}>
-        {FILTERS.map((item) => (
+      <ActiveUserBanner />
+
+      <View style={styles.tabRow}>
+        {CALENDAR_TABS.map((item) => (
           <Pressable
             key={item}
             style={[
-              styles.filterChip,
-              filter === item && styles.filterChipActive
+              styles.tabButton,
+              tab === item && styles.activeTab
             ]}
-            onPress={() => setFilter(item)}
+            onPress={() => setTab(item)}
           >
             <Text
               style={
-                filter === item
-                  ? styles.filterTextActive
-                  : styles.filterText
+                tab === item
+                  ? styles.activeTabText
+                  : styles.tabText
               }
             >
               {item}
@@ -86,42 +65,75 @@ export default function CalendarScreen() {
       </View>
 
       <View style={styles.summaryCard}>
-        <Metric label="Events" value={String(events.length)} />
-        <Metric label="Dividends" value="1" />
-        <Metric label="AGMs" value="1" />
-        <Metric label="Actions" value="2" />
+        <Metric
+          label="Events"
+          value={summary.total}
+        />
+
+        <Metric
+          label="Dividends"
+          value={summary.dividends}
+        />
+
+        <Metric
+          label="AGMs"
+          value={summary.agms}
+        />
+
+        <Metric
+          label="Actions"
+          value={summary.actions}
+        />
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Upcoming Events</Text>
+        <Text style={styles.cardTitle}>
+          Upcoming Events
+        </Text>
 
-        {events.map((event, index) => (
-          <View key={`${event.symbol}-${index}`} style={styles.eventCard}>
-            <View style={styles.eventTop}>
-              <Text style={styles.eventType}>{event.type}</Text>
-              <Text style={styles.eventDate}>{event.date}</Text>
+        {events.map((event) => (
+          <View
+            key={event.id}
+            style={styles.eventRow}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.eventTitle}>
+                {event.title}
+              </Text>
+
+              <Text style={styles.eventCompany}>
+                {event.company}
+              </Text>
+
+              <Text style={styles.eventDetail}>
+                {event.detail}
+              </Text>
             </View>
 
-            <Text style={styles.company}>
-              {event.symbol} · {event.company}
-            </Text>
+            <View style={styles.dateBox}>
+              <Text style={styles.eventType}>
+                {event.type}
+              </Text>
 
-            <Text style={styles.eventTitle}>
-              {event.title}
-            </Text>
+              <Text style={styles.eventDate}>
+                {event.date}
+              </Text>
+            </View>
           </View>
         ))}
       </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
-          Coach G Dividend Planner
+          Event Categories
         </Text>
 
-        <Text style={styles.body}>
-          Upcoming versions will estimate expected dividend income from your
-          actual holdings and broker-linked portfolios.
-        </Text>
+        <Category title="Dividends" />
+        <Category title="AGMs" />
+        <Category title="Earnings" />
+        <Category title="Rights Issues" />
+        <Category title="Treasury Bills" />
+        <Category title="Bond Auctions" />
       </View>
     </ScrollView>
   );
@@ -130,8 +142,23 @@ export default function CalendarScreen() {
 function Metric({ label, value }) {
   return (
     <View style={styles.metric}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>
+        {label}
+      </Text>
+
+      <Text style={styles.metricValue}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function Category({ title }) {
+  return (
+    <View style={styles.categoryRow}>
+      <Text style={styles.categoryText}>
+        {title}
+      </Text>
     </View>
   );
 }
@@ -141,112 +168,140 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#020617"
   },
+
   content: {
     padding: 22,
     paddingTop: 70,
     paddingBottom: 120
   },
+
   title: {
     color: "white",
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: "900"
   },
+
   subtitle: {
     color: "#94a3b8",
-    marginTop: 8,
-    lineHeight: 22
+    marginTop: 8
   },
-  filterRow: {
+
+  tabRow: {
+    marginTop: 20,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginTop: 18
+    gap: 8
   },
-  filterChip: {
-    backgroundColor: "#1e293b",
-    borderRadius: 16,
+
+  tabButton: {
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    paddingHorizontal: 14
+    borderRadius: 14,
+    backgroundColor: "#1e293b"
   },
-  filterChipActive: {
+
+  activeTab: {
     backgroundColor: "#9333ea"
   },
-  filterText: {
+
+  tabText: {
     color: "#94a3b8",
     fontWeight: "900"
   },
-  filterTextActive: {
+
+  activeTabText: {
     color: "white",
     fontWeight: "900"
   },
+
   summaryCard: {
-    marginTop: 20,
+    marginTop: 18,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10
   },
+
   metric: {
-    flex: 1,
-    minWidth: 140,
+    width: "47%",
     backgroundColor: "#0f172a",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#1e293b",
+    borderRadius: 16,
     padding: 14
   },
+
   metricLabel: {
     color: "#94a3b8",
     fontSize: 12
   },
+
   metricValue: {
     color: "white",
     fontWeight: "900",
-    marginTop: 6
+    marginTop: 4
   },
+
   card: {
-    marginTop: 20,
+    marginTop: 18,
     backgroundColor: "#0f172a",
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#1e293b",
-    padding: 18
+    borderRadius: 20,
+    padding: 16
   },
+
   cardTitle: {
     color: "#67e8f9",
-    fontSize: 18,
     fontWeight: "900",
+    fontSize: 18,
     marginBottom: 12
   },
-  eventCard: {
-    backgroundColor: "#020617",
-    borderColor: "#334155",
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 12
-  },
-  eventTop: {
+
+  eventRow: {
     flexDirection: "row",
-    justifyContent: "space-between"
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e293b"
   },
-  eventType: {
-    color: "#fbbf24",
+
+  eventTitle: {
+    color: "white",
     fontWeight: "900"
   },
-  eventDate: {
-    color: "#94a3b8"
+
+  eventCompany: {
+    color: "#67e8f9",
+    marginTop: 4
   },
-  company: {
-    color: "white",
+
+  eventDetail: {
+    color: "#94a3b8",
+    marginTop: 4,
+    fontSize: 12
+  },
+
+  dateBox: {
+    alignItems: "flex-end"
+  },
+
+  eventType: {
+    color: "#fbbf24",
     fontWeight: "900",
-    marginTop: 8
+    fontSize: 11
   },
-  eventTitle: {
-    color: "#cbd5e1",
-    marginTop: 6
+
+  eventDate: {
+    color: "white",
+    marginTop: 6,
+    fontWeight: "900",
+    fontSize: 12
   },
-  body: {
-    color: "#cbd5e1",
-    lineHeight: 22
+
+  categoryRow: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1e293b"
+  },
+
+  categoryText: {
+    color: "white",
+    fontWeight: "900"
   }
 });

@@ -14,10 +14,21 @@ import { router, useFocusEffect } from "expo-router";
 import ActiveUserBanner from "../../src/components/ActiveUserBanner";
 import { loadTradingHubData } from "../../src/trade/tradingHubStore";
 import { queueExecutionOrders } from "../../src/trade/basketExecutionStore";
-import { userSetItem } from "../../src/auth/userStorage";
+import { userGetItem, userSetItem } from "../../src/auth/userStorage";
+import { getMarketDepth } from "../../src/trade/marketDepthData";
+
+const TRADING_TABS = ["Account", "Orders", "Depth", "Activity"];
+
+const EXECUTION_FLOW = [
+  "READY_FOR_BROKER",
+  "SUBMITTED",
+  "BROKER_ACCEPTED",
+  "FILLED"
+];
 
 export default function Trading() {
   const [data, setData] = useState(null);
+  const [tab, setTab] = useState("Account");
   const [side, setSide] = useState("BUY");
   const [symbol, setSymbol] = useState("SCOM");
   const [quantity, setQuantity] = useState("1");
@@ -25,6 +36,7 @@ export default function Trading() {
   const [showDeposit, setShowDeposit] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [mpesaNumber, setMpesaNumber] = useState("");
+  const [executionStatus, setExecutionStatus] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -35,6 +47,11 @@ export default function Trading() {
   async function load() {
     const result = await loadTradingHubData();
     setData(result);
+
+    const savedExecution = await userGetItem("latestOrderHandoff");
+    if (savedExecution) {
+      setExecutionStatus(JSON.parse(savedExecution));
+    }
 
     const firstOrder = result.orders?.[0];
 
@@ -48,14 +65,25 @@ export default function Trading() {
 
   const broker = data?.broker;
   const orders = data?.orders || [];
-  const portfolio = data?.portfolio || [];
   const cash = Number(data?.cash || 0);
 
   const estimate = useMemo(() => {
-    const qty = Number(quantity || 0);
-    const px = Number(price || 0);
-    return qty * px;
+    return Number(quantity || 0) * Number(price || 0);
   }, [quantity, price]);
+
+  const depth = useMemo(() => {
+    return getMarketDepth(symbol);
+  }, [symbol]);
+
+  const liveOpenOrders =
+    executionStatus && executionStatus.status !== "FILLED"
+      ? executionStatus.orders || []
+      : [];
+
+  const recentExecutions =
+    executionStatus?.status === "FILLED"
+      ? executionStatus.orders || []
+      : [];
 
   async function prepareBasket() {
     if (!broker) {
@@ -71,26 +99,64 @@ export default function Trading() {
 
     await queueExecutionOrders();
 
-    await userSetItem(
-      "latestOrderHandoff",
-      JSON.stringify({
-        broker,
-        orders,
-        totalOrders: orders.length,
-        totalValue: orders.reduce(
-          (sum, order) =>
-            sum + Number(order.quantity || 0) * Number(order.price || 0),
-          0
-        ),
-        status: "HANDOFF_READY",
-        savedAt: new Date().toISOString()
-      })
-    );
+    const handoff = {
+      broker,
+      orders,
+      totalOrders: orders.length,
+      totalValue: orders.reduce(
+        (sum, order) =>
+          sum + Number(order.quantity || 0) * Number(order.price || 0),
+        0
+      ),
+      status: "READY_FOR_BROKER",
+      submitted: false,
+      createdAt: new Date().toISOString()
+    };
 
-    Alert.alert(
-      "Order Pack Ready",
-      "Broker-ready orders have been prepared. Use your broker portal to complete execution."
-    );
+    await userSetItem("latestOrderHandoff", JSON.stringify(handoff));
+    setExecutionStatus(handoff);
+
+    Alert.alert("Order Pack Ready", "Orders moved to execution status.");
+  }
+
+  async function submitToBroker() {
+    if (!executionStatus) return;
+
+    const updated = {
+      ...executionStatus,
+      status: "SUBMITTED",
+      submitted: true,
+      submittedAt: new Date().toISOString()
+    };
+
+    await userSetItem("latestOrderHandoff", JSON.stringify(updated));
+    setExecutionStatus(updated);
+  }
+
+  async function acceptByBroker() {
+    if (!executionStatus) return;
+
+    const updated = {
+      ...executionStatus,
+      status: "BROKER_ACCEPTED",
+      brokerAcceptedAt: new Date().toISOString()
+    };
+
+    await userSetItem("latestOrderHandoff", JSON.stringify(updated));
+    setExecutionStatus(updated);
+  }
+
+  async function markFilled() {
+    if (!executionStatus) return;
+
+    const updated = {
+      ...executionStatus,
+      status: "FILLED",
+      filledAt: new Date().toISOString()
+    };
+
+    await userSetItem("latestOrderHandoff", JSON.stringify(updated));
+    setExecutionStatus(updated);
   }
 
   async function saveDepositRequest() {
@@ -106,11 +172,10 @@ export default function Trading() {
     );
 
     setShowDeposit(false);
+    setDepositAmount("");
+    setMpesaNumber("");
 
-    Alert.alert(
-      "Deposit Request Saved",
-      "Deposit request saved for broker follow-up."
-    );
+    Alert.alert("Deposit Request Saved", "Deposit request saved for broker follow-up.");
   }
 
   return (
@@ -127,235 +192,408 @@ export default function Trading() {
       </View>
 
       <Text style={styles.subtitle}>
-        Broker workspace for basket orders, cash, deposits, and order status.
+        Broker workspace for account, orders, market depth, and execution activity.
       </Text>
 
       <ActiveUserBanner />
 
-      {!broker && (
-  <View style={styles.warningCard}>
-    <Text style={styles.warningTitle}>
-      Broker Required
-    </Text>
-
-    <Text style={styles.body}>
-      Connect a broker account before submitting orders.
-    </Text>
-
-    <Pressable
-      style={styles.primary}
-      onPress={() => router.push("/broker-accounts")}
-    >
-      <Text style={styles.primaryText}>
-        Connect Broker
-      </Text>
-    </Pressable>
-  </View>
-)}
-
-      <View style={styles.brokerCard}>
-        <Text style={styles.label}>Trading Account</Text>
-
-        <Text style={styles.brokerName}>
-          {broker?.broker || broker?.name || "No Broker Connected"}
-        </Text>
-
-        <Text style={styles.body}>
-          Client: {broker?.clientNumber || broker?.accountNumber || "Not Linked"}
-        </Text>
-
-        <Pressable
-          style={styles.secondary}
-          onPress={() => router.push("/broker-accounts")}
-        >
-          <Text style={styles.secondaryText}>
-            {broker ? "Manage Broker" : "Connect Broker"}
-          </Text>
-        </Pressable>
+      <View style={styles.tabRow}>
+        {TRADING_TABS.map((item) => (
+          <Pressable
+            key={item}
+            style={[styles.tabButton, tab === item && styles.activeTab]}
+            onPress={() => setTab(item)}
+          >
+            <Text style={tab === item ? styles.activeTabText : styles.tabText}>
+              {item}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
-      <View style={styles.cashCard}>
-        <Metric label="Available Cash" value={`KES ${money(cash)}`} />
-        <Metric label="Portfolio Positions" value={String(portfolio.length)} />
-      </View>
+      {tab === "Account" ? (
+        <>
+          <View style={styles.brokerCard}>
+            <Text style={styles.label}>Trading Account</Text>
 
-      <View style={styles.actionRow}>
-        <Pressable style={styles.actionButton} onPress={() => setShowDeposit(true)}>
-          <Text style={styles.actionText}>Deposit</Text>
-        </Pressable>
+            <Text style={styles.brokerName}>
+              {broker?.broker || broker?.name || "No Broker Connected"}
+            </Text>
 
-        <Pressable
-          style={styles.actionButton}
-          onPress={() => Alert.alert("Withdraw", "Withdrawal workflow will connect to broker instructions.")}
-        >
-          <Text style={styles.actionText}>Withdraw</Text>
-        </Pressable>
+            <Text style={styles.body}>
+              Client: {broker?.clientNumber || broker?.accountNumber || "Not Linked"}
+            </Text>
 
-        <Pressable
-          style={styles.actionButton}
-          onPress={() => Alert.alert("Statement", "Broker statement request saved for future connector.")}
-        >
-          <Text style={styles.actionText}>Statement</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Basket Orders</Text>
-
-        {orders.length === 0 ? (
-          <Text style={styles.body}>
-            No active Coach G basket orders. Create a basket from Coach G first.
-          </Text>
-        ) : (
-          orders.map((order) => (
             <Pressable
-              key={order.id}
-              style={styles.orderRow}
-              onPress={() => {
-                setSide(order.side || "BUY");
-                setSymbol(order.symbol || "");
-                setQuantity(String(order.quantity || 1));
-                setPrice(String(order.price || 0));
-              }}
+              style={styles.secondary}
+              onPress={() => router.push("/broker-accounts")}
             >
-              <View>
-                <Text style={styles.orderSymbol}>
-                  {order.side} {order.symbol}
-                </Text>
-                <Text style={styles.small}>
-                  Qty {order.quantity} @ KES {money(order.price)}
-                </Text>
-              </View>
-
-              <Text style={styles.status}>{order.status}</Text>
-            </Pressable>
-          ))
-        )}
-
-        <Pressable
-          style={[styles.primary, !orders.length && styles.disabledButton]}
-          disabled={!orders.length}
-          onPress={prepareBasket}
-        >
-          <Text style={styles.primaryText}>
-            Prepare Broker Order Pack
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Order Ticket</Text>
-
-        <View style={styles.sideRow}>
-          {["BUY", "SELL"].map((item) => (
-            <Pressable
-              key={item}
-              style={[styles.sideChip, side === item && styles.sideActive]}
-              onPress={() => setSide(item)}
-            >
-              <Text style={side === item ? styles.sideTextActive : styles.sideText}>
-                {item}
+              <Text style={styles.secondaryText}>
+                {broker ? "Manage Broker" : "Connect Broker"}
               </Text>
             </Pressable>
-          ))}
-        </View>
+          </View>
 
-        <Text style={styles.inputLabel}>Symbol</Text>
-        <TextInput
-          value={symbol}
-          onChangeText={(value) => setSymbol(value.toUpperCase())}
-          placeholder="SCOM"
-          placeholderTextColor="#64748b"
-          style={styles.input}
-        />
+          {!broker ? (
+            <View style={styles.warningCard}>
+              <Text style={styles.warningTitle}>Broker Required</Text>
 
-        <Text style={styles.inputLabel}>Quantity</Text>
-        <TextInput
-          value={quantity}
-          onChangeText={setQuantity}
-          keyboardType="numeric"
-          placeholder="Quantity"
-          placeholderTextColor="#64748b"
-          style={styles.input}
-        />
+              <Text style={styles.body}>
+                Connect a broker before preparing or submitting orders.
+              </Text>
 
-        <Text style={styles.inputLabel}>Limit Price</Text>
-        <TextInput
-          value={price}
-          onChangeText={setPrice}
-          keyboardType="numeric"
-          placeholder="Price"
-          placeholderTextColor="#64748b"
-          style={styles.input}
-        />
+              <Pressable
+                style={styles.primary}
+                onPress={() => router.push("/broker-accounts")}
+              >
+                <Text style={styles.primaryText}>Connect Broker</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
-        <View style={styles.estimateBox}>
-          <Text style={styles.label}>Estimated Value</Text>
-          <Text style={styles.estimate}>KES {money(estimate)}</Text>
-        </View>
+          <View style={styles.cashCard}>
+            <Metric label="Available Cash" value={`KES ${money(cash)}`} />
+            <Metric label="Broker Mode" value={broker ? "Linked" : "Missing"} />
+          </View>
 
-        <Pressable
-          style={styles.primary}
-          onPress={() =>
-            Alert.alert(
-              "Order Drafted",
-              `${side} ${quantity} ${symbol} @ KES ${price} prepared.`
-            )
-          }
-        >
-          <Text style={styles.primaryText}>Draft Order</Text>
-        </Pressable>
-      </View>
+          <View style={styles.actionRow}>
+            <Pressable style={styles.actionButton} onPress={() => setShowDeposit(true)}>
+              <Text style={styles.actionText}>Deposit</Text>
+            </Pressable>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Order Book</Text>
-        <Text style={styles.body}>
-          Broker order book will appear here once broker connectivity is enabled.
-        </Text>
+            <Pressable
+              style={styles.actionButton}
+              onPress={() =>
+                Alert.alert(
+                  "Withdraw",
+                  "Withdrawal workflow will connect to broker instructions."
+                )
+              }
+            >
+              <Text style={styles.actionText}>Withdraw</Text>
+            </Pressable>
 
+            <Pressable
+              style={styles.actionButton}
+              onPress={() =>
+                Alert.alert(
+                  "Statement",
+                  "Broker statement request saved for future connector."
+                )
+              }
+            >
+              <Text style={styles.actionText}>Statement</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+
+      {tab === "Orders" ? (
+        <>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Basket Orders</Text>
+
+            {orders.length === 0 ? (
+              <Text style={styles.body}>
+                No active Coach G basket orders. Create a basket from Coach G first.
+              </Text>
+            ) : (
+              orders.map((order) => (
+                <Pressable
+                  key={order.id}
+                  style={styles.orderRow}
+                  onPress={() => {
+                    setSide(order.side || "BUY");
+                    setSymbol(order.symbol || "");
+                    setQuantity(String(order.quantity || 1));
+                    setPrice(String(order.price || 0));
+                  }}
+                >
+                  <View>
+                    <Text style={styles.orderSymbol}>
+                      {order.side} {order.symbol}
+                    </Text>
+
+                    <Text style={styles.small}>
+                      Qty {order.quantity} @ KES {money(order.price)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.status}>{order.status}</Text>
+                </Pressable>
+              ))
+            )}
+
+            <Pressable
+              style={[styles.primary, (!orders.length || !broker) && styles.disabledButton]}
+              disabled={!orders.length || !broker}
+              onPress={prepareBasket}
+            >
+              <Text style={styles.primaryText}>
+                {!broker ? "Connect Broker First" : "Prepare Broker Order Pack"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Execution Status</Text>
+
+            {!executionStatus ? (
+              <Text style={styles.body}>No orders prepared yet.</Text>
+            ) : (
+              <>
+                <Text style={styles.body}>
+                  Current status: {executionStatus.status}
+                </Text>
+
+                <View style={styles.timelineCard}>
+                  {EXECUTION_FLOW.map((step, index) => {
+                    const currentIndex = EXECUTION_FLOW.indexOf(
+                      executionStatus.status
+                    );
+
+                    const completed = index < currentIndex;
+                    const active = index === currentIndex;
+
+                    return (
+                      <View key={step} style={styles.timelineRow}>
+                        <Text style={styles.orderSymbol}>{step}</Text>
+
+                        <Text
+                          style={
+                            active
+                              ? styles.green
+                              : completed
+                              ? styles.completed
+                              : styles.timelinePending
+                          }
+                        >
+                          {active ? "ACTIVE" : completed ? "DONE" : "PENDING"}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.orderRow}>
+                  <Text style={styles.orderSymbol}>Orders</Text>
+                  <Text style={styles.status}>{executionStatus.totalOrders}</Text>
+                </View>
+
+                <View style={styles.orderRow}>
+                  <Text style={styles.orderSymbol}>Value</Text>
+                  <Text style={styles.status}>
+                    KES {money(executionStatus.totalValue)}
+                  </Text>
+                </View>
+
+                {executionStatus.status === "READY_FOR_BROKER" ? (
+                  <Pressable style={styles.primary} onPress={submitToBroker}>
+                    <Text style={styles.primaryText}>Submit To Broker</Text>
+                  </Pressable>
+                ) : null}
+
+                {executionStatus.status === "SUBMITTED" ? (
+                  <Pressable style={styles.secondary} onPress={acceptByBroker}>
+                    <Text style={styles.secondaryText}>
+                      Simulate Broker Acceptance
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {executionStatus.status === "BROKER_ACCEPTED" ? (
+                  <Pressable style={styles.primary} onPress={markFilled}>
+                    <Text style={styles.primaryText}>Mark Filled</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            )}
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Order Ticket</Text>
+
+            <View style={styles.sideRow}>
+              {["BUY", "SELL"].map((item) => (
+                <Pressable
+                  key={item}
+                  style={[styles.sideChip, side === item && styles.sideActive]}
+                  onPress={() => setSide(item)}
+                >
+                  <Text style={side === item ? styles.sideTextActive : styles.sideText}>
+                    {item}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Symbol</Text>
+            <TextInput
+              value={symbol}
+              onChangeText={(value) => setSymbol(value.toUpperCase())}
+              placeholder="SCOM"
+              placeholderTextColor="#64748b"
+              style={styles.input}
+            />
+
+            <Text style={styles.inputLabel}>Quantity</Text>
+            <TextInput
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+              placeholder="Quantity"
+              placeholderTextColor="#64748b"
+              style={styles.input}
+            />
+
+            <Text style={styles.inputLabel}>Limit Price</Text>
+            <TextInput
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+              placeholder="Price"
+              placeholderTextColor="#64748b"
+              style={styles.input}
+            />
+
+            <View style={styles.estimateBox}>
+              <Text style={styles.label}>Estimated Value</Text>
+              <Text style={styles.estimate}>KES {money(estimate)}</Text>
+            </View>
+
+            <Pressable
+              style={[styles.primary, !broker && styles.disabledButton]}
+              disabled={!broker}
+              onPress={() =>
+                Alert.alert(
+                  "Order Drafted",
+                  `${side} ${quantity} ${symbol} @ KES ${price} prepared.`
+                )
+              }
+            >
+              <Text style={styles.primaryText}>
+                {broker ? "Draft Order" : "Connect Broker First"}
+              </Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+
+      {tab === "Depth" ? (
         <View style={styles.card}>
-  <Text style={styles.cardTitle}>Holdings</Text>
+          <Text style={styles.cardTitle}>Market Depth</Text>
 
-  {portfolio.slice(0, 10).map((holding) => (
-    <View
-      key={holding.symbol}
-      style={styles.orderRow}
-    >
-      <View>
-        <Text style={styles.orderSymbol}>
-          {holding.symbol}
-        </Text>
+          <Text style={styles.body}>{depth.symbol} live depth preview.</Text>
 
-        <Text style={styles.small}>
-          Qty {holding.quantity}
-        </Text>
-      </View>
+          <View style={styles.depthSummary}>
+            <Metric label="Best Bid" value={`KES ${money(depth.bestBid)}`} />
+            <Metric label="Best Ask" value={`KES ${money(depth.bestAsk)}`} />
+            <Metric label="Spread" value={`KES ${money(depth.spread)}`} />
+          </View>
 
-      <Text style={styles.status}>
-        KES {money(holding.marketValue)}
-      </Text>
-    </View>
-  ))}
-</View> 
+          <View style={styles.bookHeader}>
+            <Text style={[styles.bookHeaderText, { textAlign: "left" }]}>
+              Bid Qty
+            </Text>
 
-        <View style={styles.bookRow}>
-          <Text style={styles.bookText}>BID</Text>
-          <Text style={styles.bookText}>Price</Text>
-          <Text style={styles.bookText}>Volume</Text>
+            <Text style={[styles.bookHeaderText, { textAlign: "center" }]}>
+              Price
+            </Text>
+
+            <Text style={[styles.bookHeaderText, { textAlign: "right" }]}>
+              Ask Qty
+            </Text>
+          </View>
+
+          {depth.bids.map((bid, index) => {
+            const ask = depth.asks[index];
+
+            return (
+              <View key={`${bid.price}-${index}`} style={styles.bookRow}>
+                <View style={styles.depthSide}>
+                  <View
+                    style={[
+                      styles.bidDepthBar,
+                      {
+                        width: `${Math.min((bid.qty / 120000) * 100, 100)}%`
+                      }
+                    ]}
+                  />
+
+                  <Text style={styles.bidText}>{bid.qty.toLocaleString()}</Text>
+                </View>
+
+                <Text style={styles.bookValue}>KES {money(bid.price)}</Text>
+
+                <View style={styles.depthSide}>
+                  <View
+                    style={[
+                      styles.askDepthBar,
+                      {
+                        width: `${Math.min(((ask?.qty || 0) / 120000) * 100, 100)}%`
+                      }
+                    ]}
+                  />
+
+                  <Text style={styles.askText}>
+                    {ask?.qty?.toLocaleString() || "--"}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
         </View>
+      ) : null}
 
-        <View style={styles.bookRow}>
-          <Text style={styles.green}>BUY</Text>
-          <Text style={styles.body}>--</Text>
-          <Text style={styles.body}>--</Text>
-        </View>
+      {tab === "Activity" ? (
+        <>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Open Orders</Text>
 
-        <View style={styles.bookRow}>
-          <Text style={styles.red}>SELL</Text>
-          <Text style={styles.body}>--</Text>
-          <Text style={styles.body}>--</Text>
-        </View>
-      </View>
+            {liveOpenOrders.length === 0 ? (
+              <Text style={styles.body}>No open orders.</Text>
+            ) : (
+              liveOpenOrders.map((order) => (
+                <View key={order.id} style={styles.orderRow}>
+                  <View>
+                    <Text style={styles.orderSymbol}>
+                      {order.side} {order.symbol}
+                    </Text>
+
+                    <Text style={styles.small}>
+                      Qty {order.quantity} @ KES {money(order.price)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.status}>{executionStatus.status}</Text>
+                </View>
+              ))
+            )}
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Recent Executions</Text>
+
+            {recentExecutions.length === 0 ? (
+              <Text style={styles.body}>No executions yet.</Text>
+            ) : (
+              recentExecutions.map((order) => (
+                <View key={order.id} style={styles.orderRow}>
+                  <View>
+                    <Text style={styles.orderSymbol}>FILLED {order.symbol}</Text>
+
+                    <Text style={styles.small}>
+                      Qty {order.quantity} @ KES {money(order.price)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.green}>FILLED</Text>
+                </View>
+              ))
+            )}
+          </View>
+        </>
+      ) : null}
 
       <DepositModal
         visible={showDeposit}
@@ -460,6 +698,21 @@ const styles = StyleSheet.create({
     borderRadius: 14
   },
   dashboardButtonText: { color: "#67e8f9", fontWeight: "900" },
+  tabRow: {
+    marginTop: 20,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  tabButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: "#1e293b"
+  },
+  activeTab: { backgroundColor: "#9333ea" },
+  tabText: { color: "#94a3b8", fontWeight: "900" },
+  activeTabText: { color: "white", fontWeight: "900" },
   brokerCard: {
     marginTop: 18,
     backgroundColor: "rgba(6,182,212,.10)",
@@ -469,6 +722,15 @@ const styles = StyleSheet.create({
     padding: 18
   },
   brokerName: { color: "white", fontSize: 24, fontWeight: "900", marginTop: 6 },
+  warningCard: {
+    marginTop: 16,
+    backgroundColor: "rgba(251,191,36,.10)",
+    borderColor: "rgba(251,191,36,.35)",
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 16
+  },
+  warningTitle: { color: "#fbbf24", fontWeight: "900", fontSize: 18 },
   label: { color: "#94a3b8", fontSize: 12 },
   body: { color: "#cbd5e1", marginTop: 8, lineHeight: 21 },
   cashCard: {
@@ -489,16 +751,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14
   },
-  metricValue: {
-    color: "white",
-    fontWeight: "900",
-    marginTop: 6
-  },
-  actionRow: {
-    marginTop: 14,
-    flexDirection: "row",
-    gap: 10
-  },
+  metricValue: { color: "white", fontWeight: "900", marginTop: 6 },
+  actionRow: { marginTop: 14, flexDirection: "row", gap: 10 },
   actionButton: {
     flex: 1,
     backgroundColor: "#1e293b",
@@ -531,11 +785,22 @@ const styles = StyleSheet.create({
   orderSymbol: { color: "white", fontWeight: "900", fontSize: 16 },
   small: { color: "#94a3b8", marginTop: 4, fontSize: 12 },
   status: { color: "#fbbf24", fontWeight: "900", fontSize: 12 },
-  sideRow: {
-    marginTop: 16,
-    flexDirection: "row",
-    gap: 10
+  timelineCard: {
+    marginTop: 14,
+    backgroundColor: "#020617",
+    borderRadius: 16,
+    padding: 12
   },
+  timelineRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomColor: "#1e293b",
+    borderBottomWidth: 1
+  },
+  timelinePending: { color: "#64748b", fontWeight: "900" },
+  completed: { color: "#67e8f9", fontWeight: "900" },
+  sideRow: { marginTop: 16, flexDirection: "row", gap: 10 },
   sideChip: {
     flex: 1,
     backgroundColor: "#020617",
@@ -544,20 +809,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14
   },
-  sideActive: {
-    backgroundColor: "#9333ea",
-    borderColor: "#c084fc"
-  },
-  sideText: {
-    color: "#94a3b8",
-    textAlign: "center",
-    fontWeight: "900"
-  },
-  sideTextActive: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "900"
-  },
+  sideActive: { backgroundColor: "#9333ea", borderColor: "#c084fc" },
+  sideText: { color: "#94a3b8", textAlign: "center", fontWeight: "900" },
+  sideTextActive: { color: "white", textAlign: "center", fontWeight: "900" },
   inputLabel: {
     color: "#94a3b8",
     marginTop: 14,
@@ -580,21 +834,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14
   },
-  estimate: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 5
-  },
-  bookRow: {
-    marginTop: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderBottomColor: "#1e293b",
-    borderBottomWidth: 1,
-    paddingBottom: 10
-  },
-  bookText: { color: "#94a3b8", fontWeight: "900" },
+  estimate: { color: "white", fontSize: 20, fontWeight: "900", marginTop: 5 },
   green: { color: "#86efac", fontWeight: "900" },
   red: { color: "#fca5a5", fontWeight: "900" },
   primary: {
@@ -625,21 +865,70 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20
   },
-
-warningCard: {
-  marginTop: 16,
-  backgroundColor: "rgba(251,191,36,.10)",
-  borderColor: "rgba(251,191,36,.35)",
-  borderWidth: 1,
-  borderRadius: 20,
-  padding: 16
-},
-
-warningTitle: {
-  color: "#fbbf24",
-  fontWeight: "900",
-  fontSize: 18
-},
-
-  modalTitle: { color: "white", fontSize: 26, fontWeight: "900" }
+  modalTitle: { color: "white", fontSize: 26, fontWeight: "900" },
+  depthSummary: {
+    marginTop: 14,
+    flexDirection: "row",
+    gap: 10
+  },
+  bookHeader: {
+    marginTop: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderBottomColor: "#334155",
+    borderBottomWidth: 1,
+    paddingBottom: 10
+  },
+  bookHeaderText: {
+    flex: 1,
+    color: "#94a3b8",
+    fontWeight: "900"
+  },
+  bookRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomColor: "#1e293b",
+    borderBottomWidth: 1,
+    minHeight: 44,
+    paddingVertical: 4
+  },
+  depthSide: {
+    flex: 1,
+    height: 32,
+    justifyContent: "center",
+    position: "relative"
+  },
+  bidDepthBar: {
+    position: "absolute",
+    left: 0,
+    top: 6,
+    bottom: 6,
+    backgroundColor: "rgba(34,197,94,.18)",
+    borderRadius: 4
+  },
+  askDepthBar: {
+    position: "absolute",
+    right: 0,
+    top: 6,
+    bottom: 6,
+    backgroundColor: "rgba(239,68,68,.18)",
+    borderRadius: 4
+  },
+  bidText: {
+    flex: 1,
+    color: "#86efac",
+    fontWeight: "900"
+  },
+  askText: {
+    flex: 1,
+    color: "#fca5a5",
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  bookValue: {
+    flex: 1,
+    color: "white",
+    fontWeight: "900",
+    textAlign: "center"
+  }
 });
