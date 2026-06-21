@@ -89,6 +89,7 @@ import positionsRouter from "./routes/positions.routes.js";
 import pnlRouter from "./routes/pnl.routes.js";
 import rebalancerRouter from "./routes/rebalancer.routes.js";
 import aiRebalanceRouter from "./routes/aiRebalance.routes.js";
+import portfolioImportRouter from "./routes/portfolioImport.routes.js";
 
 /* Broker / Coach G routes */
 import { brokerRouter } from "./routes/brokerRoutes.js";
@@ -276,6 +277,23 @@ app.use("/time-sales", timeSalesRouter);
 app.use("/fix", fixRouter);
 
 /* Portfolio */
+app.get("/portfolio/unified", async (req, res) => {
+  try {
+    const { getUnifiedPortfolio } = await import(
+      "./services/portfolio/unifiedPortfolio.service.js"
+    );
+
+    const portfolio = await getUnifiedPortfolio();
+
+    res.set("Cache-Control", "no-store");
+    return res.json(portfolio);
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: error.message
+    });
+  }
+});
 app.use("/portfolio", unifiedPortfolioRouter);
 app.use("/portfolio", portfolioAnalyticsRoutes);
 app.use("/portfolio/sectors", sectorAllocationRouter);
@@ -288,6 +306,7 @@ app.use("/positions", positionsRouter);
 app.use("/pnl", pnlRouter);
 app.use("/rebalancer", rebalancerRouter);
 app.use("/ai-rebalance", aiRebalanceRouter);
+app.use("/portfolio", portfolioImportRouter);
 
 /* Broker */
 app.use("/brokers", brokerRouter);

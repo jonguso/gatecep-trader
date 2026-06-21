@@ -55,13 +55,20 @@ export default function ActiveUserBanner() {
       </View>
 
       <View style={styles.right}>
-        <Text style={styles.detail}>
-          {profile?.riskTolerance || profile?.goal || "Profile pending"}
-        </Text>
-        <Text style={styles.detail}>
-          {broker?.broker || broker?.name || "No broker"}
-        </Text>
-      </View>
+  <Text style={styles.detail}>
+    {
+      profile?.risk ||
+      profile?.riskTolerance ||
+      profile?.riskProfile ||
+      profile?.goal ||
+      "Profile pending"
+    }
+  </Text>
+
+  <Text style={styles.detail}>
+    {broker?.broker || broker?.name || "No broker"}
+  </Text>
+</View>
     </Pressable>
   );
 }

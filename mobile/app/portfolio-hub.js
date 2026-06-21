@@ -11,7 +11,7 @@ import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
 
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
-import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
 
 import {
   PORTFOLIO_TABS,
@@ -40,10 +40,16 @@ export default function PortfolioHub() {
   );
 
   async function load() {
-    const holdings = (await loadPortfolio({ revalue: true })) || [];
-    setPortfolio(holdings);
+    const portfolio = await loadUnifiedPortfolio();
+const holdings = portfolio.holdings || [];
+    
   }
 
+async function load() {
+  const result = await loadUnifiedPortfolio();
+
+  setPortfolio(result.holdings || []);
+}
   const hub = useMemo(() => buildPortfolioHub(portfolio), [portfolio]);
 
   const sectorRows = useMemo(() => {

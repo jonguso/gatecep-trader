@@ -10,7 +10,7 @@ import {
   View
 } from "react-native";
 import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
-import { loadPortfolio as loadSavedPortfolio } from "../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   userGetItem,
@@ -48,36 +48,26 @@ export default function PortfolioAnalysis() {
     loadPortfolio();
   }, []);
 
-  async function loadPortfolio() {
-    try {
-      setLoading(true);
+async function loadPortfolio() {
+  try {
+    setLoading(true);
 
-      const brokerRaw = await userGetItem("BrokerProfile");
-      const manualRaw = await userGetItem("ManualPortfolio");
-      const uploadRaw = await userGetItem("LatestUpload");
+    const portfolio = await loadUnifiedPortfolio();
 
-      const brokerData = brokerRaw ? JSON.parse(brokerRaw) : null;
-      const manualData = manualRaw ? JSON.parse(manualRaw) : [];
-      const uploadData = uploadRaw ? JSON.parse(uploadRaw) : null;
+    setHeatmap(portfolio.holdings || []);
 
-      setBrokerProfile(brokerData);
+    const brokerRaw =
+      await userGetItem("defaultBrokerProfile");
 
-      const parsedUpload =
-        uploadData?.valuation?.parsedHoldings ||
-        uploadData?.parsedHoldings ||
-        [];
-
-      if (Array.isArray(manualData) && manualData.length > 0) {
-        setHeatmap(manualData);
-      } else if (Array.isArray(parsedUpload) && parsedUpload.length > 0) {
-        setHeatmap(parsedUpload);
-      } else {
-        setHeatmap([]);
-      }
-    } finally {
-      setLoading(false);
-    }
+    setBrokerProfile(
+      brokerRaw
+        ? JSON.parse(brokerRaw)
+        : null
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   const sectorRows = useMemo(() => {
     const grouped = {};

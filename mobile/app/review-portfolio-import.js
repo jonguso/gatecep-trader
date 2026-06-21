@@ -14,6 +14,7 @@ import {
   savePortfolio,
   normalizePortfolioHolding
 } from "../src/portfolio/portfolioStore";
+import { uploadConfirmedPortfolio } from "../src/portfolio/uploadPortfolioApi";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   userGetItem,
@@ -186,6 +187,9 @@ export default function ReviewPortfolioImport() {
     }
 
     await savePortfolio(portfolio);
+    await uploadConfirmedPortfolio(portfolio);
+
+router.replace("/(tabs)/dashboard");
 
     await userSetItem("statementUploaded", "true");
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");

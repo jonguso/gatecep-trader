@@ -12,8 +12,9 @@ import { router, useFocusEffect } from "expo-router";
 import ActiveUserBanner from "../../src/components/ActiveUserBanner";
 import { getCurrentSession } from "../../src/auth/authStore";
 import { userGetItem } from "../../src/auth/userStorage";
-import { loadPortfolio } from "../../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../../src/portfolio/unifiedPortfolioApi";
 import { APP_VERSION } from "../../src/version/versionRegistry";
+
 import {
   INDEX_ROWS,
   MARKET_ROWS
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [holdings, setHoldings] = useState([]);
   const [cash, setCash] = useState(0);
   const [lastUpdated, setLastUpdated] = useState("");
+  const [portfolioSource, setPortfolioSource] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -33,28 +35,41 @@ export default function Dashboard() {
   );
 
   async function load() {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const currentSession = await getCurrentSession();
-    const portfolio = (await loadPortfolio({ revalue: true })) || [];
-    const cashRaw = await userGetItem("availableCash");
+      const currentSession = await getCurrentSession();
+      const portfolio = await loadUnifiedPortfolio();
+      const cashRaw = await userGetItem("availableCash");
 
-    setSession(currentSession);
-    setHoldings(portfolio);
-    setCash(Number(cashRaw || 0));
-    setLastUpdated(new Date().toLocaleString());
-    setLoading(false);
+      setSession(currentSession);
+      setHoldings(portfolio?.holdings || []);
+      setCash(Number(cashRaw || 0));
+      setPortfolioSource(portfolio?.priceSource || portfolio?.source || "");
+      setLastUpdated(new Date().toLocaleString());
+    } catch (error) {
+      console.log("Dashboard load error:", error.message);
+      setHoldings([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const investedValue = useMemo(() => {
-    return holdings.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.quantity || 0) *
-          Number(item.averagePrice || item.averageCost || item.costPrice || 0),
-      0
+  return holdings.reduce((sum, item) => {
+    const directInvested = Number(item.investedValue || item.costValue || 0);
+
+    if (directInvested > 0) {
+      return sum + directInvested;
+    }
+
+    return (
+      sum +
+      Number(item.quantity || 0) *
+        Number(item.averagePrice || item.averageCost || item.avgPrice || 0)
     );
-  }, [holdings]);
+  }, 0);
+}, [holdings]);
 
   const currentValue = useMemo(() => {
     return holdings.reduce(
@@ -64,6 +79,7 @@ export default function Dashboard() {
   }, [holdings]);
 
   const netGainLoss = currentValue - investedValue;
+
   const gainLossPct =
     investedValue > 0 ? (netGainLoss / investedValue) * 100 : 0;
 
@@ -80,7 +96,8 @@ export default function Dashboard() {
 
   const watchlistCount = 8;
   const goalTarget = 1000000;
-  const goalProgress = goalTarget > 0 ? (currentValue / goalTarget) * 100 : 0;
+  const goalProgress =
+    goalTarget > 0 ? (currentValue / goalTarget) * 100 : 0;
 
   if (loading) {
     return (
@@ -107,10 +124,16 @@ export default function Dashboard() {
 
       <Text style={styles.subtitle}>GateCEP investor command center</Text>
       <Text style={styles.small}>Version {APP_VERSION}</Text>
+
       <Text style={styles.userLine}>
         Logged in as {session?.username || session?.userId || "Guest"}
       </Text>
+
       <Text style={styles.timestamp}>Updated {lastUpdated}</Text>
+
+      {portfolioSource ? (
+        <Text style={styles.sourceText}>Source: {portfolioSource}</Text>
+      ) : null}
 
       <ActiveUserBanner />
 
@@ -148,8 +171,13 @@ export default function Dashboard() {
 
             <View style={{ alignItems: "flex-end" }}>
               <Text style={styles.value}>{item.value}</Text>
+
               <Text
-                style={Number(item.changePct || 0) >= 0 ? styles.green : styles.red}
+                style={
+                  Number(item.changePct || 0) >= 0
+                    ? styles.green
+                    : styles.red
+                }
               >
                 {Number(item.changePct || 0) >= 0 ? "+" : ""}
                 {Number(item.changePct || 0).toFixed(2)}%
@@ -166,9 +194,12 @@ export default function Dashboard() {
           {topMovers.map((item) => (
             <View key={item.symbol} style={styles.moverChip}>
               <Text style={styles.symbol}>{item.symbol}</Text>
+
               <Text
                 style={
-                  Number(item.changePct || 0) >= 0 ? styles.green : styles.red
+                  Number(item.changePct || 0) >= 0
+                    ? styles.green
+                    : styles.red
                 }
               >
                 {Number(item.changePct || 0) >= 0 ? "+" : ""}
@@ -247,11 +278,11 @@ export default function Dashboard() {
         <Text style={styles.cardTitle}>Recent Activity</Text>
 
         {[
-          "BUY SCOM prepared",
-          "Broker profile active",
           "Portfolio valuation updated",
+          "Broker profile active",
+          "Coach G analysis refreshed",
           "Market alert triggered - EABL",
-          "Coach G analysis refreshed"
+          "Order workspace ready"
         ].map((item) => (
           <View key={item} style={styles.activityRow}>
             <Text style={styles.body}>• {item}</Text>
@@ -322,6 +353,12 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   timestamp: { color: "#64748b", marginTop: 6, fontSize: 12 },
+  sourceText: {
+    color: "#c084fc",
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "900"
+  },
   heroCard: {
     marginTop: 18,
     backgroundColor: "rgba(147,51,234,.16)",

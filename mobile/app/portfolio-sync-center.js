@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { userGetItem } from "../src/auth/userStorage";
-import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 import { buildSyncStatus } from "../src/portfolio/syncStatus";
 
@@ -20,6 +20,7 @@ export default function PortfolioSyncCenter() {
   const [cashUploaded, setCashUploaded] = useState(false);
   const [transactionsUploaded, setTransactionsUploaded] = useState(false);
   const [syncStatus, setSyncStatus] = useState(null);
+  const [portfolioSource, setPortfolioSource] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -28,7 +29,8 @@ export default function PortfolioSyncCenter() {
   );
 
   async function load() {
-    const holdings = await loadPortfolio({ revalue: true });
+    const portfolio = await loadUnifiedPortfolio();
+    const holdings = portfolio?.holdings || [];
     const cashRaw = await userGetItem("availableCash");
     const portfolioUploadedRaw = await userGetItem("statementUploaded");
     const cashUploadedRaw = await userGetItem("cashStatementUploaded");
@@ -48,6 +50,7 @@ export default function PortfolioSyncCenter() {
     setPortfolioUploaded(portfolioUploadedRaw === "true");
     setCashUploaded(cashUploadedRaw === "true");
     setTransactionsUploaded(transactionsUploadedRaw === "true");
+    setPortfolioSource(portfolio?.priceSource || portfolio?.source || "");
   }
 
   return (
@@ -70,7 +73,11 @@ export default function PortfolioSyncCenter() {
 
       <ActiveUserBanner />
 
-      <View style={styles.summary}>
+      {portfolioSource ? (
+  <Text style={styles.syncNote}>Portfolio source: {portfolioSource}</Text>
+) : null}
+
+<View style={styles.summary}>
         <Metric label="Holdings" value={String(holdingsCount)} />
         <Metric label="Portfolio" value={`KES ${money(portfolioValue)}`} />
         <Metric label="Cash" value={`KES ${money(cash)}`} />

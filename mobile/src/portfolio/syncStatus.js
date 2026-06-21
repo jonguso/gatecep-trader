@@ -1,8 +1,9 @@
 import { userGetItem, userSetItem } from "../auth/userStorage";
-import { loadPortfolio } from "./portfolioStore";
+import { loadUnifiedPortfolio } from "./unifiedPortfolioApi";
 
 export async function buildSyncStatus() {
-  const holdings = await loadPortfolio({ revalue: true });
+  const portfolio = await loadUnifiedPortfolio();
+  const holdings = portfolio?.holdings || [];
 
   const cashRaw = await userGetItem("availableCash");
   const defaultBrokerRaw = await userGetItem("defaultBrokerProfile");
@@ -38,25 +39,35 @@ export async function buildSyncStatus() {
     brokerProfile?.provider ||
     null;
 
-  const brokerConnected =
-    !!brokerName && brokerSkippedRaw !== "true";
+  const brokerConnected = !!brokerName && brokerSkippedRaw !== "true";
+
+  const portfolioValue = Number(
+    portfolio?.totalMarketValue ||
+      holdings.reduce(
+        (sum, h) => sum + Number(h.marketValue || h.value || 0),
+        0
+      )
+  );
 
   const status = {
     broker: brokerName || "No broker",
     brokerConnected,
+
     holdingsCount: holdings.length,
     availableCash: Number(cashRaw || 0),
     transactionCount: transactions.length,
-    portfolioValue: holdings.reduce(
-      (sum, h) => sum + Number(h.marketValue || h.value || 0),
-      0
-    ),
+
+    portfolioValue,
+    portfolioSource: portfolio?.priceSource || portfolio?.source || "",
+
     portfolioUploaded: portfolioUploaded === "true",
     cashUploaded: cashUploaded === "true",
     transactionsUploaded: transactionsUploaded === "true",
+
     lastPortfolioSync: statementSummary?.uploadedAt || null,
     lastCashSync: statementSummary?.uploadedAt || null,
     lastTransactionSync: txSummary?.uploadedAt || null,
+
     updatedAt: new Date().toISOString()
   };
 

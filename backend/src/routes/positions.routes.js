@@ -7,17 +7,21 @@ import {
 
 const router = express.Router();
 
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
+  const positions = await getPositions();
+
   res.json({
     ok: true,
-    positions: getPositions()
+    positions
   });
 });
 
-router.get("/:symbol", (req, res) => {
+router.get("/:symbol", async (req, res) => {
+  const position = await getPositionBySymbol(req.params.symbol);
+
   res.json({
     ok: true,
-    positions: getPositionBySymbol(req.params.symbol)
+    position
   });
 });
 

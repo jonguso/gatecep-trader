@@ -10,10 +10,9 @@ router.get("/unified", async (req, res) => {
   try {
     const portfolio = await getUnifiedPortfolio();
 
-    return res.json({
-      ok: true,
-      portfolio
-    });
+    res.set("Cache-Control", "no-store");
+
+    return res.json(portfolio);
   } catch (error) {
     return res.status(500).json({
       ok: false,

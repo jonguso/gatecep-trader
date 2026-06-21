@@ -14,7 +14,7 @@ import {
 import {
   userGetItem
 } from "../src/auth/userStorage";
-import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 
 export default function MyProfile() {
@@ -35,7 +35,8 @@ export default function MyProfile() {
     const profileRaw = await userGetItem("investorProfile");
     const brokerRaw = await userGetItem("brokerProfile");
     const cashRaw = await userGetItem("availableCash");
-    const holdings = await loadPortfolio({ revalue: true });
+    const portfolio = await loadUnifiedPortfolio();
+    const holdings = portfolio.holdings || [];
 
     setSession(currentSession);
     setProfile(profileRaw ? JSON.parse(profileRaw) : null);
@@ -83,9 +84,26 @@ export default function MyProfile() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Investor Profile</Text>
 
+        <Pressable
+  style={styles.primary}
+  onPress={() => router.push("/investor-profile-edit")}
+>
+  <Text style={styles.primaryText}>
+    Edit Investor Profile
+  </Text>
+</Pressable>
+
         <Info label="Name" value={profile?.name || profile?.fullName || "Not set"} />
         <Info label="Goal" value={profile?.goal || "Not set"} />
-        <Info label="Risk" value={profile?.riskTolerance || "Not set"} />
+        <Info
+  label="Risk"
+  value={
+    profile?.risk ||
+    profile?.riskTolerance ||
+    profile?.riskProfile ||
+    "Not set"
+  }
+/>
         <Info label="Experience" value={profile?.experience || "Not set"} />
       </View>
 
@@ -240,5 +258,17 @@ const styles = StyleSheet.create({
     color: "#fca5a5",
     textAlign: "center",
     fontWeight: "900"
-  }
+  },
+primary: {
+  marginTop: 18,
+  backgroundColor: "#9333ea",
+  padding: 16,
+  borderRadius: 16
+},
+
+primaryText: {
+  color: "white",
+  fontWeight: "900",
+  textAlign: "center"
+}
 });

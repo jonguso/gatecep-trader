@@ -8,7 +8,7 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
 
 export default function HoldingDetails() {
   const [holdings, setHoldings] = useState([]);
@@ -23,8 +23,9 @@ export default function HoldingDetails() {
 
   async function load() {
     setLoading(true);
-    const portfolio = await loadPortfolio({ revalue: true });
-    setHoldings(portfolio);
+   const portfolio = await loadUnifiedPortfolio();
+
+    setHoldings(portfolio.holdings || []);
     setLoading(false);
   }
 

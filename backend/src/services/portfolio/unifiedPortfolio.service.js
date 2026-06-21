@@ -1,55 +1,131 @@
-import { getPositions } from "../positions/position.service.js";
+import { getBrokerMirror } from "../../repositories/brokerMirror.repository.js";
 import { marketDataGateway } from "../marketData/MarketDataGateway.js";
-import {
-  getMarketMetadata
-} from "../market/marketMetadata.service.js";
+import { getMarketMetadata } from "../market/marketMetadata.service.js";
 
-export async function getUnifiedPortfolio() {
-  const positions = await getPositions();
+function cleanNumber(value) {
+  const cleaned = String(value ?? 0)
+    .replaceAll(",", "")
+    .replaceAll("'", "")
+    .replace(/KES/gi, "")
+    .trim();
+
+  const number = Number(cleaned);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function normalizeSymbol(value) {
+  return String(value || "").toUpperCase().trim();
+}
+
+function isTrustedMarketFeed(prices) {
+  const source = String(
+    prices?.source || prices?.provider || prices?.feedType || ""
+  ).toUpperCase();
+
+  if (!source) return false;
+
+  return ![
+    "STATIC",
+    "STATIC_SEED",
+    "DEMO",
+    "DEMO_FEED",
+    "SIMULATED",
+    "MOCK"
+  ].includes(source);
+}
+
+export async function getUnifiedPortfolio(options = {}) {
+  const broker = options.broker || "AIB";
+
+  const valuationRows = getBrokerMirror(broker, "valuation");
+  const holdingRows = getBrokerMirror(broker, "holdings");
+
+  const sourceRows =
+    valuationRows.length > 0 ? valuationRows : holdingRows;
+
+  const source =
+    valuationRows.length > 0 ? "BROKER_VALUATION" : "BROKER_HOLDINGS";
 
   const prices = await marketDataGateway.getPrices();
-  
-const priceMap = new Map();
+  const trustedLiveFeed = isTrustedMarketFeed(prices);
+
+  const priceMap = new Map();
 
   for (const item of prices.data || []) {
-    priceMap.set(item.symbol, Number(item.price || item.lastPrice || 0));
+    priceMap.set(
+      normalizeSymbol(item.symbol),
+      Number(item.price || item.lastPrice || 0)
+    );
   }
 
-  const holdings = positions.map((position) => {
-  const metadata = getMarketMetadata(position.symbol);
-    const marketPrice =
-      priceMap.get(position.symbol) || position.averageCost || 0;
+  const holdings = sourceRows
+    .map((row) => {
+      const symbol = normalizeSymbol(row.symbol);
+      if (!symbol) return null;
 
-    const marketValue =
-      Number(position.quantity || 0) * marketPrice;
+      const metadata = getMarketMetadata(symbol);
 
-    const costValue =
-      Number(position.quantity || 0) * Number(position.averageCost || 0);
+      const quantity = cleanNumber(row.quantity);
 
-    const unrealizedPnL =
-      Number((marketValue - costValue).toFixed(2));
+      const averageCost = cleanNumber(
+        row.averageCost || row.averagePrice || row.avgPrice || row.costPrice
+      );
 
-    const unrealizedPnLPercent =
-      costValue > 0
-        ? Number(((unrealizedPnL / costValue) * 100).toFixed(2))
-        : 0;
-    
+      const uploadedMarketPrice = cleanNumber(
+        row.marketPrice || row.price || row.lastPrice
+      );
 
-   return {
-  broker: position.broker,
-  symbol: position.symbol,
-  name: metadata.name,
-  sector: metadata.sector,
-  quantity: position.quantity,
-  averageCost: position.averageCost,
-  marketPrice,
-  marketValue,
-  unrealizedPnL,
-  unrealizedPnLPercent,
-  realizedPnL: position.realizedPnL,
-  updatedAt: position.updatedAt
-};
-  });
+      const liveMarketPrice = cleanNumber(priceMap.get(symbol));
+
+      const marketPrice =
+        trustedLiveFeed && liveMarketPrice > 0
+          ? liveMarketPrice
+          : uploadedMarketPrice > 0
+          ? uploadedMarketPrice
+          : averageCost;
+
+      const marketValue = Number((quantity * marketPrice).toFixed(2));
+      const costValue = Number((quantity * averageCost).toFixed(2));
+      const unrealizedPnL = Number((marketValue - costValue).toFixed(2));
+
+      const unrealizedPnLPercent =
+        costValue > 0
+          ? Number(((unrealizedPnL / costValue) * 100).toFixed(2))
+          : 0;
+
+      return {
+        broker: row.broker || broker,
+        clientNumber: row.clientNumber || "",
+        cdsNumber: row.cdsNumber || "",
+        symbol,
+        name: row.name || metadata.name || symbol,
+        sector: row.sector || metadata.sector || "Unknown",
+        quantity,
+        averageCost,
+        averagePrice: averageCost,
+        marketPrice,
+        price: marketPrice,
+        lastPrice: marketPrice,
+        marketValue,
+        value: marketValue,
+        costValue,
+        investedValue: costValue,
+        unrealizedPnL,
+        profitLoss: unrealizedPnL,
+        unrealizedPnLPercent,
+        profitLossPct: unrealizedPnLPercent,
+        realizedPnL: 0,
+        hasLivePrice: trustedLiveFeed && liveMarketPrice > 0,
+        priceSource:
+          trustedLiveFeed && liveMarketPrice > 0
+            ? "LIVE_MARKET"
+            : uploadedMarketPrice > 0
+            ? "BROKER_VALUATION"
+            : "AVERAGE_COST_FALLBACK",
+        updatedAt: row.importedAt || row.uploadedAt || new Date().toISOString()
+      };
+    })
+    .filter(Boolean);
 
   const brokersMap = new Map();
 
@@ -71,13 +147,12 @@ const priceMap = new Map();
     brokersMap.set(holding.broker, current);
   }
 
-  const brokers = Array.from(brokersMap.values()).map((broker) => ({
-    ...broker,
-    marketValue: Number(broker.marketValue.toFixed(2)),
-    unrealizedPnL: Number(broker.unrealizedPnL.toFixed(2)),
-    realizedPnL: Number(broker.realizedPnL.toFixed(2))
+  const brokers = Array.from(brokersMap.values()).map((item) => ({
+    ...item,
+    marketValue: Number(item.marketValue.toFixed(2)),
+    unrealizedPnL: Number(item.unrealizedPnL.toFixed(2)),
+    realizedPnL: Number(item.realizedPnL.toFixed(2))
   }));
-
 
   const totalMarketValue = Number(
     holdings.reduce((sum, item) => sum + item.marketValue, 0).toFixed(2)
@@ -100,6 +175,8 @@ const priceMap = new Map();
     holdingCount: holdings.length,
     brokers,
     holdings,
+    source,
+    priceSource: trustedLiveFeed ? "LIVE_MARKET" : "BROKER_VALUATION_OR_FALLBACK",
     generatedAt: new Date().toISOString()
   };
 }
