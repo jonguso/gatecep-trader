@@ -23,11 +23,7 @@ export default function ImportPortfolio() {
   async function pickFile() {
     try {
       setStatus("Selecting file...");
-
-      console.log("FILE", file);
-      console.log("URI", file.uri);
-      console.log("WEB FILE", file.file);      
-
+      
       const result = await DocumentPicker.getDocumentAsync({
         copyToCacheDirectory: true,
         multiple: false,
