@@ -1,6 +1,9 @@
 const API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
-  "http://localhost:4000";
+  (typeof window !== "undefined" &&
+  window.location.hostname !== "localhost"
+    ? "https://gatecep-trader-production.up.railway.app"
+    : "http://localhost:4000");
 
 export async function uploadConfirmedPortfolio(rows = [], context = {}) {
   const response = await fetch(`${API_URL}/broker-reports/import`, {

@@ -6,7 +6,10 @@ import { applySecurityMaster } from "../utils/nseSecurityMaster";
 
 const API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
-  "http://localhost:4000";
+  (typeof window !== "undefined" &&
+  window.location.hostname !== "localhost"
+    ? "https://gatecep-trader-production.up.railway.app"
+    : "http://localhost:4000");
 
 export const PORTFOLIO_KEY = "portfolio";
 
