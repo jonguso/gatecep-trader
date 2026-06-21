@@ -179,37 +179,47 @@ export default function ImportPortfolio() {
   }
 
   async function readFileText(file) {
-    if (Platform.OS === "web") {
-      const response = await fetch(file.uri);
-      return await response.text();
+  if (Platform.OS === "web") {
+    if (file.file && typeof file.file.text === "function") {
+      return await file.file.text();
     }
 
-    return await FileSystem.readAsStringAsync(file.uri, {
-      encoding: FileSystem.EncodingType.UTF8
-    });
+    const response = await fetch(file.uri);
+    return await response.text();
   }
+
+  return await FileSystem.readAsStringAsync(file.uri, {
+    encoding: FileSystem.EncodingType.UTF8
+  });
+}
 
   async function readFileBase64(file) {
-    if (Platform.OS === "web") {
+  if (Platform.OS === "web") {
+    let arrayBuffer;
+
+    if (file.file && typeof file.file.arrayBuffer === "function") {
+      arrayBuffer = await file.file.arrayBuffer();
+    } else {
       const response = await fetch(file.uri);
-      const arrayBuffer = await response.arrayBuffer();
-
-      let binary = "";
-      const bytes = new Uint8Array(arrayBuffer);
-      const chunkSize = 8192;
-
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        const chunk = bytes.subarray(i, i + chunkSize);
-        binary += String.fromCharCode(...chunk);
-      }
-
-      return btoa(binary);
+      arrayBuffer = await response.arrayBuffer();
     }
 
-    return await FileSystem.readAsStringAsync(file.uri, {
-      encoding: FileSystem.EncodingType.Base64
-    });
+    let binary = "";
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunkSize = 8192;
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+
+    return btoa(binary);
   }
+
+  return await FileSystem.readAsStringAsync(file.uri, {
+    encoding: FileSystem.EncodingType.Base64
+  });
+}
 
   function normalizeHolding(row) {
     const symbol = findValue(row, [
