@@ -1,26 +1,6 @@
-import {
-  userGetItem,
-  userSetItem
-} from "../auth/userStorage";
-
-export async function loadRecommendationHistory() {
-  const raw = await userGetItem(
-    "recommendationHistory"
-  );
-
-  return raw ? JSON.parse(raw) : [];
-}
-
-export async function saveRecommendation(rec) {
-  const history =
-    await loadRecommendationHistory();
-
-  history.unshift(rec);
-
-  await userSetItem(
-    "recommendationHistory",
-    JSON.stringify(history)
-  );
-
-  return history;
-}
+/**
+ * Legacy compatibility wrapper.
+ * Source moved to src/services/coach/recommendationStore.js.
+ * Keep this wrapper until Expo Router app imports are fully migrated.
+ */
+export * from "../services/coach/recommendationStore.js";

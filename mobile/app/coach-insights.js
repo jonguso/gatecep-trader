@@ -17,7 +17,7 @@ import {
   updateRecommendationStatus
 } from "../src/coach/recommendationLifecycleStore";
 
-import { loadPortfolio } from "../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 import { buildCoachPortfolioReview } from "../src/portfolio/coachPortfolioReview";
 import { buildPerformanceAttribution } from "../src/portfolio/performanceAttribution";
@@ -54,7 +54,8 @@ export default function Coach() {
   );
 
   async function load() {
-    const savedPortfolio = await loadPortfolio({ revalue: true });
+    const portfolioData = await loadUnifiedPortfolio();
+    const savedPortfolio = portfolioData?.holdings || [];
     const contextRaw = await userGetItem("coachContext");
     const txUploadedRaw = await userGetItem("transactionsUploaded");
     const txRaw = await userGetItem("transactionHistory");

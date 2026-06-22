@@ -1,11 +1,6 @@
 import { applySecurityMaster } from "./nseSecurityMaster";
+import { API_URL } from "../config/apiConfig";
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  (typeof window !== "undefined" &&
-  window.location.hostname !== "localhost"
-    ? "https://gatecep-trader-production.up.railway.app"
-    : "http://localhost:4000");
 
 const DEFAULT_WATCHLIST = [
   { symbol: "SCOM" },

@@ -1,40 +1,6 @@
-export const ORDER_STATUS = {
-  DRAFT: "DRAFT",
-  REVIEW: "REVIEW",
-  PENDING: "PENDING",
-  QUEUED: "QUEUED",
-  ROUTED: "ROUTED",
-  BROKER_SELECTED: "BROKER_SELECTED",
-  BROKER_RECEIVED: "BROKER_RECEIVED",
-  PARTIAL_FILL: "PARTIAL_FILL",
-  FILLED: "FILLED",
-  CANCELLED: "CANCELLED",
-  REJECTED: "REJECTED",
-  EXPIRED: "EXPIRED"
-};
-
-export const ACTIVE_ORDER_STATUSES = [
-  ORDER_STATUS.DRAFT,
-  ORDER_STATUS.REVIEW,
-  ORDER_STATUS.PENDING,
-  ORDER_STATUS.QUEUED,
-  ORDER_STATUS.ROUTED,
-  ORDER_STATUS.BROKER_SELECTED,
-  ORDER_STATUS.BROKER_RECEIVED,
-  ORDER_STATUS.PARTIAL_FILL
-];
-
-export const CLOSED_ORDER_STATUSES = [
-  ORDER_STATUS.FILLED,
-  ORDER_STATUS.CANCELLED,
-  ORDER_STATUS.REJECTED,
-  ORDER_STATUS.EXPIRED
-];
-
-export function isActiveOrder(status) {
-  return ACTIVE_ORDER_STATUSES.includes(String(status || "").toUpperCase());
-}
-
-export function isClosedOrder(status) {
-  return CLOSED_ORDER_STATUSES.includes(String(status || "").toUpperCase());
-}
+/**
+ * Legacy compatibility wrapper.
+ * Source moved to src/services/trade/orderLifecycle.js.
+ * Keep this wrapper until Expo Router app imports are fully migrated.
+ */
+export * from "../services/trade/orderLifecycle.js";

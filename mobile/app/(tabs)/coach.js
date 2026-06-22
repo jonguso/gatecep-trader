@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { loadPortfolio } from "../../src/portfolio/portfolioStore";
+import { loadUnifiedPortfolio } from "../../src/portfolio/unifiedPortfolioApi";
 import { buildCoachPortfolioReview } from "../../src/portfolio/coachPortfolioReview";
 import {
   userGetItem,
@@ -44,7 +44,8 @@ export default function Coach() {
   );
 
   async function load() {
-    const savedPortfolio = await loadPortfolio({ revalue: true });
+    const portfolioData = await loadUnifiedPortfolio();
+    const savedPortfolio = portfolioData?.holdings || [];
     const contextRaw = await userGetItem("coachContext");
     const txUploadedRaw = await AsyncStorage.getItem("gatecepTransactionsUploaded");
     const txRaw = await AsyncStorage.getItem("gatecepTransactionHistory");

@@ -1,34 +1,6 @@
-export function buildDashboardHome() {
-  return {
-    portfolioValue: 1250000,
-    todaysPnL: 12400,
-    cash: 250000,
-    openOrders: 3,
-
-    marketPulse: {
-      topGainer: "SCOM",
-      topLoser: "KPLC",
-      mostActive: "EQTY",
-      foreignActivity: "Net Buy"
-    },
-
-    coachInsight: {
-      symbol: "SCOM",
-      confidence: 84,
-      message:
-        "Momentum remains positive with strong institutional demand."
-    },
-
-    notifications: [
-      "Dividend paid - KCB",
-      "Order filled - SCOM",
-      "Broker statement ready",
-      "Price alert triggered - EABL"
-    ],
-
-    goalTracker: {
-      target: 5000000,
-      current: 1250000
-    }
-  };
-}
+/**
+ * Legacy compatibility wrapper.
+ * Source moved to src/services/dashboard/dashboardHomeData.js.
+ * Keep this wrapper until Expo Router app imports are fully migrated.
+ */
+export * from "../services/dashboard/dashboardHomeData.js";

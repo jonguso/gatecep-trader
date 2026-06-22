@@ -52,9 +52,8 @@ async function loadPortfolio() {
   try {
     setLoading(true);
 
-    const portfolio = await loadUnifiedPortfolio();
-
-    setHeatmap(portfolio.holdings || []);
+    const portfolioData = await loadUnifiedPortfolio();
+    const savedPortfolio = portfolioData?.holdings || [];
 
     const brokerRaw =
       await userGetItem("defaultBrokerProfile");
