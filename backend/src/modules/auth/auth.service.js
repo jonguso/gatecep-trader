@@ -24,7 +24,7 @@ export async function register(payload = {}) {
     throw new Error("Password must be at least 6 characters");
   }
 
-  const existing = findUserByEmail(email);
+  const existing = await findUserByEmail(email);
 
   if (existing) {
     throw new Error("User already exists");
@@ -32,7 +32,7 @@ export async function register(payload = {}) {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const user = createUser({
+  const user = await createUser({
     id: uuid(),
     email,
     username,
@@ -50,7 +50,7 @@ export async function login(payload = {}) {
   if (!email) throw new Error("Email is required");
   if (!password) throw new Error("Password is required");
 
-  const user = findUserByEmail(email);
+  const user = await findUserByEmail(email);
 
   if (!user) {
     throw new Error("Invalid email or password");
