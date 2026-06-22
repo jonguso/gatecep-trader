@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import authRoutes from "./modules/auth/auth.routes.js";
+import usersRoutes from "./modules/users/users.routes.js";
+
 
 import brokerLinkRoutes from "./routes/broker/brokerLink.routes.js";
 import brokerReportRoutes from "./routes/broker/brokerReportImport.routes.js";
@@ -33,6 +36,7 @@ app.use(
   })
 );
 
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -64,6 +68,10 @@ app.use("/stress-test", stressTestRoutes);
 app.use("/starter-basket", starterBasketRoutes);
 app.use("/new-investor-plan", newInvestorPlanRoutes);
 
+
+app.use("/auth", authRoutes);
+app.use("/users", usersRoutes);
+
 app.use((req, res) => {
   res.status(404).json({
     ok: false,
@@ -83,3 +91,4 @@ app.use((error, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Gatecep backend running on ${PORT}`);
 });
+

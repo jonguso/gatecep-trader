@@ -9,23 +9,23 @@
     "migrate": "node src/database/migrate.js"
   },
   "dependencies": {
+    "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
     "cors": "latest",
     "dotenv": "latest",
     "express": "latest",
-    "multer": "latest",
-    "pg": "latest",
-    "xlsx": "latest",
-    "axios": "^1.7.9",
-    "bcryptjs": "^2.4.3",
     "express-rate-limit": "^8.5.1",
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
+    "multer": "latest",
     "nodemailer": "^8.0.7",
+    "pg": "latest",
     "socket.io": "^4.8.1",
-    "uuid": "^14.0.0",
-    "winston": "^3.19.0"
+    "uuid": "^14.0.1",
+    "winston": "^3.19.0",
+    "xlsx": "latest"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
