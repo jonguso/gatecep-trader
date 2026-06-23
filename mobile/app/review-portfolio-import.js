@@ -10,18 +10,19 @@ import {
   View
 } from "react-native";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { applySecurityMaster } from "../src/utils/nseSecurityMaster";
 import {
   savePortfolio,
   normalizePortfolioHolding
 } from "../src/portfolio/portfolioStore";
 import { uploadConfirmedPortfolio } from "../src/portfolio/uploadPortfolioApi";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   userGetItem,
   userSetItem,
   userRemoveItem
 } from "../src/auth/userStorage";
-
 
 export default function ReviewPortfolioImport() {
   const [fileInfo, setFileInfo] = useState(null);
@@ -34,33 +35,63 @@ export default function ReviewPortfolioImport() {
   }, []);
 
   async function loadDraft() {
-    const pendingRaw = await userGetItem("PendingPortfolioImport");
-    const scopedRaw = await userGetItem("importedPortfolioDraft");
-    const legacyRaw = await AsyncStorage.getItem("gatecepImportedPortfolioDraft");
+    try {
+      const pendingRaw =
+        (await userGetItem("pendingPortfolioImport")) ||
+        (await userGetItem("PendingPortfolioImport"));
 
-    const draftRaw = scopedRaw || legacyRaw;
+      const scopedRaw =
+        (await userGetItem("importedPortfolioDraft")) ||
+        (await userGetItem("ImportedPortfolioDraft"));
 
-    if (pendingRaw) {
-      setFileInfo(JSON.parse(pendingRaw));
-    }
-
-    if (draftRaw) {
-      const parsed = JSON.parse(draftRaw);
-
-      const normalized = parsed.map((row) =>
-        normalizePortfolioHolding({
-          ...row,
-          averagePrice:
-            Number(row.averagePrice || row.averageCost || 0) ||
-            inferAveragePrice(row),
-          marketPrice:
-            Number(row.marketPrice || row.price || 0) ||
-            inferMarketPrice(row)
-        })
+      const legacyRaw = await AsyncStorage.getItem(
+        "gatecepImportedPortfolioDraft"
       );
 
-      setRows(normalized);
+      const draftRaw = scopedRaw || legacyRaw;
+
+      if (pendingRaw) {
+        setFileInfo(JSON.parse(pendingRaw));
+      }
+
+      if (draftRaw) {
+        const parsed = JSON.parse(draftRaw);
+
+        const normalized = parsed.map((row) => normalizeImportedRow(row));
+
+        setRows(normalized);
+
+        await userSetItem(
+          "importedPortfolioDraft",
+          JSON.stringify(normalized)
+        );
+      }
+    } catch (error) {
+      Alert.alert("Import Review Error", error.message);
     }
+  }
+
+  function normalizeImportedRow(row = {}) {
+    const mastered = applySecurityMaster(row);
+
+    return normalizePortfolioHolding({
+      ...mastered,
+      symbol: String(mastered.symbol || "").toUpperCase().trim(),
+      name: mastered.name || mastered.symbol,
+      sector: mastered.sector || "Unknown",
+      averagePrice:
+        Number(mastered.averagePrice || mastered.averageCost || 0) ||
+        inferAveragePrice(mastered),
+      averageCost:
+        Number(mastered.averageCost || mastered.averagePrice || 0) ||
+        inferAveragePrice(mastered),
+      marketPrice:
+        Number(mastered.marketPrice || mastered.price || 0) ||
+        inferMarketPrice(mastered),
+      price:
+        Number(mastered.price || mastered.marketPrice || 0) ||
+        inferMarketPrice(mastered)
+    });
   }
 
   function openEdit(index) {
@@ -69,23 +100,16 @@ export default function ReviewPortfolioImport() {
   }
 
   async function saveEdit() {
-    const nextRow = normalizePortfolioHolding({
-      ...editingRow,
-      averagePrice:
-        Number(editingRow.averagePrice || editingRow.averageCost || 0) ||
-        inferAveragePrice(editingRow),
-      marketPrice:
-        Number(editingRow.marketPrice || editingRow.price || 0) ||
-        inferMarketPrice(editingRow)
-    });
+    const nextRow = normalizeImportedRow(editingRow);
 
     const copy = [...rows];
     copy[editingIndex] = nextRow;
 
     setRows(copy);
 
-    await userSetItem(
-      "ImportedPortfolioDraft",
+    await userSetItem("importedPortfolioDraft", JSON.stringify(copy));
+    await AsyncStorage.setItem(
+      "gatecepImportedPortfolioDraft",
       JSON.stringify(copy)
     );
 
@@ -109,11 +133,7 @@ export default function ReviewPortfolioImport() {
     ];
 
     setRows(next);
-
-    await userSetItem(
-      "ImportedPortfolioDraft",
-      JSON.stringify(next)
-    );
+    await userSetItem("importedPortfolioDraft", JSON.stringify(next));
 
     openEdit(next.length - 1);
   }
@@ -122,11 +142,7 @@ export default function ReviewPortfolioImport() {
     const copy = rows.filter((_, index) => index !== editingIndex);
 
     setRows(copy);
-
-    await userSetItem(
-      "ImportedPortfolioDraft",
-      JSON.stringify(copy)
-    );
+    await userSetItem("importedPortfolioDraft", JSON.stringify(copy));
 
     setEditingIndex(null);
     setEditingRow(null);
@@ -136,12 +152,22 @@ export default function ReviewPortfolioImport() {
     const portfolio = rows
       .filter((row) => row.symbol && Number(row.quantity || 0) > 0)
       .map((row) => {
-        const qty = Number(row.quantity || 0);
+        const mastered = applySecurityMaster(row);
+        const qty = Number(mastered.quantity || 0);
 
-        const rowMarketValue = Number(row.marketValue || row.value || 0);
-        const rowMarketPrice = Number(row.marketPrice || row.price || 0);
+        const rowMarketValue = Number(
+          mastered.marketValue || mastered.value || 0
+        );
+
+        const rowMarketPrice = Number(
+          mastered.marketPrice || mastered.price || 0
+        );
+
         const rowProfitLoss = Number(
-          row.profitLoss || row.unrealizedPnL || row.gainLoss || 0
+          mastered.profitLoss ||
+            mastered.unrealizedPnL ||
+            mastered.gainLoss ||
+            0
         );
 
         const impliedCostValue =
@@ -150,7 +176,12 @@ export default function ReviewPortfolioImport() {
             : 0;
 
         const fallbackAvgPrice =
-          Number(row.averagePrice || row.averageCost || row.costPrice || 0) ||
+          Number(
+            mastered.averagePrice ||
+              mastered.averageCost ||
+              mastered.costPrice ||
+              0
+          ) ||
           (impliedCostValue > 0 && qty > 0
             ? impliedCostValue / qty
             : 0) ||
@@ -164,18 +195,16 @@ export default function ReviewPortfolioImport() {
 
         return normalizePortfolioHolding({
           broker: "IMPORT_REVIEW",
-          symbol: String(row.symbol || "").toUpperCase().trim(),
-          name: row.name || row.symbol,
-          sector: row.sector || "Unknown",
+          symbol: String(mastered.symbol || "").toUpperCase().trim(),
+          name: mastered.name || mastered.symbol,
+          sector: mastered.sector || "Unknown",
           quantity: qty,
           averagePrice: fallbackAvgPrice,
           averageCost: fallbackAvgPrice,
           marketPrice: fallbackMarketPrice,
           price: fallbackMarketPrice,
-          marketValue:
-            rowMarketValue || qty * fallbackMarketPrice,
-          value:
-            rowMarketValue || qty * fallbackMarketPrice,
+          marketValue: rowMarketValue || qty * fallbackMarketPrice,
+          value: rowMarketValue || qty * fallbackMarketPrice,
           profitLoss: rowProfitLoss,
           source: "CONFIRMED_VALUATION_IMPORT"
         });
@@ -188,8 +217,6 @@ export default function ReviewPortfolioImport() {
 
     await savePortfolio(portfolio);
     await uploadConfirmedPortfolio(portfolio);
-
-router.replace("/(tabs)/dashboard");
 
     await userSetItem("statementUploaded", "true");
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
@@ -210,6 +237,7 @@ router.replace("/(tabs)/dashboard");
     );
 
     await userRemoveItem("importedPortfolioDraft");
+    await userRemoveItem("ImportedPortfolioDraft");
     await AsyncStorage.removeItem("gatecepImportedPortfolioDraft");
 
     Alert.alert("Portfolio Saved", "Your holdings have been saved.");
@@ -248,15 +276,7 @@ router.replace("/(tabs)/dashboard");
         </View>
 
         {rows.map((row, index) => {
-          const normalized = normalizePortfolioHolding({
-            ...row,
-            averagePrice:
-              Number(row.averagePrice || row.averageCost || 0) ||
-              inferAveragePrice(row),
-            marketPrice:
-              Number(row.marketPrice || row.price || 0) ||
-              inferMarketPrice(row)
-          });
+          const normalized = normalizeImportedRow(row);
 
           return (
             <Pressable
@@ -276,7 +296,9 @@ router.replace("/(tabs)/dashboard");
                 {Number(normalized.quantity || 0).toLocaleString()}
               </Text>
 
-              <Text style={[styles.tdStrong, { flex: 0.9, textAlign: "right" }]}>
+              <Text
+                style={[styles.tdStrong, { flex: 0.9, textAlign: "right" }]}
+              >
                 {money(normalized.marketValue)}
               </Text>
 

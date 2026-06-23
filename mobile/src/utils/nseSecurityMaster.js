@@ -7,7 +7,16 @@ export const NSE_SECURITIES = [
   { symbol: "ABSA", name: "Absa Bank Kenya", sector: "Banking" },
   { symbol: "BAT", name: "BAT Kenya", sector: "Manufacturing" },
   { symbol: "KPLC", name: "Kenya Power", sector: "Energy" },
-  { symbol: "SMWF", name: "Sanlam MSCI World ETF", sector: "ETF" }
+  { symbol: "SMWF", name: "Sanlam MSCI World ETF", sector: "ETF" },
+  { symbol: "DTK", aliases: ["DTB"], name: "Diamond Trust Bank Kenya", sector: "Banking" },
+  { symbol: "GLD", aliases:["NEWGOLD"], name: "ABSA NewGold ETF", sector: "ETF" },
+  { symbol: "IM", aliases:["I&M", "I & M", "I AND M", "IMH"], name: "I&M Group", sector: "Banking" },
+  { symbol: "KEGN", aliases:["KENGEN"], name: "KenGen PLC", sector: "Energy" },
+  { symbol: "KNRE", name: "Kenya Reinsurance", sector: "Insurance" },
+  { symbol: "KPC", name: "Kapchorua Tea Kenya", sector: "Agricultural" },
+  { symbol: "KQ", name: "Kenya Airways", sector: "Transport" },
+  { symbol: "SBIC", name: "Stanbic Holdings", sector: "Banking" },
+  { symbol: "SCBK", name: "Standard Chartered Bank Kenya", sector: "Banking" }
 ];
 
 export const nseSecurityMaster = NSE_SECURITIES;
@@ -36,11 +45,19 @@ export function applySecurityMaster(row = {}) {
   const symbol = normalizeNseSymbol(row.symbol || row.code || "");
   const security = getSecurityBySymbol(symbol);
 
+  const currentName = String(row.name || "").trim();
+  const currentSector = String(row.sector || "").trim();
+
+  const shouldReplaceSector =
+    !currentSector ||
+    currentSector.toLowerCase() === "unknown" ||
+    currentSector.toLowerCase() === "n/a";
+
   return {
     ...row,
     symbol: security.symbol,
-    name: row.name || security.name,
-    sector: row.sector || security.sector
+    name: currentName || security.name,
+    sector: shouldReplaceSector ? security.sector : currentSector
   };
 }
 

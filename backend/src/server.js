@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./modules/auth/auth.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
+import portfolioRoutes from "./modules/portfolio/portfolio.routes.js";
 
 
 import brokerLinkRoutes from "./routes/broker/brokerLink.routes.js";
@@ -48,9 +49,11 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, service: "gatecep-backend" });
 });
 
+
 /*
  * Broker mirror / portfolio routes
  */
+app.use("/user-portfolio", portfolioRoutes);
 app.use("/coach-g/broker-link", brokerLinkRoutes);
 app.use("/broker-reports", brokerReportRoutes);
 app.use("/broker-portfolio", brokerPortfolioRoutes);

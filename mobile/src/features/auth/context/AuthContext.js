@@ -1,0 +1,105 @@
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState
+} from "react";
+
+import {
+  getCurrentUser,
+  loginUser,
+  registerUser
+} from "../api/authApi";
+
+import {
+  clearAuthSession,
+  getStoredAccessToken,
+  getStoredUser,
+  saveAuthSession
+} from "../storage/authStorage";
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [loading, setLoading] = useState(true);
+  const [accessToken, setAccessToken] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    restoreSession();
+  }, []);
+
+  async function restoreSession() {
+    try {
+      const token = await getStoredAccessToken();
+      const storedUser = await getStoredUser();
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const currentUser = await getCurrentUser(token);
+
+      setAccessToken(token);
+      setUser(currentUser || storedUser);
+    } catch (error) {
+      await clearAuthSession();
+      setAccessToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function login(credentials) {
+    const result = await loginUser(credentials);
+
+    await saveAuthSession({
+      accessToken: result.accessToken,
+      user: result.user
+    });
+
+    setAccessToken(result.accessToken);
+    setUser(result.user);
+
+    return result;
+  }
+
+  async function register(payload) {
+    return await registerUser(payload);
+  }
+
+  async function logout() {
+    await clearAuthSession();
+    setAccessToken(null);
+    setUser(null);
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        loading,
+        accessToken,
+        user,
+        isAuthenticated: Boolean(accessToken && user),
+        login,
+        register,
+        logout,
+        restoreSession
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const value = useContext(AuthContext);
+
+  if (!value) {
+    throw new Error("useAuth must be used inside AuthProvider");
+  }
+
+  return value;
+}

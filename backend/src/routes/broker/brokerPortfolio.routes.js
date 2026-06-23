@@ -1,16 +1,17 @@
 import express from "express";
 
 import {
+  applySecurityMaster,
+  normalizeNseSymbol
+} from "../../data/nseSecurityMaster.js";
+
+import {
   getBrokerMirror
 } from "../../repositories/brokerMirror.repository.js";
 
 import {
   marketDataGateway
 } from "../../services/marketData/MarketDataGateway.js";
-
-import {
-  normalizeNseSymbol
-} from "../../data/nseSecurityMaster.js";
 
 const router = express.Router();
 
@@ -47,6 +48,12 @@ function filterByClient(rows = [], clientNumber = "", cdsNumber = "") {
       (!cdsNumber || rowCds === cdsNumber)
     );
   });
+}
+
+function isUnknown(value) {
+  const text = String(value || "").trim().toLowerCase();
+
+  return !text || text === "unknown" || text === "n/a" || text === "na";
 }
 
 router.get("/:broker", async (req, res) => {
@@ -87,35 +94,41 @@ router.get("/:broker", async (req, res) => {
     );
 
     const portfolio = sourceRows.map((holding) => {
-      const symbol = normalizeNseSymbol(holding.symbol);
+      const masteredHolding = applySecurityMaster(holding);
+      const symbol = normalizeNseSymbol(masteredHolding.symbol || holding.symbol);
       const market = priceLookup[symbol] || {};
+      const masteredMarket = applySecurityMaster({
+        ...market,
+        symbol
+      });
 
-      const quantity = cleanNumber(holding.quantity);
+      const quantity = cleanNumber(masteredHolding.quantity);
 
       const price = cleanNumber(
-        holding.marketPrice ||
-          holding.price ||
-          market.price ||
-          market.lastPrice ||
-          market.currentPrice ||
-          market.marketPrice
+        masteredHolding.marketPrice ||
+          masteredHolding.price ||
+          masteredMarket.price ||
+          masteredMarket.lastPrice ||
+          masteredMarket.currentPrice ||
+          masteredMarket.marketPrice
       );
 
       const marketValue = cleanNumber(
-        holding.marketValue ||
-          holding.value ||
+        masteredHolding.marketValue ||
+          masteredHolding.value ||
           quantity * price
       );
 
       const averagePrice = cleanNumber(
-        holding.averagePrice ||
-          holding.avgPrice
+        masteredHolding.averagePrice ||
+          masteredHolding.avgPrice ||
+          masteredHolding.averageCost
       );
 
       const costValue = quantity * averagePrice;
 
       const profitLoss = cleanNumber(
-        holding.profitLoss ||
+        masteredHolding.profitLoss ||
           (
             costValue > 0
               ? marketValue - costValue
@@ -124,7 +137,7 @@ router.get("/:broker", async (req, res) => {
       );
 
       const profitLossPct = cleanNumber(
-        holding.profitLossPct ||
+        masteredHolding.profitLossPct ||
           (
             costValue > 0
               ? (profitLoss / costValue) * 100
@@ -132,20 +145,36 @@ router.get("/:broker", async (req, res) => {
           )
       );
 
+      const finalMastered = applySecurityMaster({
+        ...masteredMarket,
+        ...masteredHolding,
+        symbol
+      });
+
+      const name = isUnknown(finalMastered.name)
+        ? symbol
+        : finalMastered.name;
+
+      const sector = isUnknown(finalMastered.sector)
+        ? "Unknown"
+        : finalMastered.sector;
+
       return {
         broker,
-        clientNumber: holding.clientNumber || clientNumber,
-        cdsNumber: holding.cdsNumber || cdsNumber,
-        symbol,
-        name: holding.name || market.name || "",
-        sector: holding.sector || market.sector || "Unknown",
+        clientNumber: masteredHolding.clientNumber || clientNumber,
+        cdsNumber: masteredHolding.cdsNumber || cdsNumber,
+        symbol: finalMastered.symbol || symbol,
+        name,
+        sector,
         quantity,
         averagePrice,
         price,
         marketValue,
         profitLoss,
         profitLossPct: Number(profitLossPct.toFixed(2)),
-        changePct: cleanNumber(holding.changePct || market.changePct),
+        changePct: cleanNumber(
+          masteredHolding.changePct || masteredMarket.changePct
+        ),
         weight: 0
       };
     });
@@ -158,7 +187,12 @@ router.get("/:broker", async (req, res) => {
     portfolio.forEach((item) => {
       item.weight =
         totalValue > 0
-          ? Number(((Number(item.marketValue || 0) / totalValue) * 100).toFixed(2))
+          ? Number(
+              (
+                (Number(item.marketValue || 0) / totalValue) *
+                100
+              ).toFixed(2)
+            )
           : 0;
     });
 
