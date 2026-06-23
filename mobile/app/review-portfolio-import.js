@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { syncHoldingsToCloud } from "../src/features/portfolio/api/portfolioSyncApi";
 import {
   Alert,
   Modal,
@@ -217,6 +218,12 @@ export default function ReviewPortfolioImport() {
 
     await savePortfolio(portfolio);
     await uploadConfirmedPortfolio(portfolio);
+    
+    try {
+  await syncHoldingsToCloud(portfolio);
+} catch (error) {
+  console.log("Cloud portfolio sync skipped:", error.message);
+}
 
     await userSetItem("statementUploaded", "true");
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");

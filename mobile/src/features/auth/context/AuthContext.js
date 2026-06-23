@@ -18,6 +18,10 @@ import {
   saveAuthSession
 } from "../storage/authStorage";
 
+import {
+  restorePortfolioFromCloud
+} from "../../portfolio/loadUserPortfolio";
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -62,6 +66,8 @@ export function AuthProvider({ children }) {
 
     setAccessToken(result.accessToken);
     setUser(result.user);
+
+    await restorePortfolioFromCloud();
 
     return result;
   }
