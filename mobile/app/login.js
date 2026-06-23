@@ -26,7 +26,7 @@ export default function LoginScreen() {
         password
       });
 
-      router.replace("/dashboard");
+      router.replace("/");
     } catch (error) {
       Alert.alert(
         "Login Failed",

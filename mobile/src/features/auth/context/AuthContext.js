@@ -5,6 +5,8 @@ import React, {
   useState
 } from "react";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import {
   getCurrentUser,
   loginUser,
@@ -15,6 +17,7 @@ import {
   clearAuthSession,
   getStoredAccessToken,
   getStoredUser,
+  getStoredAuthUserId,
   saveAuthSession
 } from "../storage/authStorage";
 
@@ -24,6 +27,19 @@ import {
 
 const AuthContext = createContext(null);
 
+const USER_SCOPED_CACHE_KEYS = [
+  "gatecepPortfolio",
+  "gatecepImportedPortfolioDraft",
+  "gatecepStatementUploaded",
+  "availableCash",
+  "LatestUpload",
+  "latestUpload",
+  "importedPortfolioDraft",
+  "ImportedPortfolioDraft",
+  "PendingPortfolioImport",
+  "pendingPortfolioImport"
+];
+
 export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState(null);
@@ -32,6 +48,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     restoreSession();
   }, []);
+
+  async function clearUserScopedCaches() {
+    await AsyncStorage.multiRemove(USER_SCOPED_CACHE_KEYS);
+  }
 
   async function restoreSession() {
     try {
@@ -47,8 +67,11 @@ export function AuthProvider({ children }) {
 
       setAccessToken(token);
       setUser(currentUser || storedUser);
+
+      await restorePortfolioFromCloud();
     } catch (error) {
       await clearAuthSession();
+      await clearUserScopedCaches();
       setAccessToken(null);
       setUser(null);
     } finally {
@@ -57,7 +80,12 @@ export function AuthProvider({ children }) {
   }
 
   async function login(credentials) {
+    const previousUserId = await getStoredAuthUserId();
     const result = await loginUser(credentials);
+
+    if (previousUserId && previousUserId !== result.user.id) {
+      await clearUserScopedCaches();
+    }
 
     await saveAuthSession({
       accessToken: result.accessToken,
@@ -78,6 +106,8 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     await clearAuthSession();
+    await clearUserScopedCaches();
+
     setAccessToken(null);
     setUser(null);
   }

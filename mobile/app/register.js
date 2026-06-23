@@ -30,11 +30,11 @@ export default function RegisterScreen() {
       });
 
       Alert.alert(
-        "Account Created",
-        "Your Gatecep account has been created. Please log in."
-      );
+  "Account Created",
+  "Let’s set up your investor profile."
+);
 
-      router.replace("/login");
+      router.replace("/onboarding/name");
     } catch (error) {
       Alert.alert(
         "Registration Failed",

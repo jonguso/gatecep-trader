@@ -22,3 +22,9 @@ export async function getStoredUser() {
 export async function clearAuthSession() {
   await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
 }
+
+export async function getStoredAuthUserId() {
+  const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
+  const user = raw ? JSON.parse(raw) : null;
+  return user?.id || null;
+}

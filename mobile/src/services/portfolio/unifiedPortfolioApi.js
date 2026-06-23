@@ -1,46 +1,49 @@
 import { API_URL } from "../../config/apiConfig";
+import { getStoredAccessToken } from "../../features/auth/storage/authStorage";
 
-export async function loadUnifiedPortfolio(broker = "AIB") {
-  const response = await fetch(
-    `${API_URL}/broker-portfolio/${broker}?t=${Date.now()}`,
-    {
-      headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache"
+export async function loadUnifiedPortfolio() {
+  const token = await getStoredAccessToken();
+
+  if (!token) {
+    return {
+      ok: true,
+      source: "NO_AUTH",
+      holdings: [],
+      totalValue: 0,
+      totalMarketValue: 0,
+      totalProfitLoss: 0,
+      summary: {
+        totalHoldings: 0,
+        totalValue: 0,
+        totalProfitLoss: 0
       }
-    }
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || "Failed to load unified portfolio.");
+    };
   }
 
-  const json = await response.json();
+  const response = await fetch(`${API_URL}/user-portfolio?t=${Date.now()}`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || "Unable to load user portfolio");
+  }
 
   return {
-    totalMarketValue: Number(json.totalValue || 0),
-    totalUnrealizedPnL: (json.holdings || []).reduce(
-      (sum, h) => sum + Number(h.profitLoss || h.unrealizedPnL || 0),
-      0
-    ),
-    totalRealizedPnL: 0,
-    totalPnL: (json.holdings || []).reduce(
-      (sum, h) => sum + Number(h.profitLoss || h.unrealizedPnL || 0),
-      0
-    ),
-    brokerCount: 1,
-    holdingCount: json.holdings?.length || 0,
-    brokers: [
-      {
-        broker: json.broker || broker,
-        marketValue: Number(json.totalValue || 0),
-        holdings: json.holdings?.length || 0
-      }
-    ],
-    holdings: json.holdings || [],
-    source: json.source || "BROKER_VALUATION",
-    priceSource: json.source || "BROKER_VALUATION",
-    generatedAt: new Date().toISOString()
+    ok: true,
+    source: "USER_PORTFOLIO",
+    priceSource: "USER_PORTFOLIO",
+    holdings: data.holdings || [],
+    totalValue: data.summary?.totalValue || 0,
+    totalMarketValue: data.summary?.totalValue || 0,
+    totalProfitLoss: data.summary?.totalProfitLoss || 0,
+    summary: data.summary || {
+      totalHoldings: 0,
+      totalValue: 0,
+      totalProfitLoss: 0
+    }
   };
 }
