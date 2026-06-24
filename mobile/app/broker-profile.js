@@ -13,6 +13,7 @@ import {
   userGetItem,
   userSetItem
 } from "../src/auth/userStorage";
+import { addUserBroker } from "../src/features/brokers/api/userBrokerApi";
 
 const brokers = [
   "AIB-AXYS",
@@ -82,6 +83,17 @@ export default function BrokerProfile() {
       await userSetItem("brokerProfileSkipped", "false");
       await userSetItem("defaultBrokerProfile", JSON.stringify(baseProfile));
       await userSetItem("brokerProfiles", JSON.stringify([baseProfile]));
+
+      const cloudBroker = await addUserBroker({
+  broker: baseProfile.broker,
+  clientNumber: baseProfile.clientNumber,
+  cdsNumber: baseProfile.cdsNumber
+});
+
+await userSetItem(
+  "cloudBrokerProfile",
+  JSON.stringify(cloudBroker)
+);
 
       const verify = await userGetItem("brokerProfile");
 
