@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import authRoutes from "./modules/auth/auth.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
 import portfolioRoutes from "./modules/portfolio/portfolio.routes.js";
+import cashRoutes from "./modules/cash/cash.routes.js";
+import brokerLinksRoutes from "./modules/broker-links/brokerLinks.routes.js";
 
 
 import brokerLinkRoutes from "./routes/broker/brokerLink.routes.js";
@@ -54,6 +56,9 @@ app.get("/health", (req, res) => {
  * Broker mirror / portfolio routes
  */
 app.use("/user-portfolio", portfolioRoutes);
+app.use("/user-cash", cashRoutes);
+app.use("/user-brokers", brokerLinksRoutes);
+
 app.use("/coach-g/broker-link", brokerLinkRoutes);
 app.use("/broker-reports", brokerReportRoutes);
 app.use("/broker-portfolio", brokerPortfolioRoutes);
