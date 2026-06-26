@@ -13,6 +13,7 @@ import { getUserBrokers } from "../../src/features/brokers/api/userBrokerApi";
 import { useAuth } from "../../src/features/auth/hooks/useAuth";
 import { API_BASE_URL } from "../../src/config/apiConfig";
 import { getCoachDashboard } from "../../src/features/coach/api/coachApi";
+import { getNotifications } from "../../src/features/intelligence/api/intelligenceApi";
 
 import ActiveUserBanner from "../../src/components/ActiveUserBanner";
 import { getCurrentSession } from "../../src/auth/authStore";
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState("");
   const [portfolioSource, setPortfolioSource] = useState("");
   const [coachDashboard, setCoachDashboard] = useState(null);
+  const [notificationSummary, setNotificationSummary] = useState(null);
 
   const { user } = useAuth();
 
@@ -49,17 +51,20 @@ export default function Dashboard() {
     const currentSession = await getCurrentSession();
     const token = currentSession?.token || currentSession?.accessToken;
 
-    const [portfolio, cashResult, brokerResult, coachResult] =
+    const [portfolio, cashResult, brokerResult, coachResult, notificationResult] =
   await Promise.all([
     loadUnifiedPortfolio(),
     getUserCash(),
     getUserBrokers(),
-    getCoachDashboard(token)
+    getCoachDashboard(token),
+    getNotifications(token)
   ]);
 
     const brokers = brokerResult?.brokers || [];
 
     setCoachDashboard(coachResult);
+
+    setNotificationSummary(notificationResult?.summary || null);
 
     setSession(currentSession);
     setHoldings(portfolio?.holdings || []);
@@ -155,9 +160,20 @@ export default function Dashboard() {
 
         <Text style={styles.title}>Dashboard</Text>
 
-        <Pressable style={styles.icon} onPress={() => router.push("/intelligence-center")}>
-          <Text style={styles.iconText}>🔔</Text>
-        </Pressable>
+        <Pressable
+  style={styles.icon}
+  onPress={() => router.push("/intelligence-center")}
+>
+  <Text style={styles.iconText}>🔔</Text>
+
+  {notificationSummary?.unread > 0 ? (
+    <View style={styles.badge}>
+      <Text style={styles.badgeText}>
+        {notificationSummary.unread > 9 ? "9+" : notificationSummary.unread}
+      </Text>
+    </View>
+  ) : null}
+</Pressable>
       </View>
 
       <Text style={styles.subtitle}>GateCEP investor command center</Text>
@@ -548,6 +564,25 @@ secondaryActionText: {
     flexDirection: "row",
     justifyContent: "space-between"
   },
+
+badge: {
+  position: "absolute",
+  top: -4,
+  right: -4,
+  minWidth: 18,
+  height: 18,
+  borderRadius: 9,
+  backgroundColor: "#ef4444",
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 4
+},
+badgeText: {
+  color: "#ffffff",
+  fontSize: 10,
+  fontWeight: "900"
+},
+
   barTrack: {
     marginTop: 10,
     height: 10,

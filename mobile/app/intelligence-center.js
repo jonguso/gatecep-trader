@@ -9,10 +9,10 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { getCurrentSession } from "../src/auth/authStore";
-import { getCoachDashboard } from "../src/features/coach/api/coachApi";
 import {
-  getNotifications,
-  markNotificationRead
+  getIntelligenceHome,
+  markNotificationRead,
+  markAllNotificationsRead
 } from "../src/features/intelligence/api/intelligenceApi";
 
 export default function IntelligenceCenter() {
@@ -37,14 +37,12 @@ export default function IntelligenceCenter() {
 
       setToken(authToken);
 
-      const [coachResult, notificationResult] = await Promise.all([
-        getCoachDashboard(authToken),
-        getNotifications(authToken)
-      ]);
+      const intelligenceResult = await getIntelligenceHome(authToken);
 
-      setCoach(coachResult);
-      setNotifications(notificationResult?.notifications || []);
-      setSummary(notificationResult?.summary || null);
+	setCoach(intelligenceResult);
+	setNotifications(intelligenceResult?.notifications?.items || []);
+	setSummary(intelligenceResult?.notifications?.summary || null);
+
     } catch (error) {
       console.log("Intelligence Center error:", error.message);
     } finally {
@@ -62,6 +60,16 @@ export default function IntelligenceCenter() {
     }
   }
 
+async function handleReadAll() {
+  try {
+    if (!token) return;
+    await markAllNotificationsRead(token);
+    await load();
+  } catch (error) {
+    console.log("Mark all read error:", error.message);
+  }
+}
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -72,7 +80,7 @@ export default function IntelligenceCenter() {
   }
 
   const card = coach?.dashboardCard;
-  const intelligence = coach?.intelligence;
+  const intelligence = coach;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -112,8 +120,15 @@ export default function IntelligenceCenter() {
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Notification Summary</Text>
+        <View style={styles.sectionHeader}>
+  <Text style={styles.cardTitle}>Notification Summary</Text>
 
+  {summary?.unread > 0 ? (
+    <Pressable onPress={handleReadAll}>
+      <Text style={styles.readAllText}>Mark all read</Text>
+    </Pressable>
+  ) : null}
+</View>
         <View style={styles.summaryGrid}>
           <MiniStat label="Total" value={summary?.total || 0} />
           <MiniStat label="Unread" value={summary?.unread || 0} />
@@ -345,5 +360,16 @@ const styles = StyleSheet.create({
   actionText: {
     color: "#e5e7eb",
     fontWeight: "900"
-  }
+  },
+sectionHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: 12
+},
+readAllText: {
+  color: "#67e8f9",
+  fontSize: 12,
+  fontWeight: "900"
+}
 });
