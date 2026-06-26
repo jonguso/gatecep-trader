@@ -8,6 +8,11 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import { getUserCash } from "../../src/features/cash/api/userCashApi";
+import { getUserBrokers } from "../../src/features/brokers/api/userBrokerApi";
+import { useAuth } from "../../src/features/auth/hooks/useAuth";
+import { API_BASE_URL } from "../../src/config/apiConfig";
+import { getCoachDashboard } from "../../src/features/coach/api/coachApi";
 
 import ActiveUserBanner from "../../src/components/ActiveUserBanner";
 import { getCurrentSession } from "../../src/auth/authStore";
@@ -27,6 +32,9 @@ export default function Dashboard() {
   const [cash, setCash] = useState(0);
   const [lastUpdated, setLastUpdated] = useState("");
   const [portfolioSource, setPortfolioSource] = useState("");
+  const [coachDashboard, setCoachDashboard] = useState(null);
+
+  const { user } = useAuth();
 
   useFocusEffect(
     useCallback(() => {
@@ -35,25 +43,55 @@ export default function Dashboard() {
   );
 
   async function load() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const currentSession = await getCurrentSession();
-      const portfolio = await loadUnifiedPortfolio();
-      const cashRaw = await userGetItem("availableCash");
+    const currentSession = await getCurrentSession();
+    const token = currentSession?.token || currentSession?.accessToken;
 
-      setSession(currentSession);
-      setHoldings(portfolio?.holdings || []);
-      setCash(Number(cashRaw || 0));
-      setPortfolioSource(portfolio?.priceSource || portfolio?.source || "");
-      setLastUpdated(new Date().toLocaleString());
-    } catch (error) {
-      console.log("Dashboard load error:", error.message);
-      setHoldings([]);
-    } finally {
-      setLoading(false);
-    }
+    const [portfolio, cashResult, brokerResult, coachResult] =
+  await Promise.all([
+    loadUnifiedPortfolio(),
+    getUserCash(),
+    getUserBrokers(),
+    getCoachDashboard(token)
+  ]);
+
+    const brokers = brokerResult?.brokers || [];
+
+    setCoachDashboard(coachResult);
+
+    setSession(currentSession);
+    setHoldings(portfolio?.holdings || []);
+
+    setCash(
+      Number(
+        cashResult?.summary?.totalCash || 0
+      )
+    );
+
+    setPortfolioSource(
+      brokers.length
+        ? `USER_PORTFOLIO • ${brokers.length} broker${
+            brokers.length > 1 ? "s" : ""
+          }`
+        : "USER_PORTFOLIO"
+    );
+
+    setLastUpdated(
+      new Date().toLocaleString()
+    );
+  } catch (error) {
+    console.log(
+      "Dashboard load error:",
+      error.message
+    );
+
+    setHoldings([]);
+  } finally {
+    setLoading(false);
   }
+}
 
   const investedValue = useMemo(() => {
   return holdings.reduce((sum, item) => {
@@ -126,7 +164,7 @@ export default function Dashboard() {
       <Text style={styles.small}>Version {APP_VERSION}</Text>
 
       <Text style={styles.userLine}>
-        Logged in as {session?.username || session?.userId || "Guest"}
+        Logged in as {user?.username || user?.email || "User"}
       </Text>
 
       <Text style={styles.timestamp}>Updated {lastUpdated}</Text>
@@ -210,41 +248,7 @@ export default function Dashboard() {
         </ScrollView>
       </View>
 
-      <View style={styles.coachCard}>
-        <Text style={styles.coachTitle}>Coach G Recommendation</Text>
-
-        <Text style={styles.coachBadge}>BUY</Text>
-        <Text style={styles.coachSymbol}>SCOM</Text>
-
-        <Text style={styles.body}>
-          Strong volume accumulation and positive market momentum.
-        </Text>
-
-        <View style={styles.confidenceRow}>
-          <Text style={styles.small}>Confidence</Text>
-          <Text style={styles.green}>87%</Text>
-        </View>
-
-        <View style={styles.barTrack}>
-          <View style={[styles.barFill, { width: "87%" }]} />
-        </View>
-
-        <View style={styles.buttonRow}>
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => router.push("/coach-insights")}
-          >
-            <Text style={styles.secondaryText}>View Analysis</Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => router.push("/(tabs)/trading")}
-          >
-            <Text style={styles.primaryText}>Trade Now</Text>
-          </Pressable>
-        </View>
-      </View>
+      <CoachGIntelligenceCard card={coachDashboard?.dashboardCard} />
 
       <View style={styles.quickGrid}>
         <QuickButton title="Markets" route="/(tabs)/markets" />
@@ -290,6 +294,54 @@ export default function Dashboard() {
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+function CoachGIntelligenceCard({ card }) {
+  if (!card) return null;
+
+  return (
+    <View style={styles.coachCard}>
+      <Text style={styles.coachTitle}>Coach G Intelligence</Text>
+
+      <Text style={styles.coachBadge}>{card.label}</Text>
+
+      <Text style={styles.coachSymbol}>{card.headline}</Text>
+
+      <Text style={styles.body}>{card.summary}</Text>
+
+      <View style={styles.confidenceRow}>
+        <Text style={styles.small}>Confidence</Text>
+        <Text style={styles.green}>{card.confidence}%</Text>
+      </View>
+
+      {card.mainAction ? (
+        <Pressable
+          style={styles.primaryAction}
+          onPress={() => router.push(card.mainAction.route)}
+        >
+          <Text style={styles.primaryActionText}>
+            {card.mainAction.label}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {card.actions?.length > 1 ? (
+        <View style={styles.actionWrap}>
+          {card.actions.slice(1).map((action) => (
+            <Pressable
+              key={action.action}
+              style={styles.secondaryAction}
+              onPress={() => router.push(action.route)}
+            >
+              <Text style={styles.secondaryActionText}>
+                {action.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -359,6 +411,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900"
   },
+
+primaryAction: {
+  marginTop: 14,
+  backgroundColor: "#111827",
+  paddingVertical: 12,
+  borderRadius: 14,
+  alignItems: "center"
+},
+primaryActionText: {
+  color: "#ffffff",
+  fontWeight: "800"
+},
+actionWrap: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 12
+},
+secondaryAction: {
+  borderWidth: 1,
+  borderColor: "#334155",
+  borderRadius: 12,
+  paddingVertical: 8,
+  paddingHorizontal: 10
+},
+secondaryActionText: {
+  color: "#e5e7eb",
+  fontWeight: "700",
+  fontSize: 12
+},
   heroCard: {
     marginTop: 18,
     backgroundColor: "rgba(147,51,234,.16)",

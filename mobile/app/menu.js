@@ -7,6 +7,8 @@ import {
   StyleSheet
 } from "react-native";
 import { router } from "expo-router";
+import { useAuth } from "../src/features/auth/hooks/useAuth";
+
 import { getCurrentSession, logout } from "../src/auth/authStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BUILD_INFO } from "../src/config/buildInfo";
@@ -41,6 +43,17 @@ const items = [
     detail: "Update Broker profile",
     route: "/broker-profile"
   },
+{
+  title: "Activity",
+  detail: "View buys, sells, deposits, withdrawals, dividends, and fees",
+  route: "/transactions"
+},
+{
+  title: "Coach G Dashboard",
+  detail: "Personalized portfolio, cash, risk, and wealth recommendations",
+  route: "/coach-dashboard"
+},
+
   {
     title: "Manual Portfolio Entry",
     detail: "Enter holdings manually",
@@ -50,6 +63,7 @@ const items = [
 
 export default function Menu() {
 
+const { user } = useAuth();
 const [session, setSession] = useState(null);
 
 useEffect(() => {
@@ -82,7 +96,7 @@ async function handleLogout() {
        <View style={styles.userCard}>
   <Text style={styles.userLabel}>Logged in as</Text>
   <Text style={styles.userName}>
-    {session?.username || session?.userId || "Guest"}
+    {user?.username || user?.email || "User"}
   </Text>
 </View>
 

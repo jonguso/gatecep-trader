@@ -40,15 +40,14 @@ export default function PortfolioHub() {
   );
 
   async function load() {
-    const portfolio = await loadUnifiedPortfolio();
-const holdings = portfolio.holdings || [];
-    
+  try {
+    const result = await loadUnifiedPortfolio();
+
+    setPortfolio(result?.holdings || []);
+  } catch (error) {
+    console.log("PortfolioHub load error:", error.message);
+    setPortfolio([]);
   }
-
-async function load() {
-  const result = await loadUnifiedPortfolio();
-
-  setPortfolio(result.holdings || []);
 }
   const hub = useMemo(() => buildPortfolioHub(portfolio), [portfolio]);
 

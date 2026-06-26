@@ -1,5 +1,23 @@
 import { v4 as uuid } from "uuid";
 import { pool } from "../../database/db.js";
+import {
+  applySecurityMaster
+} from "../../data/nseSecurityMaster.js";
+
+function enrichHolding(holding = {}) {
+  const mastered = applySecurityMaster({
+    symbol: holding.symbol,
+    name: holding.name,
+    sector: holding.sector
+  });
+
+  return {
+    ...holding,
+    symbol: mastered.symbol,
+    name: mastered.name,
+    sector: mastered.sector
+  };
+}
 
 export async function listUserPortfolio(userId) {
   const result = await pool.query(
@@ -26,11 +44,17 @@ export async function listUserPortfolio(userId) {
     [userId]
   );
 
-  return result.rows;
+  return result.rows.map(enrichHolding);
 }
 
 export async function addUserHolding(userId, holding = {}) {
   const id = uuid();
+
+  const mastered = applySecurityMaster({
+    symbol: String(holding.symbol || "").toUpperCase().trim(),
+    name: holding.name,
+    sector: holding.sector
+  });
 
   const result = await pool.query(
     `
@@ -71,9 +95,9 @@ export async function addUserHolding(userId, holding = {}) {
       id,
       userId,
       holding.broker || "AIB-AXYS",
-      String(holding.symbol || "").toUpperCase().trim(),
-      holding.name || "",
-      holding.sector || "Unknown",
+      mastered.symbol,
+      mastered.name,
+      mastered.sector,
       Number(holding.quantity || 0),
       Number(holding.averagePrice || holding.averageCost || 0),
       Number(holding.marketPrice || holding.price || 0),
@@ -83,5 +107,5 @@ export async function addUserHolding(userId, holding = {}) {
     ]
   );
 
-  return result.rows[0];
+  return enrichHolding(result.rows[0]);
 }

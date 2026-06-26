@@ -7,18 +7,18 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import {
-  getCurrentSession,
-  logout
-} from "../src/auth/authStore";
-import {
-  userGetItem
-} from "../src/auth/userStorage";
+import { getInvestorProfile } from "../src/features/profile/api/investorProfileApi";
+
+import { useAuth } from "../src/features/auth/hooks/useAuth";
 import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
+import { getUserCash } from "../src/features/cash/api/userCashApi";
+import { getUserBrokers } from "../src/features/brokers/api/userBrokerApi";
+import { logout } from "../src/auth/authStore";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 
 export default function MyProfile() {
-  const [session, setSession] = useState(null);
+  const { user } = useAuth();
+
   const [profile, setProfile] = useState(null);
   const [broker, setBroker] = useState(null);
   const [cash, setCash] = useState(0);
@@ -31,17 +31,20 @@ export default function MyProfile() {
   );
 
   async function load() {
-    const currentSession = await getCurrentSession();
-    const profileRaw = await userGetItem("investorProfile");
-    const brokerRaw = await userGetItem("brokerProfile");
-    const cashRaw = await userGetItem("availableCash");
-    const portfolio = await loadUnifiedPortfolio();
-    const holdings = portfolio.holdings || [];
-
-    setSession(currentSession);
+    const investor = await getInvestorProfile();
     setProfile(profileRaw ? JSON.parse(profileRaw) : null);
-    setBroker(brokerRaw ? JSON.parse(brokerRaw) : null);
-    setCash(Number(cashRaw || 0));
+
+    const [portfolio, cashResult, brokers] = await Promise.all([
+      loadUnifiedPortfolio(),
+      getUserCash(),
+      getUserBrokers()
+    ]);
+
+    const holdings = portfolio?.holdings || [];
+
+    setProfile(investor?.profile || investor?.investorProfile || investor || null);
+    setBroker(brokers?.[0] || null);
+    setCash(Number(cashResult?.summary?.totalCash || 0));
 
     setPortfolioValue(
       holdings.reduce(
@@ -60,7 +63,7 @@ export default function MyProfile() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>My Profile</Text>
-        
+
         <Pressable
           style={styles.dashboardButton}
           onPress={() => router.replace("/(tabs)/dashboard")}
@@ -72,39 +75,53 @@ export default function MyProfile() {
       <Text style={styles.subtitle}>
         Account, investor profile, broker status, and portfolio summary.
       </Text>
-      <ActiveUserBanner />
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Account</Text>
 
-        <Info label="Username" value={session?.username || session?.userId || "N/A"} />
-        <Info label="Email" value={session?.email || "N/A"} />
-        <Info label="User ID" value={session?.userId || "N/A"} />
+      <ActiveUserBanner />
+
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Account</Text>
+
+          <Pressable
+            style={styles.editChip}
+            onPress={() => router.push("/account-edit")}
+          >
+            <Text style={styles.editChipText}>Edit</Text>
+          </Pressable>
+        </View>
+
+        <Info label="Username" value={user?.username || "N/A"} />
+        <Info label="Email" value={user?.email || "N/A"} />
+        <Info label="User ID" value={user?.id || "N/A"} />
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Investor Profile</Text>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Investor Profile</Text>
 
-        <Pressable
-  style={styles.primary}
-  onPress={() => router.push("/investor-profile-edit")}
->
-  <Text style={styles.primaryText}>
-    Edit Investor Profile
-  </Text>
-</Pressable>
+          <Pressable
+            style={styles.editChip}
+            onPress={() => router.push("/investor-profile-edit")}
+          >
+            <Text style={styles.editChipText}>Edit</Text>
+          </Pressable>
+        </View>
 
-        <Info label="Name" value={profile?.name || profile?.fullName || "Not set"} />
-        <Info label="Goal" value={profile?.goal || "Not set"} />
+        <Info label="Name" value={profile?.profile?.name || profile?.name || "User"} />
+        <Info label="Goal" value={profile?.profile?.goal || profile?.goal || "Not set"} />
         <Info
-  label="Risk"
-  value={
-    profile?.risk ||
-    profile?.riskTolerance ||
-    profile?.riskProfile ||
-    "Not set"
-  }
-/>
-        <Info label="Experience" value={profile?.experience || "Not set"} />
+          label="Risk"
+          value={
+            profile?.profile?.risk ||
+            profile?.risk ||
+            profile?.riskTolerance ||
+            "Not set"
+          }
+        />
+        <Info
+          label="Experience"
+          value={profile?.profile?.experience || profile?.experience || "Not set"}
+        />
       </View>
 
       <View style={styles.card}>
@@ -114,8 +131,9 @@ export default function MyProfile() {
           label="Status"
           value={broker ? "Connected / Profile Added" : "No broker connected"}
         />
-        <Info label="Broker" value={broker?.broker || broker?.name || "N/A"} />
-        <Info label="Account" value={broker?.accountNumber || "N/A"} />
+        <Info label="Broker" value={broker?.broker || "N/A"} />
+        <Info label="Client Number" value={broker?.clientNumber || "N/A"} />
+        <Info label="CDS Number" value={broker?.cdsNumber || "N/A"} />
 
         <Pressable
           style={styles.secondary}
@@ -139,12 +157,12 @@ export default function MyProfile() {
         </Pressable>
       </View>
 
-       <Pressable
-  style={styles.secondary}
-  onPress={() => router.push("/portfolio-sync-center")}
->
-  <Text style={styles.secondaryText}>Open Sync Center</Text>
-</Pressable>
+      <Pressable
+        style={styles.secondary}
+        onPress={() => router.push("/portfolio-sync-center")}
+      >
+        <Text style={styles.secondaryText}>Open Sync Center</Text>
+      </Pressable>
 
       <Pressable style={styles.logout} onPress={handleLogout}>
         <Text style={styles.logoutText}>Logout</Text>
@@ -157,7 +175,7 @@ function Info({ label, value }) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+      <Text style={styles.infoValue}>{String(value || "N/A")}</Text>
     </View>
   );
 }
@@ -215,11 +233,29 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 18
   },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12
+  },
   cardTitle: {
     color: "#67e8f9",
     fontSize: 18,
+    fontWeight: "900"
+  },
+  editChip: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12
+  },
+  editChipText: {
+    color: "#67e8f9",
     fontWeight: "900",
-    marginBottom: 12
+    fontSize: 12
   },
   infoRow: {
     borderBottomColor: "#1e293b",
@@ -258,17 +294,5 @@ const styles = StyleSheet.create({
     color: "#fca5a5",
     textAlign: "center",
     fontWeight: "900"
-  },
-primary: {
-  marginTop: 18,
-  backgroundColor: "#9333ea",
-  padding: 16,
-  borderRadius: 16
-},
-
-primaryText: {
-  color: "white",
-  fontWeight: "900",
-  textAlign: "center"
-}
+  }
 });

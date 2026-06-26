@@ -8,7 +8,10 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { userGetItem, userSetItem, userRemoveItem } from "../src/auth/userStorage";
+import {
+  getUserBrokers,
+  addUserBroker
+} from "../src/features/brokers/api/userBrokerApi";
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
 
 const BROKERS = [
@@ -32,29 +35,42 @@ export default function BrokerAccountCenter() {
   );
 
   async function load() {
-    const brokerRaw = await userGetItem("brokerProfile");
-    const profileRaw = await userGetItem("investorProfile");
+  const brokers = await getUserBrokers();
 
-    setBroker(brokerRaw ? JSON.parse(brokerRaw) : null);
-    setProfile(profileRaw ? JSON.parse(profileRaw) : null);
-  }
+  setBroker(
+    brokers.length ? brokers[0] : null
+  );
+
+  const profileRaw = await userGetItem("investorProfile");
+
+  setProfile(
+    profileRaw
+      ? JSON.parse(profileRaw)
+      : null
+  );
+}
 
   async function connectBroker(item) {
-    const next = {
+  try {
+    const broker = await addUserBroker({
       broker: item.name,
-      name: item.name,
-      status: "CONNECTED_DEMO",
-      bestFor: item.bestFor,
-      connectedAt: new Date().toISOString()
-    };
+      clientNumber: "",
+      cdsNumber: ""
+    });
 
-    await userSetItem("brokerProfile", JSON.stringify(next));
-    await userSetItem("brokerProfileSkipped", "false");
+    setBroker(broker);
 
-    setBroker(next);
-
-    Alert.alert("Broker Connected", `${item.name} has been added to your profile.`);
+    Alert.alert(
+      "Broker Added",
+      `${item.name} added successfully`
+    );
+  } catch (error) {
+    Alert.alert(
+      "Unable to add broker",
+      error.message
+    );
   }
+}
 
   async function disconnectBroker() {
     await userRemoveItem("brokerProfile");

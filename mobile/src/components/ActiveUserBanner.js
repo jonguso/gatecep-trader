@@ -5,6 +5,8 @@ import {
   Text,
   View
 } from "react-native";
+import { useAuth } from "../features/auth/hooks/useAuth";
+
 import { router, useFocusEffect } from "expo-router";
 import { getCurrentSession } from "../auth/authStore";
 import { userGetItem } from "../auth/userStorage";
@@ -14,32 +16,48 @@ export default function ActiveUserBanner() {
   const [profile, setProfile] = useState(null);
   const [broker, setBroker] = useState(null);
 
+  const { user } = useAuth();
+
   useFocusEffect(
     useCallback(() => {
       load();
     }, [])
   );
 
-  async function load() {
-  const currentSession = await getCurrentSession();
-  const profileRaw = await userGetItem("investorProfile");
+ async function load() {
+  const currentSession =
+    await getCurrentSession();
 
-  const defaultBrokerRaw = await userGetItem("defaultBrokerProfile");
-  const legacyBrokerRaw = await userGetItem("brokerProfile");
+  const profileRaw =
+    await userGetItem("investorProfile");
+
+  const defaultBrokerRaw =
+    await userGetItem(
+      "defaultBrokerProfile"
+    );
+
+  const legacyBrokerRaw =
+    await userGetItem(
+      "brokerProfile"
+    );
 
   setSession(currentSession);
 
   setProfile(
-    profileRaw ? JSON.parse(profileRaw) : null
+    profileRaw
+      ? JSON.parse(profileRaw)
+      : null
   );
 
-  const brokerRaw = defaultBrokerRaw || legacyBrokerRaw;
+  const brokerRaw =
+    defaultBrokerRaw ||
+    legacyBrokerRaw;
 
-  const brokerProfile = brokerRaw
-    ? JSON.parse(brokerRaw)
-    : null;
-
-  setBroker(brokerProfile);
+  setBroker(
+    brokerRaw
+      ? JSON.parse(brokerRaw)
+      : null
+  );
 }
 
   return (
@@ -50,7 +68,7 @@ export default function ActiveUserBanner() {
       <View>
         <Text style={styles.label}>Active Account</Text>
         <Text style={styles.name}>
-          👤 {session?.username || session?.userId || "Guest"}
+          👤 {user?.username || user?.email || "User"}
         </Text>
       </View>
 
