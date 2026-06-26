@@ -81,6 +81,7 @@ async function handleReadAll() {
 
   const card = coach?.dashboardCard;
   const intelligence = coach;
+  const dividends = coach?.dividends;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -118,6 +119,42 @@ async function handleReadAll() {
           ) : null}
         </View>
       ) : null}
+
+      {dividends ? (
+  <View style={styles.dividendCard}>
+    <Text style={styles.kicker}>Dividend Intelligence</Text>
+
+    <Text style={styles.dividendAmount}>
+      KES {money(dividends.projectedAnnualDividend)}
+    </Text>
+
+    <Text style={styles.small}>Projected Annual Dividend</Text>
+
+    <View style={styles.summaryGrid}>
+      <MiniStat
+        label="Monthly"
+        value={`KES ${money(dividends.projectedMonthlyDividend)}`}
+      />
+      <MiniStat
+        label="Coverage"
+        value={`${dividends.dividendCoveragePct}%`}
+      />
+    </View>
+
+    <View style={styles.summaryGrid}>
+      <MiniStat
+        label="Best"
+        value={dividends.bestDividendHolding?.symbol || "-"}
+      />
+      <MiniStat
+        label="Next"
+        value={dividends.bestDividendHolding?.nextDate || "-"}
+      />
+    </View>
+
+    <Text style={styles.body}>{dividends.narrative}</Text>
+  </View>
+) : null}
 
       <View style={styles.card}>
         <View style={styles.sectionHeader}>
@@ -178,6 +215,12 @@ async function handleReadAll() {
       ) : null}
     </ScrollView>
   );
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString("en-KE", {
+    maximumFractionDigits: 0
+  });
 }
 
 function MiniStat({ label, value }) {
@@ -371,5 +414,20 @@ readAllText: {
   color: "#67e8f9",
   fontSize: 12,
   fontWeight: "900"
+},
+
+dividendCard: {
+  backgroundColor: "#133A22",
+  borderRadius: 24,
+  padding: 18,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: "#22c55e"
+},
+dividendAmount: {
+  color: "#4ade80",
+  fontSize: 30,
+  fontWeight: "900",
+  marginTop: 8
 }
 });

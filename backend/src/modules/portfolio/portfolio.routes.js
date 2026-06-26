@@ -4,14 +4,29 @@ import { authRequired } from "../../middleware/authRequired.js";
 
 import {
   createHolding,
-  getUserPortfolio
+  getUserPortfolio,
+  getUserPortfolioAccounts
 } from "./portfolio.service.js";
 
 const router = express.Router();
 
+router.get("/accounts", authRequired, async (req, res) => {
+  try {
+    const result = await getUserPortfolioAccounts(req.user.id);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: error.message
+    });
+  }
+});
+
 router.get("/", authRequired, async (req, res) => {
   try {
-    const result = await getUserPortfolio(req.user.id);
+    const broker = req.query.broker;
+
+    const result = await getUserPortfolio(req.user.id, { broker });
 
     res.json({
       ok: true,
@@ -27,10 +42,7 @@ router.get("/", authRequired, async (req, res) => {
 
 router.post("/", authRequired, async (req, res) => {
   try {
-    const holding = await createHolding(
-      req.user.id,
-      req.body
-    );
+    const holding = await createHolding(req.user.id, req.body);
 
     res.json({
       ok: true,

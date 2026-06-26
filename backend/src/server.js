@@ -12,6 +12,7 @@ import eventsRouter from "./modules/events/events.routes.js";
 import notificationsRouter from "./modules/notifications/notifications.routes.js";
 import intelligenceRouter from "./modules/intelligence/intelligence.routes.js";
 import dividendRouter from "./modules/dividends/dividend.routes.js";
+import timelineRouter from "./modules/timeline/timeline.routes.js";
 
 import brokerLinkRoutes from "./routes/broker/brokerLink.routes.js";
 import brokerReportRoutes from "./routes/broker/brokerReportImport.routes.js";
@@ -69,6 +70,7 @@ app.use("/events", eventsRouter);
 app.use("/notifications", notificationsRouter);
 app.use("/intelligence", intelligenceRouter);
 app.use("/dividends", dividendRouter);
+app.use("/timeline", timelineRouter);
 
 app.use("/coach-g/broker-link", brokerLinkRoutes);
 app.use("/broker-reports", brokerReportRoutes);

@@ -1,10 +1,11 @@
 import {
-  addUserHolding,
-  listUserPortfolio
+  listUserPortfolio,
+  listUserPortfolioAccounts,
+  addUserHolding
 } from "./portfolio.repository.js";
 
-export async function getUserPortfolio(userId) {
-  const holdings = await listUserPortfolio(userId);
+export async function getUserPortfolio(userId, options = {}) {
+  const holdings = await listUserPortfolio(userId, options);
 
   const totalValue = holdings.reduce(
     (sum, item) => sum + Number(item.marketValue || 0),
@@ -26,6 +27,22 @@ export async function getUserPortfolio(userId) {
   };
 }
 
+export async function getUserPortfolioAccounts(userId) {
+  const accounts = await listUserPortfolioAccounts(userId);
+
+  return {
+    ok: true,
+    accounts: [
+      {
+        broker: "ALL",
+        label: "All Accounts",
+        type: "ALL"
+      },
+      ...accounts
+    ],
+    version: "PortfolioAccounts-014A3"
+  };
+}
 export async function createHolding(userId, payload) {
   return await addUserHolding(userId, payload);
 }
