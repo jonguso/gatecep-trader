@@ -155,7 +155,7 @@ export default function Dashboard() {
 
         <Text style={styles.title}>Dashboard</Text>
 
-        <Pressable style={styles.icon} onPress={() => router.push("/alerts")}>
+        <Pressable style={styles.icon} onPress={() => router.push("/intelligence-center")}>
           <Text style={styles.iconText}>🔔</Text>
         </Pressable>
       </View>

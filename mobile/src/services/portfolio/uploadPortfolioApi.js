@@ -46,3 +46,30 @@ export async function loadUnifiedPortfolio(broker = "AIB") {
     holdings: data.holdings || []
   };
 }
+
+export async function uploadConfirmedPortfolio(portfolio = []) {
+  const token = await getStoredAccessToken();
+
+  if (!token) {
+    throw new Error("Authentication token missing");
+  }
+
+  const response = await fetch(`${API_URL}/user-portfolio`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      holdings: portfolio
+    })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || data.ok === false) {
+    throw new Error(data.error || "Unable to upload confirmed portfolio");
+  }
+
+  return data;
+}
