@@ -8,7 +8,7 @@ import cashRoutes from "./modules/cash/cash.routes.js";
 import brokerLinksRoutes from "./modules/broker-links/brokerLinks.routes.js";
 import performanceRoutes from "./modules/performance/performance.routes.js";
 import coachRoutes from "./modules/coach/coach.routes.js";
-
+import eventsRouter from "./modules/events/events.routes.js";
 
 import brokerLinkRoutes from "./routes/broker/brokerLink.routes.js";
 import brokerReportRoutes from "./routes/broker/brokerReportImport.routes.js";
@@ -62,6 +62,7 @@ app.use("/user-cash", cashRoutes);
 app.use("/user-brokers", brokerLinksRoutes);
 app.use("/portfolio-performance", performanceRoutes);
 app.use("/coach", coachRoutes);
+app.use("/events", eventsRouter);
 
 app.use("/coach-g/broker-link", brokerLinkRoutes);
 app.use("/broker-reports", brokerReportRoutes);
