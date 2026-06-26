@@ -84,11 +84,8 @@ export async function processPortfolioEvents(userId) {
   const notifications = prepareNotifications(events);
 
   return {
-    ok: true,
-    userId,
-    eventCount: events.length,
-    events,
-    notifications,
-    eventEngineVersion: "EventEngine-012A"
-  };
+  userId,
+  events,
+  eventEngineVersion: "EventEngine-012C"
+};
 }
