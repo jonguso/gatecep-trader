@@ -23,7 +23,9 @@ router.post("/register", async (req, res) => {
   } catch (error) {
     return res.status(400).json({
       ok: false,
-      error: error.message
+      error: error.message || String(error),
+code: error.code || null,
+detail: error.detail || null
     });
   }
 });
@@ -39,7 +41,9 @@ router.post("/login", async (req, res) => {
   } catch (error) {
     return res.status(401).json({
       ok: false,
-      error: error.message
+      error: error.message || String(error),
+code: error.code || null,
+detail: error.detail || null
     });
   }
 });

@@ -4,7 +4,8 @@
     "slug": "gatecep",
     "scheme": "gatecep",
     "android": {
-      "package": "com.gatecep.app"
+      "package": "com.gatecep.app",
+      "usesCleartextTraffic": true
     },
     "ios": {
       "bundleIdentifier": "com.gatecep.app"
@@ -13,6 +14,9 @@
       "eas": {
         "projectId": "8c412c28-c7a5-4541-9484-7469917a1e8c"
       }
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
