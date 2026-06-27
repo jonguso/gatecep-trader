@@ -1,23 +1,29 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { LineChart } from "react-native-chart-kit";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  Dimensions,
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import { getMarketSocket } from "../../src/features/market/api/marketSocket";
+
 import { getUserCash } from "../../src/features/cash/api/userCashApi";
 import { getUserBrokers } from "../../src/features/brokers/api/userBrokerApi";
 import { useAuth } from "../../src/features/auth/hooks/useAuth";
-import { API_BASE_URL } from "../../src/config/apiConfig";
-import { getCoachDashboard } from "../../src/features/coach/api/coachApi";
-import { getNotifications } from "../../src/features/intelligence/api/intelligenceApi";
+import { getStoredAccessToken } from "../../src/features/auth/storage/authStorage";
+import {
+  getIntelligenceHome,
+  getNotifications
+} from "../../src/features/intelligence/api/intelligenceApi";
+import { getMarketIntelligenceHome } from "../../src/features/market/api/marketIntelligenceApi";
 
 import ActiveUserBanner from "../../src/components/ActiveUserBanner";
 import { getCurrentSession } from "../../src/auth/authStore";
-import { userGetItem } from "../../src/auth/userStorage";
 import { loadUnifiedPortfolio } from "../../src/portfolio/unifiedPortfolioApi";
 import { APP_VERSION } from "../../src/version/versionRegistry";
 
@@ -35,6 +41,9 @@ export default function Dashboard() {
   const [portfolioSource, setPortfolioSource] = useState("");
   const [coachDashboard, setCoachDashboard] = useState(null);
   const [notificationSummary, setNotificationSummary] = useState(null);
+  const [marketIntel, setMarketIntel] = useState(null);
+  const [portfolioHistory, setPortfolioHistory] = useState([]);
+  
 
   const { user } = useAuth();
 
@@ -45,88 +54,209 @@ export default function Dashboard() {
   );
 
   async function load() {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const currentSession = await getCurrentSession();
-    const token = currentSession?.token || currentSession?.accessToken;
+      const currentSession = await getCurrentSession();
 
-    const [portfolio, cashResult, brokerResult, coachResult, notificationResult] =
-  await Promise.all([
-    loadUnifiedPortfolio(),
-    getUserCash(),
-    getUserBrokers(),
-    getCoachDashboard(token),
-    getNotifications(token)
-  ]);
+      const token =
+        currentSession?.token ||
+        currentSession?.accessToken ||
+        currentSession?.user?.token ||
+        currentSession?.user?.accessToken ||
+        (await getStoredAccessToken());
 
-    const brokers = brokerResult?.brokers || [];
+      console.log("Dashboard token exists:", !!token);
 
-    setCoachDashboard(coachResult);
+      const [
+        portfolioResult,
+        cashResult,
+        brokerResult,
+        marketIntelResult,
+        coachResult,
+        notificationResult
+      ] = await Promise.all([
+        loadUnifiedPortfolio(),
+        getUserCash(),
+        getUserBrokers(),
+        getMarketIntelligenceHome(),
+        getIntelligenceHome(token),
+        getNotifications(token)
+      ]);
 
-    setNotificationSummary(notificationResult?.summary || null);
+      const brokers = brokerResult?.brokers || [];
 
-    setSession(currentSession);
-    setHoldings(portfolio?.holdings || []);
+      setSession(currentSession);
+      setMarketIntel(marketIntelResult);
+      setCoachDashboard(coachResult);
 
-    setCash(
-      Number(
-        cashResult?.summary?.totalCash || 0
-      )
-    );
+      setNotificationSummary(
+        coachResult?.notifications?.summary ||
+          notificationResult?.summary ||
+          null
+      );
 
-    setPortfolioSource(
-      brokers.length
-        ? `USER_PORTFOLIO • ${brokers.length} broker${
-            brokers.length > 1 ? "s" : ""
-          }`
-        : "USER_PORTFOLIO"
-    );
+      setHoldings(
+        marketIntelResult?.holdings ||
+          coachResult?.holdings ||
+          portfolioResult?.holdings ||
+          []
+      );
 
-    setLastUpdated(
-      new Date().toLocaleString()
-    );
-  } catch (error) {
-    console.log(
-      "Dashboard load error:",
-      error.message
-    );
+      setCash(
+        Number(
+          marketIntelResult?.summary?.totalCash ||
+            coachResult?.summary?.totalCash ||
+            cashResult?.summary?.totalCash ||
+            0
+        )
+      );
 
-    setHoldings([]);
-  } finally {
-    setLoading(false);
+      setPortfolioSource(
+        marketIntelResult?.marketFeed?.provider
+          ? `MARKET_INTELLIGENCE • ${marketIntelResult.marketFeed.provider}`
+          : brokers.length
+          ? `USER_PORTFOLIO • ${brokers.length} broker${
+              brokers.length > 1 ? "s" : ""
+            }`
+          : "USER_PORTFOLIO"
+      );
+
+      setLastUpdated(new Date().toLocaleString());
+    } catch (error) {
+      console.log("Dashboard load error:", error.message);
+      setHoldings([]);
+      setMarketIntel(null);
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
-  const investedValue = useMemo(() => {
-  return holdings.reduce((sum, item) => {
-    const directInvested = Number(item.investedValue || item.costValue || 0);
+useFocusEffect(
+  useCallback(() => {
+    const socket = getMarketSocket(user?.id || user?.userId);
 
-    if (directInvested > 0) {
-      return sum + directInvested;
+    const refreshDashboard = () => {
+      console.log("Market cache updated. Reloading dashboard.");
+      load();
+    };
+
+    socket.on("market-cache:updated", refreshDashboard);
+
+    return () => {
+      socket.off("market-cache:updated", refreshDashboard);
+    };
+  }, [user?.id, user?.userId])
+);
+
+useFocusEffect(
+  useCallback(() => {
+    const socket = getMarketSocket(user?.id || user?.userId);
+
+    const updatePortfolio = (payload) => {
+      console.log("Live portfolio update received:", payload?.summary);
+
+      if (payload?.summary) {
+        setMarketIntel((current) => ({
+          ...(current || {}),
+          summary: payload.summary,
+          coach: payload.coach || current?.coach,
+          movers: payload.movers || current?.movers || [],
+          holdings: payload.holdings || current?.holdings || [],
+          marketFeed: payload.marketFeed || current?.marketFeed,
+          generatedAt: payload.generatedAt || current?.generatedAt
+        }));
+         setPortfolioHistory((current) => {
+  const next = [
+    ...current,
+    {
+      time: new Date().toLocaleTimeString(),
+      value: Number(payload.summary.netWorth || payload.summary.totalValue || 0)
+    }
+  ];
+
+  return next.slice(-30);
+});
+      }
+
+      if (payload?.holdings) {
+        setHoldings(payload.holdings);
+      }
+
+      if (payload?.summary?.totalCash !== undefined) {
+        setCash(Number(payload.summary.totalCash || 0));
+      }
+    };
+
+    socket.on("portfolio:update", updatePortfolio);
+
+    return () => {
+      socket.off("portfolio:update", updatePortfolio);
+    };
+  }, [user?.id, user?.userId])
+);
+
+  const portfolioSummary = useMemo(() => {
+    const apiSummary = marketIntel?.summary || coachDashboard?.summary;
+
+    if (apiSummary?.totalValue || apiSummary?.investedValue) {
+      return {
+        currentValue: Number(apiSummary.totalValue || 0),
+        investedValue: Number(apiSummary.investedValue || 0),
+        netGainLoss: Number(apiSummary.totalGain || 0),
+        gainLossPct: Number(apiSummary.totalGainPct || 0),
+        dayChange: Number(apiSummary.dayChange || 0)
+      };
     }
 
-    return (
-      sum +
-      Number(item.quantity || 0) *
-        Number(item.averagePrice || item.averageCost || item.avgPrice || 0)
-    );
-  }, 0);
-}, [holdings]);
-
-  const currentValue = useMemo(() => {
-    return holdings.reduce(
+    const totalValueFromHoldings = holdings.reduce(
       (sum, item) => sum + Number(item.marketValue || item.value || 0),
       0
     );
-  }, [holdings]);
 
-  const netGainLoss = currentValue - investedValue;
+    const investedFromHoldings = holdings.reduce((sum, item) => {
+      const qty = Number(item.quantity || 0);
+      const avg = Number(
+        item.averagePrice || item.averageCost || item.avgPrice || 0
+      );
+      const direct = Number(item.investedValue || item.costValue || 0);
 
-  const gainLossPct =
-    investedValue > 0 ? (netGainLoss / investedValue) * 100 : 0;
+      return sum + (direct > 0 ? direct : qty * avg);
+    }, 0);
+
+    const profitLossFromHoldings = holdings.reduce(
+      (sum, item) => sum + Number(item.profitLoss || item.gain || 0),
+      0
+    );
+
+    const netGainLoss =
+      profitLossFromHoldings !== 0
+        ? profitLossFromHoldings
+        : totalValueFromHoldings - investedFromHoldings;
+
+    return {
+      currentValue: totalValueFromHoldings,
+      investedValue: investedFromHoldings,
+      netGainLoss,
+      gainLossPct:
+        investedFromHoldings > 0
+          ? (netGainLoss / investedFromHoldings) * 100
+          : 0,
+      dayChange: 0
+    };
+  }, [holdings, coachDashboard, marketIntel]);
+
+  const currentValue = portfolioSummary.currentValue;
+  const investedValue = portfolioSummary.investedValue;
+  const netGainLoss = portfolioSummary.netGainLoss;
+  const gainLossPct = portfolioSummary.gainLossPct;
+  const displayDayChange = portfolioSummary.dayChange;
 
   const topMovers = useMemo(() => {
+    if (marketIntel?.movers?.length) {
+      return marketIntel.movers.slice(0, 6);
+    }
+
     return [...MARKET_ROWS]
       .filter((item) => Number(item.changePct || 0) !== 0)
       .sort(
@@ -135,7 +265,7 @@ export default function Dashboard() {
           Math.abs(Number(a.changePct || 0))
       )
       .slice(0, 6);
-  }, []);
+  }, [marketIntel]);
 
   const watchlistCount = 8;
   const goalTarget = 1000000;
@@ -161,19 +291,21 @@ export default function Dashboard() {
         <Text style={styles.title}>Dashboard</Text>
 
         <Pressable
-  style={styles.icon}
-  onPress={() => router.push("/intelligence-center")}
->
-  <Text style={styles.iconText}>🔔</Text>
+          style={styles.icon}
+          onPress={() => router.push("/intelligence-center")}
+        >
+          <Text style={styles.iconText}>🔔</Text>
 
-  {notificationSummary?.unread > 0 ? (
-    <View style={styles.badge}>
-      <Text style={styles.badgeText}>
-        {notificationSummary.unread > 9 ? "9+" : notificationSummary.unread}
-      </Text>
-    </View>
-  ) : null}
-</Pressable>
+          {notificationSummary?.unread > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {notificationSummary.unread > 9
+                  ? "9+"
+                  : notificationSummary.unread}
+              </Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
 
       <Text style={styles.subtitle}>GateCEP investor command center</Text>
@@ -201,13 +333,160 @@ export default function Dashboard() {
           {gainLossPct.toFixed(2)}%)
         </Text>
 
+        {marketIntel?.summary ? (
+          <Text style={displayDayChange >= 0 ? styles.green : styles.red}>
+            Today {displayDayChange >= 0 ? "+" : ""}KES{" "}
+            {money(displayDayChange)}
+          </Text>
+        ) : null}
+        
+        
         <View style={styles.heroGrid}>
           <MiniMetric label="Invested" value={`KES ${money(investedValue)}`} />
           <MiniMetric label="Cash" value={`KES ${money(cash)}`} />
-          <MiniMetric label="Holdings" value={String(holdings.length)} />
+          <MiniMetric
+            label="Holdings"
+            value={String(
+              marketIntel?.summary?.holdingsCount ||
+                coachDashboard?.summary?.holdingsCount ||
+                holdings.length
+            )}
+          />
           <MiniMetric label="Watchlist" value={String(watchlistCount)} />
         </View>
       </View>
+       
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Goal Tracker</Text>
+
+        <Text style={styles.goalValue}>KES {money(currentValue)}</Text>
+
+        <View style={styles.barTrack}>
+          <View
+            style={[
+              styles.barFill,
+              { width: `${Math.min(goalProgress, 100)}%` }
+            ]}
+          />
+        </View>
+
+        <Text style={styles.small}>
+          Target KES {money(goalTarget)} • {goalProgress.toFixed(1)}% complete
+        </Text>
+      </View>
+
+        <View style={styles.card}>
+  <Text style={styles.cardTitle}>Live Net Worth</Text>
+
+  {portfolioHistory.length > 1 ? (
+    <LineChart
+      width={Dimensions.get("window").width - 70}
+      height={220}
+      data={{
+        labels: portfolioHistory.map((_, i) => ""),
+        datasets: [
+          {
+            data: portfolioHistory.map((p) => p.value)
+          }
+        ]
+      }}
+      withDots={false}
+      withInnerLines={false}
+      withOuterLines={false}
+      withShadow={false}
+      bezier
+      chartConfig={{
+        backgroundGradientFrom: "#0f172a",
+        backgroundGradientTo: "#0f172a",
+        decimalPlaces: 0,
+        color: (opacity = 1) => `rgba(103,232,249,${opacity})`,
+        labelColor: () => "#94a3b8"
+      }}
+      style={{
+        marginTop: 12,
+        borderRadius: 16
+      }}
+    />
+  ) : (
+    <Text style={styles.small}>
+      Waiting for live portfolio updates…
+    </Text>
+  )}
+</View> 
+     
+      <View style={styles.card}>
+  <Text style={styles.cardTitle}>Live NSE Ticker</Text>
+
+  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    {topMovers.map((item) => {
+      const pct = Number(item.dayChangePct || item.changePct || 0);
+      const price = Number(item.livePrice || item.price || item.lastPrice || 0);
+
+      return (
+        <View key={`ticker-${item.symbol}`} style={styles.tickerChip}>
+          <Text style={styles.symbol}>{item.symbol}</Text>
+
+          <Text style={styles.value}>KES {money(price)}</Text>
+
+          <Text style={pct >= 0 ? styles.green : styles.red}>
+            {pct >= 0 ? "▲" : "▼"} {pct.toFixed(2)}%
+          </Text>
+        </View>
+      );
+    })}
+  </ScrollView>
+</View> 
+
+       <View style={styles.card}>
+        <Text style={styles.cardTitle}>Top Movers Today</Text>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {topMovers.map((item) => (
+            <View key={item.symbol} style={styles.moverChip}>
+              <Text style={styles.symbol}>{item.symbol}</Text>
+
+              <Text
+                style={
+                  Number(item.dayChangePct || item.changePct || 0) >= 0
+                    ? styles.green
+                    : styles.red
+                }
+              >
+                {Number(item.dayChangePct || item.changePct || 0) >= 0
+                  ? "+"
+                  : ""}
+                {Number(item.dayChangePct || item.changePct || 0).toFixed(2)}%
+              </Text>
+
+              {item.dayChange !== undefined ? (
+                <Text style={styles.small}>KES {money(item.dayChange)}</Text>
+              ) : null}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
+       {marketIntel?.coach ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Coach G Market Intelligence</Text>
+
+          <Text style={styles.symbol}>{marketIntel.coach.headline}</Text>
+
+          <Text style={styles.body}>{marketIntel.coach.narrative}</Text>
+
+          <Text style={displayDayChange >= 0 ? styles.green : styles.red}>
+            Today {displayDayChange >= 0 ? "+" : ""}KES{" "}
+            {money(displayDayChange)}
+          </Text>
+
+          {marketIntel?.marketFeed ? (
+            <Text style={styles.small}>
+              {marketIntel.marketFeed.provider} •{" "}
+              {marketIntel.marketFeed.marketDate || "Market date unavailable"}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Market Snapshot</Text>
@@ -240,30 +519,7 @@ export default function Dashboard() {
           </Pressable>
         ))}
       </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Top Movers Today</Text>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {topMovers.map((item) => (
-            <View key={item.symbol} style={styles.moverChip}>
-              <Text style={styles.symbol}>{item.symbol}</Text>
-
-              <Text
-                style={
-                  Number(item.changePct || 0) >= 0
-                    ? styles.green
-                    : styles.red
-                }
-              >
-                {Number(item.changePct || 0) >= 0 ? "+" : ""}
-                {Number(item.changePct || 0).toFixed(2)}%
-              </Text>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-
+     
       <CoachGIntelligenceCard card={coachDashboard?.dashboardCard} />
 
       <View style={styles.quickGrid}>
@@ -274,34 +530,16 @@ export default function Dashboard() {
         <QuickButton title="Calendar" route="/(tabs)/calendar" />
         <QuickButton title="Coach G" route="/coach-insights" accent />
       </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Goal Tracker</Text>
-
-        <Text style={styles.goalValue}>KES {money(currentValue)}</Text>
-
-        <View style={styles.barTrack}>
-          <View
-            style={[
-              styles.barFill,
-              { width: `${Math.min(goalProgress, 100)}%` }
-            ]}
-          />
-        </View>
-
-        <Text style={styles.small}>
-          Target KES {money(goalTarget)} • {goalProgress.toFixed(1)}% complete
-        </Text>
-      </View>
+     
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Recent Activity</Text>
 
         {[
-          "Portfolio valuation updated",
+          "Market intelligence refreshed",
+          "Portfolio revalued using market prices",
           "Broker profile active",
           "Coach G analysis refreshed",
-          "Market alert triggered - EABL",
           "Order workspace ready"
         ].map((item) => (
           <View key={item} style={styles.activityRow}>
@@ -350,9 +588,7 @@ function CoachGIntelligenceCard({ card }) {
               style={styles.secondaryAction}
               onPress={() => router.push(action.route)}
             >
-              <Text style={styles.secondaryActionText}>
-                {action.label}
-              </Text>
+              <Text style={styles.secondaryActionText}>{action.label}</Text>
             </Pressable>
           ))}
         </View>
@@ -427,36 +663,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900"
   },
-
-primaryAction: {
-  marginTop: 14,
-  backgroundColor: "#111827",
-  paddingVertical: 12,
-  borderRadius: 14,
-  alignItems: "center"
-},
-primaryActionText: {
-  color: "#ffffff",
-  fontWeight: "800"
-},
-actionWrap: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8,
-  marginTop: 12
-},
-secondaryAction: {
-  borderWidth: 1,
-  borderColor: "#334155",
-  borderRadius: 12,
-  paddingVertical: 8,
-  paddingHorizontal: 10
-},
-secondaryActionText: {
-  color: "#e5e7eb",
-  fontWeight: "700",
-  fontSize: 12
-},
+  primaryAction: {
+    marginTop: 14,
+    backgroundColor: "#111827",
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center"
+  },
+  primaryActionText: {
+    color: "#ffffff",
+    fontWeight: "800"
+  },
+  actionWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12
+  },
+  secondaryAction: {
+    borderWidth: 1,
+    borderColor: "#334155",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10
+  },
+  secondaryActionText: {
+    color: "#e5e7eb",
+    fontWeight: "700",
+    fontSize: 12
+  },
   heroCard: {
     marginTop: 18,
     backgroundColor: "rgba(147,51,234,.16)",
@@ -564,25 +799,23 @@ secondaryActionText: {
     flexDirection: "row",
     justifyContent: "space-between"
   },
-
-badge: {
-  position: "absolute",
-  top: -4,
-  right: -4,
-  minWidth: 18,
-  height: 18,
-  borderRadius: 9,
-  backgroundColor: "#ef4444",
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: 4
-},
-badgeText: {
-  color: "#ffffff",
-  fontSize: 10,
-  fontWeight: "900"
-},
-
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#ef4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4
+  },
+  badgeText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "900"
+  },
   barTrack: {
     marginTop: 10,
     height: 10,
@@ -594,33 +827,6 @@ badgeText: {
     height: "100%",
     backgroundColor: "#9333ea",
     borderRadius: 8
-  },
-  buttonRow: {
-    marginTop: 16,
-    flexDirection: "row",
-    gap: 10
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: "#9333ea",
-    borderRadius: 16,
-    padding: 14
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: "#1e293b",
-    borderRadius: 16,
-    padding: 14
-  },
-  primaryText: {
-    color: "white",
-    fontWeight: "900",
-    textAlign: "center"
-  },
-  secondaryText: {
-    color: "#67e8f9",
-    fontWeight: "900",
-    textAlign: "center"
   },
   quickGrid: {
     marginTop: 16,
@@ -654,6 +860,18 @@ badgeText: {
     fontSize: 24,
     fontWeight: "900"
   },
+
+  tickerChip: {
+  backgroundColor: "#020617",
+  borderColor: "#334155",
+  borderWidth: 1,
+  borderRadius: 16,
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+  marginRight: 10,
+  minWidth: 110
+},
+
   activityRow: {
     borderBottomColor: "#1e293b",
     borderBottomWidth: 1,

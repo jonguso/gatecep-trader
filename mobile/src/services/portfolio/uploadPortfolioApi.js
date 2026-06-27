@@ -1,57 +1,36 @@
 import { API_URL } from "../../config/apiConfig";
-import { getStoredAccessToken } from "../../features/auth/storage/authStorage";
+import { getCurrentSession } from "../../auth/authStore";
 
-export async function loadUnifiedPortfolio(broker = "AIB") {
-  const token = await getStoredAccessToken();
+export async function uploadConfirmedPortfolio(portfolio = [], tokenOverride = null) {
+  const session = await getCurrentSession();
 
-  if (token) {
-    try {
-      const response = await fetch(`${API_URL}/user-portfolio?t=${Date.now()}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.ok) {
-        return {
-          source: "USER_PORTFOLIO",
-          priceSource: "USER_PORTFOLIO",
-          holdings: data.holdings || [],
-          totalValue: data.summary?.totalValue || 0,
-          totalMarketValue: data.summary?.totalValue || 0,
-          totalProfitLoss: data.summary?.totalProfitLoss || 0,
-          summary: data.summary || {}
-        };
-      }
-    } catch (error) {
-      console.log("User portfolio load failed:", error.message);
-    }
-  }
-
-  const response = await fetch(
-    `${API_URL}/broker-portfolio/${broker}?t=${Date.now()}`
-  );
-
-  const data = await response.json();
-
-  if (!response.ok || !data.ok) {
-    throw new Error(data.error || "Unable to load portfolio");
-  }
-
-  return {
-    ...data,
-    source: data.source || "BROKER_PORTFOLIO",
-    holdings: data.holdings || []
-  };
-}
-
-export async function uploadConfirmedPortfolio(portfolio = []) {
-  const token = await getStoredAccessToken();
+const token =
+  tokenOverride ||
+  session?.token ||
+  session?.accessToken ||
+  session?.user?.token ||
+  session?.user?.accessToken;
 
   if (!token) {
     throw new Error("Authentication token missing");
+  }
+
+  const cleanPortfolio = (portfolio || []).filter((h) => {
+    const symbol = String(h.symbol || "").trim().toUpperCase();
+    const quantity = Number(h.quantity || 0);
+
+    return symbol && symbol !== "N/A" && quantity > 0;
+  });
+
+  console.log(
+    "Uploading confirmed portfolio:",
+    cleanPortfolio.length,
+    "valid of",
+    portfolio.length
+  );
+
+  if (!cleanPortfolio.length) {
+    throw new Error("No valid holdings to upload");
   }
 
   const response = await fetch(`${API_URL}/user-portfolio`, {
@@ -61,7 +40,7 @@ export async function uploadConfirmedPortfolio(portfolio = []) {
       Authorization: `Bearer ${token}`
     },
     body: JSON.stringify({
-      holdings: portfolio
+      holdings: cleanPortfolio
     })
   });
 

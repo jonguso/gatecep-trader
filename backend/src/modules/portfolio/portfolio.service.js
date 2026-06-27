@@ -1,7 +1,8 @@
 import {
   listUserPortfolio,
   listUserPortfolioAccounts,
-  addUserHolding
+  addUserHolding,
+  updateUserPositionSettlement
 } from "./portfolio.repository.js";
 
 export async function getUserPortfolio(userId, options = {}) {
@@ -45,4 +46,16 @@ export async function getUserPortfolioAccounts(userId) {
 }
 export async function createHolding(userId, payload) {
   return await addUserHolding(userId, payload);
+}
+
+export async function getUserPositions(userId, options = {}) {
+  return await getUserPortfolio(userId, options);
+}
+
+export async function upsertUserPosition(userId, payload) {
+  return await createHolding(userId, payload);
+}
+
+export async function settleUserPosition(userId, payload = {}) {
+  return await updateUserPositionSettlement(userId, payload);
 }

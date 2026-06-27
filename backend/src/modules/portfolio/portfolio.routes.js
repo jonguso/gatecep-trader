@@ -42,11 +42,27 @@ router.get("/", authRequired, async (req, res) => {
 
 router.post("/", authRequired, async (req, res) => {
   try {
-    const holding = await createHolding(req.user.id, req.body);
+    const holdings = Array.isArray(req.body?.holdings)
+      ? req.body.holdings
+      : [req.body];
+
+    const saved = [];
+
+    for (const holding of holdings) {
+      const symbol = String(holding.symbol || "").trim().toUpperCase();
+      const quantity = Number(holding.quantity || 0);
+
+      if (!symbol || symbol === "N/A" || quantity <= 0) {
+        continue;
+      }
+
+      saved.push(await createHolding(req.user.id, holding));
+    }
 
     res.json({
       ok: true,
-      holding
+      count: saved.length,
+      holdings: saved
     });
   } catch (error) {
     res.status(500).json({

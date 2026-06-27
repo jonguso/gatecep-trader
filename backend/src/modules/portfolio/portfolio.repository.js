@@ -38,6 +38,11 @@ export async function listUserPortfolio(userId, options = {}) {
         name,
         sector,
         quantity,
+        settled_quantity AS "settledQuantity",
+        pending_buy_quantity AS "pendingBuyQuantity",
+        pending_sell_quantity AS "pendingSellQuantity",
+        settlement_status AS "settlementStatus",
+        settlement_date AS "settlementDate",
         average_price AS "averagePrice",
         market_price AS "marketPrice",
         market_value AS "marketValue",
@@ -104,9 +109,9 @@ export async function addUserHolding(userId, holding = {}) {
     sector: holding.sector
   });
 
-   if (!mastered.symbol || Number(holding.quantity || 0) <= 0) {
-  throw new Error("Invalid holding: symbol and quantity are required");
-}
+  if (!mastered.symbol || Number(holding.quantity || 0) <= 0) {
+    throw new Error("Invalid holding: symbol and quantity are required");
+  }
 
   const result = await pool.query(
     `
@@ -118,6 +123,11 @@ export async function addUserHolding(userId, holding = {}) {
         name,
         sector,
         quantity,
+        settled_quantity,
+        pending_buy_quantity,
+        pending_sell_quantity,
+        settlement_status,
+        settlement_date,
         average_price,
         market_price,
         market_value,
@@ -126,12 +136,20 @@ export async function addUserHolding(userId, holding = {}) {
         created_at,
         updated_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW(),NOW())
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+        $13,$14,$15,$16,$17,NOW(),NOW()
+      )
       ON CONFLICT (user_id, broker, symbol)
       DO UPDATE SET
         name = EXCLUDED.name,
         sector = EXCLUDED.sector,
         quantity = EXCLUDED.quantity,
+        settled_quantity = EXCLUDED.settled_quantity,
+        pending_buy_quantity = EXCLUDED.pending_buy_quantity,
+        pending_sell_quantity = EXCLUDED.pending_sell_quantity,
+        settlement_status = EXCLUDED.settlement_status,
+        settlement_date = EXCLUDED.settlement_date,
         average_price = EXCLUDED.average_price,
         market_price = EXCLUDED.market_price,
         market_value = EXCLUDED.market_value,
@@ -146,6 +164,11 @@ export async function addUserHolding(userId, holding = {}) {
         name,
         sector,
         quantity,
+        settled_quantity AS "settledQuantity",
+        pending_buy_quantity AS "pendingBuyQuantity",
+        pending_sell_quantity AS "pendingSellQuantity",
+        settlement_status AS "settlementStatus",
+        settlement_date AS "settlementDate",
         average_price AS "averagePrice",
         market_price AS "marketPrice",
         market_value AS "marketValue",
@@ -162,6 +185,11 @@ export async function addUserHolding(userId, holding = {}) {
       mastered.name,
       mastered.sector,
       Number(holding.quantity || 0),
+      Number(holding.settledQuantity ?? holding.quantity ?? 0),
+      Number(holding.pendingBuyQuantity || 0),
+      Number(holding.pendingSellQuantity || 0),
+      holding.settlementStatus || "SETTLED",
+      holding.settlementDate || null,
       Number(holding.averagePrice || holding.averageCost || 0),
       Number(holding.marketPrice || holding.price || 0),
       Number(holding.marketValue || holding.value || 0),
@@ -171,4 +199,72 @@ export async function addUserHolding(userId, holding = {}) {
   );
 
   return enrichHolding(result.rows[0]);
+}
+export async function listUserPositions(userId, options = {}) {
+  return await listUserPortfolio(userId, options);
+}
+
+export async function updateUserPositionSettlement(userId, payload = {}) {
+  const broker = payload.broker || "GATECEP-DEMO";
+  const symbol = String(payload.symbol || "").toUpperCase().trim();
+
+  if (!symbol) {
+    throw new Error("Settlement update requires symbol");
+  }
+
+  const result = await pool.query(
+    `
+      UPDATE user_portfolios
+      SET
+        settled_quantity = $4,
+        pending_buy_quantity = $5,
+        pending_sell_quantity = $6,
+        settlement_status = $7,
+        settlement_date = $8,
+        updated_at = NOW()
+      WHERE user_id = $1
+        AND broker = $2
+        AND symbol = $3
+      RETURNING
+        id,
+        user_id AS "userId",
+        broker,
+        symbol,
+        name,
+        sector,
+        quantity,
+        settled_quantity AS "settledQuantity",
+        pending_buy_quantity AS "pendingBuyQuantity",
+        pending_sell_quantity AS "pendingSellQuantity",
+        settlement_status AS "settlementStatus",
+        settlement_date AS "settlementDate",
+        average_price AS "averagePrice",
+        market_price AS "marketPrice",
+        market_value AS "marketValue",
+        profit_loss AS "profitLoss",
+        source,
+        created_at AS "createdAt",
+        updated_at AS "updatedAt"
+    `,
+    [
+      userId,
+      broker,
+      symbol,
+      Number(payload.settledQuantity || 0),
+      Number(payload.pendingBuyQuantity || 0),
+      Number(payload.pendingSellQuantity || 0),
+      payload.settlementStatus || "SETTLED",
+      payload.settlementDate || null
+    ]
+  );
+
+  if (!result.rows[0]) {
+    throw new Error("Position not found for settlement update");
+  }
+
+  return enrichHolding(result.rows[0]);
+}
+
+export async function upsertUserPosition(userId, position = {}) {
+  return await addUserHolding(userId, position);
 }

@@ -13,10 +13,13 @@ import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import * as XLSX from "xlsx";
 import * as FileSystem from "expo-file-system/legacy";
+
 import {
-  userGetItem,
   userSetItem
 } from "../../src/auth/userStorage";
+import { getCurrentSession } from "../../src/auth/authStore";
+import { API_URL } from "../../src/config/apiConfig";
+import { getStoredAccessToken } from "../../src/features/auth/storage/authStorage";
 
 export default function Funds() {
   const [cash, setCash] = useState("");
@@ -201,43 +204,89 @@ export default function Funds() {
   }
 
   async function saveStatement() {
-    const amount = cleanNumber(cash);
+    try {
+      const amount = cleanNumber(cash);
 
-    if (!Number.isFinite(amount) || amount < 0) {
-      Alert.alert("Invalid Amount", "Enter available cash / trading space.");
-      return;
-    }
+      if (!Number.isFinite(amount) || amount < 0) {
+        Alert.alert("Invalid Amount", "Enter available cash / trading space.");
+        return;
+      }
 
-    const summary = {
+      const summary = {
+        broker,
+        availableCash: amount,
+        uploadedAt: new Date().toISOString(),
+        source: selectedFile
+          ? "MOBILE_STATEMENT_UPLOAD"
+          : "MANUAL_STATEMENT_ENTRY",
+        fileName: selectedFile?.name || null
+      };
+
+      await userSetItem("availableCash", String(amount));
+      await userSetItem("cashStatementUploaded", "true");
+      await userSetItem("statementSummary", JSON.stringify(summary));
+
+      const session = await getCurrentSession();
+
+const token =
+  session?.token ||
+  session?.accessToken ||
+  session?.user?.token ||
+  session?.user?.accessToken ||
+  (await getStoredAccessToken());
+
+      if (!token) {
+        Alert.alert("Session expired", "Please log in again.");
+        router.replace("/login");
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/user-cash`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
   broker,
+  amount,
+  cashBalance: amount,
   availableCash: amount,
-  uploadedAt: new Date().toISOString(),
-  source: selectedFile ? "MOBILE_STATEMENT_UPLOAD" : "MANUAL_STATEMENT_ENTRY",
-  fileName: selectedFile?.name || null
-};
+  ledgerBalance: amount,
+  balance: amount,
+  type: "STATEMENT_CASH_UPDATE",
+  source: summary.source,
+  fileName: summary.fileName
+})
+      });
 
-await userSetItem("availableCash", String(amount));
-await userSetItem("cashStatementUploaded", "true");
-await userSetItem("statementSummary", JSON.stringify(summary));
+      const data = await response.json();
 
-    Alert.alert("Statement Saved", "Available cash updated.");
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || "Unable to update backend cash");
+      }
 
-    router.replace("/broker-upload");
+      Alert.alert("Statement Saved", "Available cash updated.");
+      router.replace("/broker-upload");
+    } catch (error) {
+      Alert.alert("Cash Update Failed", error.message);
+      setStatus(`Cash update failed: ${error.message}`);
+    }
   }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      
       <View style={styles.headerRow}>
-  <Text style={styles.title}>Funds</Text>
+        <Text style={styles.title}>Funds</Text>
 
-  <Pressable
-    style={styles.dashboardButton}
-    onPress={() => router.replace("/(tabs)/dashboard")}
-  >
-    <Text style={styles.dashboardButtonText}>Dashboard</Text>
-  </Pressable>
-</View>
+        <Pressable
+          style={styles.dashboardButton}
+          onPress={() => router.replace("/(tabs)/dashboard")}
+        >
+          <Text style={styles.dashboardButtonText}>Dashboard</Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.subtitle}>
         Import or enter your broker cash / ledger statement to calculate
         available cash for Coach G.
@@ -302,7 +351,10 @@ await userSetItem("statementSummary", JSON.stringify(summary));
         <Text style={styles.primaryText}>Save Statement</Text>
       </Pressable>
 
-      <Pressable style={styles.backButton} onPress={() => router.replace("/broker-upload")}>
+      <Pressable
+        style={styles.backButton}
+        onPress={() => router.replace("/broker-upload")}
+      >
         <Text style={styles.backText}>Back to Upload Center</Text>
       </Pressable>
     </ScrollView>
@@ -393,26 +445,24 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14
   },
-headerRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12
-},
-
-dashboardButton: {
-  backgroundColor: "#1e293b",
-  borderColor: "#334155",
-  borderWidth: 1,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 14
-},
-
-dashboardButtonText: {
-  color: "#67e8f9",
-  fontWeight: "900"
-},
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12
+  },
+  dashboardButton: {
+    backgroundColor: "#1e293b",
+    borderColor: "#334155",
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14
+  },
+  dashboardButtonText: {
+    color: "#67e8f9",
+    fontWeight: "900"
+  },
   statusText: {
     color: "#cbd5e1",
     lineHeight: 20

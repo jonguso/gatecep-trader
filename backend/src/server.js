@@ -1,4 +1,6 @@
 import express from "express";
+import http from "http";
+import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -13,6 +15,19 @@ import notificationsRouter from "./modules/notifications/notifications.routes.js
 import intelligenceRouter from "./modules/intelligence/intelligence.routes.js";
 import dividendRouter from "./modules/dividends/dividend.routes.js";
 import timelineRouter from "./modules/timeline/timeline.routes.js";
+import brokerSyncRoutes from "./modules/broker-adapters/brokerSync.routes.js";
+import transactionRoutes from "./modules/transactions/transaction.routes.js";
+import marketIntelligenceRoutes from "./modules/market-intelligence/marketIntelligence.routes.js";
+import marketCacheRoutes from "./modules/market-cache/marketCache.routes.js";
+import { startMarketCacheScheduler } from "./modules/market-cache/marketCache.scheduler.js";
+import { registerMarketCacheSocket } from "./modules/market-cache/marketCache.socket.js";
+import { registerLivePortfolioSocket } from "./modules/live-portfolio/livePortfolio.socket.js";
+import livePortfolioRoutes from "./modules/live-portfolio/livePortfolio.routes.js";
+import portfolioHealthRoutes from "./modules/portfolio-health/portfolioHealth.routes.js";
+import {
+  registerActiveUser,
+  unregisterSocket
+} from "./modules/live-portfolio/livePortfolio.registry.js";
 
 import brokerLinkRoutes from "./routes/broker/brokerLink.routes.js";
 import brokerReportRoutes from "./routes/broker/brokerReportImport.routes.js";
@@ -71,6 +86,12 @@ app.use("/notifications", notificationsRouter);
 app.use("/intelligence", intelligenceRouter);
 app.use("/dividends", dividendRouter);
 app.use("/timeline", timelineRouter);
+app.use("/broker-adapters", brokerSyncRoutes);
+app.use("/transactions", transactionRoutes);
+app.use("/market-intelligence", marketIntelligenceRoutes);
+app.use("/market-cache", marketCacheRoutes);
+app.use("/live-portfolio", livePortfolioRoutes);
+app.use("/portfolio-health", portfolioHealthRoutes);
 
 app.use("/coach-g/broker-link", brokerLinkRoutes);
 app.use("/broker-reports", brokerReportRoutes);
@@ -109,7 +130,40 @@ app.use((error, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Gatecep backend running on ${PORT}`);
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins.includes("*") ? "*" : allowedOrigins,
+    credentials: true
+  }
 });
 
+registerMarketCacheSocket(io);
+
+registerLivePortfolioSocket(io);
+
+io.on("connection", (socket) => {
+const userId = socket.handshake.auth?.userId;
+
+if (userId) {
+  registerActiveUser(userId, socket.id);
+  console.log("Live portfolio user registered:", userId);
+}
+
+  console.log("Socket connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+   unregisterSocket(socket.id);
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Gatecep backend running on ${PORT}`);
+
+  const schedulerStatus = startMarketCacheScheduler();
+  console.log(
+    `Market cache scheduler: running=${schedulerStatus.running}, interval=${schedulerStatus.intervalMs}ms`
+  );
+});

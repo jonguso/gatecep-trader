@@ -11,7 +11,10 @@ import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
 import { router, useFocusEffect } from "expo-router";
 
 import ActiveUserBanner from "../src/components/ActiveUserBanner";
-import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
+import {
+  loadUnifiedPortfolio,
+  loadPortfolioAccounts
+} from "../src/portfolio/unifiedPortfolioApi";
 
 import {
   PORTFOLIO_TABS,
@@ -31,6 +34,13 @@ const COLORS = [
 export default function PortfolioHub() {
   const [tab, setTab] = useState("Holdings");
   const [portfolio, setPortfolio] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [selectedAccount, setSelectedAccount] = useState({
+  broker: "ALL",
+  label: "All Accounts",
+  type: "ALL"
+});
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [selectedSector, setSelectedSector] = useState(null);
 
   useFocusEffect(
@@ -39,11 +49,15 @@ export default function PortfolioHub() {
     }, [])
   );
 
-  async function load() {
+  async function load(account = selectedAccount) {
   try {
-    const result = await loadUnifiedPortfolio();
+    const [portfolioResult, accountResult] = await Promise.all([
+      loadUnifiedPortfolio({ broker: account?.broker || "ALL" }),
+      loadPortfolioAccounts()
+    ]);
 
-    setPortfolio(result?.holdings || []);
+    setPortfolio(portfolioResult?.holdings || []);
+    setAccounts(accountResult?.accounts || []);
   } catch (error) {
     console.log("PortfolioHub load error:", error.message);
     setPortfolio([]);
@@ -125,6 +139,18 @@ export default function PortfolioHub() {
 
       <ActiveUserBanner />
 
+      <Pressable
+  style={styles.accountSelector}
+  onPress={() => setAccountModalOpen(true)}
+>
+  <View>
+    <Text style={styles.accountLabel}>Portfolio Source</Text>
+    <Text style={styles.accountName}>{selectedAccount.label}</Text>
+  </View>
+
+  <Text style={styles.accountChevron}>⌄</Text>
+</Pressable>
+
       <View style={styles.hero}>
         <Text style={styles.heroLabel}>Total Portfolio Value</Text>
         <Text style={styles.heroValue}>KES {money(hub.totalValue)}</Text>
@@ -192,20 +218,61 @@ export default function PortfolioHub() {
                       {holding.name || holding.sector || "NSE Security"}
                     </Text>
                     <Text style={styles.small}>
-                      Qty {Number(holding.quantity || 0).toLocaleString()}
-                    </Text>
+  Qty {Number(holding.quantity || 0).toLocaleString()}
+</Text>
+
+<Text style={styles.small}>
+  Sellable {Number(
+    holding.settledQuantity ?? holding.quantity ?? 0
+  ).toLocaleString()}
+</Text>
+
+{Number(holding.pendingBuyQuantity || 0) > 0 ? (
+  <Text style={styles.pendingText}>
+    Pending Buy {Number(holding.pendingBuyQuantity || 0).toLocaleString()}
+  </Text>
+) : null}
+
+{Number(holding.pendingSellQuantity || 0) > 0 ? (
+  <Text style={styles.pendingText}>
+    Pending Sell {Number(holding.pendingSellQuantity || 0).toLocaleString()}
+  </Text>
+) : null}
+
                   </View>
 
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={styles.value}>KES {money(value)}</Text>
-                    <Text style={profitLoss >= 0 ? styles.green : styles.red}>
-                      KES {money(profitLoss)}
-                    </Text>
-                    <Text style={changePct >= 0 ? styles.green : styles.red}>
-                      {changePct >= 0 ? "+" : ""}
-                      {changePct.toFixed(2)}%
-                    </Text>
-                  </View>
+    <Text style={styles.value}>
+        KES {money(value)}
+    </Text>
+
+    <Text style={profitLoss >= 0 ? styles.green : styles.red}>
+        KES {money(profitLoss)}
+    </Text>
+
+    <Text style={changePct >= 0 ? styles.green : styles.red}>
+        {changePct >= 0 ? "+" : ""}
+        {changePct.toFixed(2)}%
+    </Text>
+
+    {holding.settlementStatus === "SETTLED" && (
+        <Text style={{ color: "#22c55e", fontWeight: "900", marginTop: 5 }}>
+            ● SETTLED
+        </Text>
+    )}
+
+    {holding.settlementStatus === "PENDING_BUY_SETTLEMENT" && (
+        <Text style={{ color: "#facc15", fontWeight: "900", marginTop: 5 }}>
+            ● BUY T+2
+        </Text>
+    )}
+
+    {holding.settlementStatus === "PENDING_SELL_SETTLEMENT" && (
+        <Text style={{ color: "#fb923c", fontWeight: "900", marginTop: 5 }}>
+            ● SELL T+2
+        </Text>
+    )}
+</View>
                 </View>
               );
             })
@@ -371,6 +438,57 @@ export default function PortfolioHub() {
         sector={selectedSector}
         onClose={() => setSelectedSector(null)}
       />
+
+   <Modal
+  visible={accountModalOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setAccountModalOpen(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.accountModal}>
+      <Text style={styles.modalTitle}>Select Portfolio Source</Text>
+
+      {accounts.map((account) => (
+        <Pressable
+          key={account.broker}
+          style={[
+            styles.accountOption,
+            selectedAccount.broker === account.broker &&
+              styles.activeAccountOption
+          ]}
+          onPress={() => {
+            setSelectedAccount(account);
+            setAccountModalOpen(false);
+            load(account);
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.accountOptionTitle}>
+  {selectedAccount.broker === account.broker ? "✓ " : ""}
+  {account.label || account.name || account.broker || "Unknown Account"}
+</Text>
+
+            <Text style={styles.accountOptionMeta}>
+  {account.type || account.broker || "BROKER"}
+  {account.totalValue !== undefined
+    ? ` • KES ${money(account.totalValue)}`
+    : ""}
+</Text>
+          </View>
+        </Pressable>
+      ))}
+
+      <Pressable
+        style={styles.closeButton}
+        onPress={() => setAccountModalOpen(false)}
+      >
+        <Text style={styles.closeButtonText}>Close</Text>
+      </Pressable>
+    </View>
+  </View>
+</Modal>
+
     </ScrollView>
   );
 }
@@ -931,5 +1049,96 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 4,
     fontSize: 12
-  }
+  },
+
+accountSelector: {
+  backgroundColor: "#0f172a",
+  borderRadius: 18,
+  padding: 14,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: "#334155",
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center"
+},
+accountLabel: {
+  color: "#94a3b8",
+  fontSize: 12,
+  fontWeight: "700"
+},
+accountName: {
+  color: "#f8fafc",
+  fontSize: 16,
+  fontWeight: "900",
+  marginTop: 4
+},
+accountChevron: {
+  color: "#67e8f9",
+  fontSize: 24,
+  fontWeight: "900"
+},
+modalOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.65)",
+  justifyContent: "center",
+  padding: 20
+},
+accountModal: {
+  backgroundColor: "#020617",
+  borderRadius: 24,
+  padding: 18,
+  borderWidth: 1,
+  borderColor: "#334155"
+},
+modalTitle: {
+  color: "#f8fafc",
+  fontSize: 18,
+  fontWeight: "900",
+  marginBottom: 14
+},
+accountOption: {
+  backgroundColor: "#0f172a",
+  borderRadius: 16,
+  padding: 14,
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: "#1e293b"
+},
+activeAccountOption: {
+  borderColor: "#67e8f9"
+},
+accountOptionTitle: {
+  color: "#f8fafc",
+  fontSize: 15,
+  fontWeight: "900"
+},
+accountOptionMeta: {
+  color: "#94a3b8",
+  fontSize: 12,
+  marginTop: 4
+},
+closeButton: {
+  backgroundColor: "#111827",
+  borderRadius: 14,
+  padding: 12,
+  alignItems: "center",
+  marginTop: 6
+},
+closeButtonText: {
+  color: "#e5e7eb",
+  fontWeight: "900"
+},
+pendingText: {
+  color: "#facc15",
+  fontSize: 11,
+  fontWeight: "800",
+  marginTop: 3
+},
+settlementBadge: {
+  color: "#facc15",
+  fontSize: 10,
+  fontWeight: "900",
+  marginTop: 5
+}
 });

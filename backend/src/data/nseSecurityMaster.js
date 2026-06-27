@@ -13,7 +13,7 @@ export const NSE_SECURITIES = [
   { symbol: "IM", aliases:["I&M", "I & M", "I AND M", "IMH"], name: "I&M Group", sector: "Banking" },
   { symbol: "KEGN", aliases:["KENGEN"], name: "KenGen PLC", sector: "Energy" },
   { symbol: "KNRE", name: "Kenya Reinsurance", sector: "Insurance" },
-  { symbol: "KPC", name: "Kapchorua Tea Kenya", sector: "Agricultural" },
+  { symbol: "KPC", name: "Kenya Pipeline Corporation", sector: "Energy" },
   { symbol: "KQ", name: "Kenya Airways", sector: "Transport" },
   { symbol: "SBIC", name: "Stanbic Holdings", sector: "Banking" },
   { symbol: "SCBK", name: "Standard Chartered Bank Kenya", sector: "Banking" }

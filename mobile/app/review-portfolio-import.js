@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { syncHoldingsToCloud } from "../src/features/portfolio/api/portfolioSyncApi";
 import {
   Alert,
   Modal,
@@ -12,6 +11,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getStoredAccessToken } from "../src/features/auth/storage/authStorage";
 
 import { applySecurityMaster } from "../src/utils/nseSecurityMaster";
 import {
@@ -19,11 +19,13 @@ import {
   normalizePortfolioHolding
 } from "../src/portfolio/portfolioStore";
 import { uploadConfirmedPortfolio } from "../src/portfolio/uploadPortfolioApi";
+import { syncHoldingsToCloud } from "../src/features/portfolio/api/portfolioSyncApi";
 import {
   userGetItem,
   userSetItem,
   userRemoveItem
 } from "../src/auth/userStorage";
+import { getCurrentSession } from "../src/auth/authStore";
 
 export default function ReviewPortfolioImport() {
   const [fileInfo, setFileInfo] = useState(null);
@@ -51,21 +53,14 @@ export default function ReviewPortfolioImport() {
 
       const draftRaw = scopedRaw || legacyRaw;
 
-      if (pendingRaw) {
-        setFileInfo(JSON.parse(pendingRaw));
-      }
+      if (pendingRaw) setFileInfo(JSON.parse(pendingRaw));
 
       if (draftRaw) {
         const parsed = JSON.parse(draftRaw);
-
         const normalized = parsed.map((row) => normalizeImportedRow(row));
 
         setRows(normalized);
-
-        await userSetItem(
-          "importedPortfolioDraft",
-          JSON.stringify(normalized)
-        );
+        await userSetItem("importedPortfolioDraft", JSON.stringify(normalized));
       }
     } catch (error) {
       Alert.alert("Import Review Error", error.message);
@@ -102,10 +97,9 @@ export default function ReviewPortfolioImport() {
 
   async function saveEdit() {
     const nextRow = normalizeImportedRow(editingRow);
-
     const copy = [...rows];
-    copy[editingIndex] = nextRow;
 
+    copy[editingIndex] = nextRow;
     setRows(copy);
 
     await userSetItem("importedPortfolioDraft", JSON.stringify(copy));
@@ -135,7 +129,6 @@ export default function ReviewPortfolioImport() {
 
     setRows(next);
     await userSetItem("importedPortfolioDraft", JSON.stringify(next));
-
     openEdit(next.length - 1);
   }
 
@@ -211,19 +204,41 @@ export default function ReviewPortfolioImport() {
         });
       });
 
-    if (!portfolio.length) {
-      Alert.alert("No holdings", "Confirm at least one valid holding.");
+    const cleanPortfolio = portfolio.filter((h) => {
+      const symbol = String(h.symbol || "").trim().toUpperCase();
+      const quantity = Number(h.quantity || 0);
+
+      return symbol && symbol !== "N/A" && quantity > 0;
+    });
+
+    if (!cleanPortfolio.length) {
+      Alert.alert("No valid holdings", "No valid holdings found to upload.");
       return;
     }
 
-    await savePortfolio(portfolio);
-    await uploadConfirmedPortfolio(portfolio);
-    
-    try {
-  await syncHoldingsToCloud(portfolio);
-} catch (error) {
-  console.log("Cloud portfolio sync skipped:", error.message);
+    const session = await getCurrentSession();
+
+const token =
+  session?.token ||
+  session?.accessToken ||
+  session?.user?.token ||
+  session?.user?.accessToken ||
+  (await getStoredAccessToken());
+
+if (!token) {
+  Alert.alert("Session expired", "Please log in again.");
+  router.replace("/login");
+  return;
 }
+
+    await savePortfolio(cleanPortfolio);
+    await uploadConfirmedPortfolio(cleanPortfolio, token);
+
+    try {
+      await syncHoldingsToCloud(cleanPortfolio);
+    } catch (error) {
+      console.log("Cloud portfolio sync skipped:", error.message);
+    }
 
     await userSetItem("statementUploaded", "true");
     await AsyncStorage.setItem("gatecepStatementUploaded", "true");
@@ -238,7 +253,7 @@ export default function ReviewPortfolioImport() {
           uploadedAt: new Date().toISOString(),
           manualEntry: false,
           confirmed: true,
-          parsedHoldings: portfolio
+          parsedHoldings: cleanPortfolio
         }
       })
     );
@@ -248,7 +263,6 @@ export default function ReviewPortfolioImport() {
     await AsyncStorage.removeItem("gatecepImportedPortfolioDraft");
 
     Alert.alert("Portfolio Saved", "Your holdings have been saved.");
-
     router.replace("/broker-upload");
   }
 
@@ -450,9 +464,7 @@ function inferAveragePrice(row = {}) {
   const profitLoss = Number(row.profitLoss || row.unrealizedPnL || 0);
 
   const impliedCostValue =
-    marketValue > 0 && profitLoss !== 0
-      ? marketValue - profitLoss
-      : 0;
+    marketValue > 0 && profitLoss !== 0 ? marketValue - profitLoss : 0;
 
   if (Number(row.averagePrice || row.averageCost || 0) > 0) {
     return Number(row.averagePrice || row.averageCost || 0);
