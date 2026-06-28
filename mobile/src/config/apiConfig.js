@@ -19,4 +19,4 @@ function getExpoHostApiUrl() {
 
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
-  getExpoHostApiUrl();
+  (__DEV__ ? getExpoHostApiUrl() : PROD_API_URL);
