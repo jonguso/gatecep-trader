@@ -16,12 +16,13 @@ import {
 import { addUserBroker } from "../src/features/brokers/api/userBrokerApi";
 
 const brokers = [
-  "AIB-AXYS",
-  "ABC",
-  "Dyer & Blair",
-  "NCBA Investment Bank",
-  "Standard Investment Bank",
-  "Other"
+"GATECEP-DEMO",
+"AIB-AXYS",
+"ABC",
+"Dyer & Blair",
+"NCBA Investment Bank",
+"Standard Investment Bank",
+"Other"
 ];
 
 export default function BrokerProfile() {

@@ -11,9 +11,11 @@ import {
 import { router } from "expo-router";
 
 import {
-  userGetItem,
-  userSetItem
-} from "../src/auth/userStorage";
+  getInvestorProfile,
+  saveInvestorProfile
+} from "../src/features/profile/api/investorProfileApi";
+
+import { userSetItem } from "../src/auth/userStorage";
 
 const GOALS = ["Build Wealth", "Dividend Income", "Retirement", "Education", "Preserve Capital"];
 const RISKS = ["Conservative", "Balanced", "Growth", "Aggressive"];
@@ -30,19 +32,21 @@ export default function InvestorProfileEdit() {
   }, []);
 
   async function load() {
-    const raw = await userGetItem("investorProfile");
+  try {
+    const data = await getInvestorProfile();
+    const saved = data?.profile || {};
 
-    if (raw) {
-      const saved = JSON.parse(raw);
-
-      setName(saved.name || "");
-      setGoal(saved.goal || "Build Wealth");
-      setRisk(saved.risk || "Balanced");
-      setExperience(saved.experience || "Beginner");
-    }
+    setName(saved.name || "");
+    setGoal(saved.goal || "Build Wealth");
+    setRisk(saved.risk || "Balanced");
+    setExperience(saved.experience || "Beginner");
+  } catch (error) {
+    console.log("Investor profile load error:", error.message);
   }
+}
 
   async function save() {
+  try {
     const profile = {
       name,
       goal,
@@ -51,12 +55,19 @@ export default function InvestorProfileEdit() {
       savedAt: new Date().toISOString()
     };
 
-    await userSetItem("investorProfile", JSON.stringify(profile));
+    const result = await saveInvestorProfile(profile);
 
-    Alert.alert("Profile Saved", "Investor profile updated successfully.");
+    await userSetItem(
+      "investorProfile",
+      JSON.stringify(result.profile || profile)
+    );
 
+    Alert.alert("Profile Saved", "Investor profile saved to GateCEP cloud.");
     router.replace("/my-profile");
+  } catch (error) {
+    Alert.alert("Save Failed", error.message);
   }
+}
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>

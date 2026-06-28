@@ -32,8 +32,7 @@ export default function MyProfile() {
 
   async function load() {
     const investor = await getInvestorProfile();
-    setProfile(profileRaw ? JSON.parse(profileRaw) : null);
-
+    
     const [portfolio, cashResult, brokers] = await Promise.all([
       loadUnifiedPortfolio(),
       getUserCash(),

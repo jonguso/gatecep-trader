@@ -1,29 +1,41 @@
 import { API_URL } from "../../../config/apiConfig";
 import { getStoredAccessToken } from "../../auth/storage/authStorage";
 
-export async function getInvestorProfile() {
+async function authHeaders() {
   const token = await getStoredAccessToken();
 
-  const response = await fetch(`${API_URL}/investor-profile`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  return await response.json();
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`
+  };
 }
 
-export async function updateInvestorProfile(payload) {
-  const token = await getStoredAccessToken();
-
+export async function getInvestorProfile() {
   const response = await fetch(`${API_URL}/investor-profile`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
+    headers: await authHeaders()
   });
 
-  return await response.json();
+  const data = await response.json();
+
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || "Could not load investor profile");
+  }
+
+  return data;
+}
+
+export async function saveInvestorProfile(profile) {
+  const response = await fetch(`${API_URL}/investor-profile`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(profile)
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || "Could not save investor profile");
+  }
+
+  return data;
 }
