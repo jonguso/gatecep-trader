@@ -27,7 +27,7 @@ export default function Index() {
       return;
     }
 
-    router.replace("/dashboard");
+    router.replace("/(tabs)/dashboard");
   }
 
   return (
