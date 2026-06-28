@@ -3,7 +3,7 @@ import { pool } from "../../database/db.js";
 export async function createUser(user) {
   const result = await pool.query(
     `
-    INSERT INTO auth_users (
+    INSERT INTO public.auth_users (
       id,
       email,
       username,
@@ -36,7 +36,7 @@ export async function findUserByEmail(email) {
       password_hash AS "passwordHash",
       created_at AS "createdAt",
       updated_at AS "updatedAt"
-    FROM auth_users
+    FROM public.auth_users
     WHERE LOWER(email) = LOWER($1)
     LIMIT 1
     `,
@@ -56,7 +56,7 @@ export async function findUserById(id) {
       password_hash AS "passwordHash",
       created_at AS "createdAt",
       updated_at AS "updatedAt"
-    FROM auth_users
+    FROM public.auth_users
     WHERE id = $1
     LIMIT 1
     `,
