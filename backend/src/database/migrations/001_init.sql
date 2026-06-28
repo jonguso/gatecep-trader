@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS investor_profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id),
+  user_id UUID REFERENCES public.auth_users(id),
   goal TEXT NOT NULL,
   risk TEXT NOT NULL,
   experience TEXT,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS investor_profiles (
 
 CREATE TABLE IF NOT EXISTS broker_links (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES users(id),
+  user_id UUID REFERENCES public.auth_users(id)),
   broker TEXT NOT NULL,
   client_number TEXT NOT NULL,
   cds_number TEXT NOT NULL,
