@@ -24,6 +24,7 @@ import { registerMarketCacheSocket } from "./modules/market-cache/marketCache.so
 import { registerLivePortfolioSocket } from "./modules/live-portfolio/livePortfolio.socket.js";
 import livePortfolioRoutes from "./modules/live-portfolio/livePortfolio.routes.js";
 import portfolioHealthRoutes from "./modules/portfolio-health/portfolioHealth.routes.js";
+import diagnosticsRoutes from "./modules/diagnostics/diagnostics.routes.js";
 import {
   registerActiveUser,
   unregisterSocket
@@ -92,6 +93,7 @@ app.use("/market-intelligence", marketIntelligenceRoutes);
 app.use("/market-cache", marketCacheRoutes);
 app.use("/live-portfolio", livePortfolioRoutes);
 app.use("/portfolio-health", portfolioHealthRoutes);
+app.use("/diagnostics", diagnosticsRoutes);
 
 app.use("/coach-g/broker-link", brokerLinkRoutes);
 app.use("/broker-reports", brokerReportRoutes);
