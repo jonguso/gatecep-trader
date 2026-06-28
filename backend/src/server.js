@@ -27,6 +27,7 @@ import portfolioHealthRoutes from "./modules/portfolio-health/portfolioHealth.ro
 import diagnosticsRoutes from "./modules/diagnostics/diagnostics.routes.js";
 import investorProfileRoutes from "./modules/investor-profile/investorProfile.routes.js";
 import userProfileRoutes from "./modules/user-profile/userProfile.routes.js";
+import { startRedis } from "./cache/redisClient.js";
 import {
   registerActiveUser,
   unregisterSocket
@@ -167,6 +168,7 @@ if (userId) {
 
 server.listen(PORT, () => {
   console.log(`Gatecep backend running on ${PORT}`);
+  startRedis();
 
   const schedulerStatus = startMarketCacheScheduler();
   console.log(

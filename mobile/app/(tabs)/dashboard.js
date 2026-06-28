@@ -101,7 +101,7 @@ export default function Dashboard() {
           <Text style={styles.iconText}>☰</Text>
         </Pressable>
 
-        <Text style={styles.title}>Coach G</Text>
+        <Text style={styles.title}>Dashboard</Text>
 
         <Pressable
           style={styles.icon}
