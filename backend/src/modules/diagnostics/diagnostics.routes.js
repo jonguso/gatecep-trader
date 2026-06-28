@@ -15,11 +15,11 @@ router.get("/db", async (req, res) => {
     `);
 
     const tables = await pool.query(`
-      SELECT table_schema, table_name
-      FROM information_schema.tables
-      WHERE table_name ILIKE '%auth%'
-      ORDER BY table_schema, table_name
-    `);
+  SELECT table_schema, table_name
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+  ORDER BY table_name
+`);
 
     res.json({
       ok: true,
