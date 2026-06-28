@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS public.user_portfolios (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.auth_users(id) ON DELETE CASCADE,
+  broker TEXT NOT NULL DEFAULT 'GATECEP-DEMO',
+  symbol TEXT NOT NULL,
+  name TEXT,
+  sector TEXT,
+  quantity NUMERIC(18,4) DEFAULT 0,
+  settled_quantity NUMERIC(18,4) DEFAULT 0,
+  pending_buy_quantity NUMERIC(18,4) DEFAULT 0,
+  pending_sell_quantity NUMERIC(18,4) DEFAULT 0,
+  settlement_status TEXT DEFAULT 'SETTLED',
+  settlement_date TIMESTAMPTZ,
+  average_price NUMERIC(18,4) DEFAULT 0,
+  market_price NUMERIC(18,4) DEFAULT 0,
+  market_value NUMERIC(18,4) DEFAULT 0,
+  profit_loss NUMERIC(18,4) DEFAULT 0,
+  source TEXT DEFAULT 'MANUAL',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, broker, symbol)
+);
