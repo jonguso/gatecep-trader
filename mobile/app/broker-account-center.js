@@ -8,21 +8,21 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+
+import {
+  userGetItem,
+  userSetItem,
+  userRemoveItem
+} from "../src/auth/userStorage";
+
 import {
   getUserBrokers,
   addUserBroker
 } from "../src/features/brokers/api/userBrokerApi";
-import ActiveUserBanner from "../src/components/ActiveUserBanner";
 
-const BROKERS = [
-  { name: "AIB", bestFor: "Beginner investors and long-term portfolios" },
-  { name: "ABC Capital", bestFor: "Active investors and execution support" },
-  { name: "NCBA", bestFor: "Bank-integrated investing" },
-  { name: "Dyer & Blair", bestFor: "Research-driven investors" },
-  { name: "Standard Investment", bestFor: "Banking and brokerage convenience" },
-  { name: "Genghis Capital", bestFor: "Digital-first investors" },
-  { name: "Faida", bestFor: "NSE retail investors" }
-];
+import ActiveUserBanner from "../src/components/ActiveUserBanner";
+import { BROKERS } from "../src/constants/brokers";
+
 
 export default function BrokerAccountCenter() {
   const [broker, setBroker] = useState(null);
@@ -35,11 +35,10 @@ export default function BrokerAccountCenter() {
   );
 
   async function load() {
-  const brokers = await getUserBrokers();
+  const brokerResult = await getUserBrokers();
+const brokerList = brokerResult?.brokers || [];
 
-  setBroker(
-    brokers.length ? brokers[0] : null
-  );
+setBroker(brokerList.length ? brokerList[0] : null);
 
   const profileRaw = await userGetItem("investorProfile");
 
@@ -53,10 +52,11 @@ export default function BrokerAccountCenter() {
   async function connectBroker(item) {
   try {
     const broker = await addUserBroker({
-      broker: item.name,
-      clientNumber: "",
-      cdsNumber: ""
-    });
+  broker: item.code,
+  brokerName: item.name,
+  clientNumber: "",
+  cdsNumber: ""
+});
 
     setBroker(broker);
 
@@ -149,8 +149,8 @@ export default function BrokerAccountCenter() {
           <View key={item.name} style={styles.brokerRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.brokerName}>
-                {item.name} {item.name === recommended ? "★" : ""}
-              </Text>
+              {item.name} {item.recommended ? "★" : ""}
+             </Text>
               <Text style={styles.brokerDesc}>{item.bestFor}</Text>
             </View>
 

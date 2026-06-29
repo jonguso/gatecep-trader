@@ -37,6 +37,12 @@ export async function createBrokerLink(userId, payload = {}) {
       updated_at
     )
     VALUES ($1,$2,$3,$4,$5,'ACTIVE',NOW(),NOW())
+    ON CONFLICT (user_id, broker)
+    DO UPDATE SET
+      client_number = EXCLUDED.client_number,
+      cds_number = EXCLUDED.cds_number,
+      status = 'ACTIVE',
+      updated_at = NOW()
     RETURNING
       id,
       user_id AS "userId",
@@ -50,7 +56,7 @@ export async function createBrokerLink(userId, payload = {}) {
     [
       uuid(),
       userId,
-      payload.broker || "AIB-AXYS",
+      payload.broker || "GATECEP-DEMO",
       payload.clientNumber || "",
       payload.cdsNumber || ""
     ]

@@ -14,6 +14,7 @@ import {
   userSetItem
 } from "../src/auth/userStorage";
 import { addUserBroker } from "../src/features/brokers/api/userBrokerApi";
+import { BROKERS, getDefaultBroker } from "../src/constants/brokers";
 
 const brokers = [
 "GATECEP-DEMO",
@@ -27,7 +28,7 @@ const brokers = [
 
 export default function BrokerProfile() {
   const [form, setForm] = useState({
-    broker: "AIB-AXYS",
+    broker: getDefaultBroker().code,
     clientNumber: "",
     cdsNumber: "",
     brokerEmail: ""
@@ -148,29 +149,26 @@ await userSetItem(
       <Text style={styles.label}>Broker</Text>
 
       <View style={styles.brokerGrid}>
-        {brokers.map((broker) => {
-          const active = form.broker === broker;
+        {BROKERS.map((broker) => {
+  const active = form.broker === broker.code;
 
-          return (
-            <Pressable
-              key={broker}
-              onPress={() => setForm({ ...form, broker })}
-              style={[
-                styles.brokerOption,
-                active && styles.brokerOptionActive
-              ]}
-            >
-              <Text
-                style={[
-                  styles.brokerOptionText,
-                  active && styles.brokerOptionTextActive
-                ]}
-              >
-                {broker}
-              </Text>
-            </Pressable>
-          );
-        })}
+  return (
+    <Pressable
+      key={broker.code}
+      onPress={() => setForm({ ...form, broker: broker.code })}
+      style={[styles.brokerOption, active && styles.brokerOptionActive]}
+    >
+      <Text
+        style={[
+          styles.brokerOptionText,
+          active && styles.brokerOptionTextActive
+        ]}
+      >
+        {broker.name}
+      </Text>
+    </Pressable>
+  );
+})}
       </View>
 
       <Input

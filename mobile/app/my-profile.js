@@ -7,9 +7,9 @@ import {
   View
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { getInvestorProfile } from "../src/features/profile/api/investorProfileApi";
 
 import { useAuth } from "../src/features/auth/hooks/useAuth";
+import { getInvestorProfile } from "../src/features/profile/api/investorProfileApi";
 import { loadUnifiedPortfolio } from "../src/portfolio/unifiedPortfolioApi";
 import { getUserCash } from "../src/features/cash/api/userCashApi";
 import { getUserBrokers } from "../src/features/brokers/api/userBrokerApi";
@@ -31,32 +31,48 @@ export default function MyProfile() {
   );
 
   async function load() {
-    const investor = await getInvestorProfile();
-    
-    const [portfolio, cashResult, brokers] = await Promise.all([
-      loadUnifiedPortfolio(),
-      getUserCash(),
-      getUserBrokers()
-    ]);
+    try {
+      const [investor, portfolio, cashResult, brokerResult] =
+        await Promise.all([
+          getInvestorProfile().catch(() => ({ profile: null })),
+          loadUnifiedPortfolio().catch(() => ({ holdings: [] })),
+          getUserCash().catch(() => ({ summary: { totalCash: 0 } })),
+          getUserBrokers().catch(() => ({ brokers: [] }))
+        ]);
 
-    const holdings = portfolio?.holdings || [];
+      const investorProfile =
+        investor?.profile || investor?.investorProfile || investor || null;
 
-    setProfile(investor?.profile || investor?.investorProfile || investor || null);
-    setBroker(brokers?.[0] || null);
-    setCash(Number(cashResult?.summary?.totalCash || 0));
+      const holdings = portfolio?.holdings || [];
+      const brokerList = brokerResult?.brokers || [];
 
-    setPortfolioValue(
-      holdings.reduce(
-        (sum, h) => sum + Number(h.marketValue || h.value || 0),
-        0
-      )
-    );
+      setProfile(investorProfile);
+      setBroker(brokerList.length ? brokerList[0] : null);
+      setCash(Number(cashResult?.summary?.totalCash || 0));
+
+      setPortfolioValue(
+        holdings.reduce(
+          (sum, h) => sum + Number(h.marketValue || h.value || 0),
+          0
+        )
+      );
+    } catch (error) {
+      console.log("My profile load error:", error.message);
+    }
   }
 
   async function handleLogout() {
     await logout();
     router.replace("/login");
   }
+
+  const constraints = profile?.constraints || {};
+const displayName =
+  constraints.name ||
+  profile?.name ||
+  user?.username ||
+  user?.email?.split("@")[0] ||
+  "Unknown";
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -106,21 +122,14 @@ export default function MyProfile() {
           </Pressable>
         </View>
 
-        <Info label="Name" value={profile?.profile?.name || profile?.name || "User"} />
-        <Info label="Goal" value={profile?.profile?.goal || profile?.goal || "Not set"} />
-        <Info
-          label="Risk"
-          value={
-            profile?.profile?.risk ||
-            profile?.risk ||
-            profile?.riskTolerance ||
-            "Not set"
-          }
-        />
-        <Info
-          label="Experience"
-          value={profile?.profile?.experience || profile?.experience || "Not set"}
-        />
+        <Info label="Name" value={constraints.name || profile?.name || "User"} />
+        <Info label="Goal" value={profile?.goal || "Not set"} />
+        <Info label="Risk" value={profile?.risk || "Not set"} />
+        <Info label="Experience" value={profile?.experience || "Not set"} />
+        <Info label="Time Horizon" value={profile?.timeHorizon || profile?.time_horizon || "Not set"} />
+        <Info label="Contribution" value={profile?.contribution || "Not set"} />
+        <Info label="Market Drop Response" value={constraints.marketDrop || "Not set"} />
+        <Info label="Starting Amount" value={`KES ${money(constraints.amount || 0)}`} />
       </View>
 
       <View style={styles.card}>
@@ -187,31 +196,16 @@ function money(value) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#020617"
-  },
-  content: {
-    padding: 22,
-    paddingTop: 70,
-    paddingBottom: 100
-  },
+  screen: { flex: 1, backgroundColor: "#020617" },
+  content: { padding: 22, paddingTop: 70, paddingBottom: 100 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: 12
   },
-  title: {
-    color: "white",
-    fontSize: 34,
-    fontWeight: "900"
-  },
-  subtitle: {
-    color: "#94a3b8",
-    marginTop: 10,
-    lineHeight: 22
-  },
+  title: { color: "white", fontSize: 34, fontWeight: "900" },
+  subtitle: { color: "#94a3b8", marginTop: 10, lineHeight: 22 },
   dashboardButton: {
     backgroundColor: "#1e293b",
     borderColor: "#334155",
@@ -220,10 +214,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 14
   },
-  dashboardButtonText: {
-    color: "#67e8f9",
-    fontWeight: "900"
-  },
+  dashboardButtonText: { color: "#67e8f9", fontWeight: "900" },
   card: {
     marginTop: 20,
     backgroundColor: "#0f172a",
@@ -238,11 +229,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12
   },
-  cardTitle: {
-    color: "#67e8f9",
-    fontSize: 18,
-    fontWeight: "900"
-  },
+  cardTitle: { color: "#67e8f9", fontSize: 18, fontWeight: "900" },
   editChip: {
     backgroundColor: "#1e293b",
     borderColor: "#334155",
@@ -251,36 +238,21 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12
   },
-  editChipText: {
-    color: "#67e8f9",
-    fontWeight: "900",
-    fontSize: 12
-  },
+  editChipText: { color: "#67e8f9", fontWeight: "900", fontSize: 12 },
   infoRow: {
     borderBottomColor: "#1e293b",
     borderBottomWidth: 1,
     paddingVertical: 12
   },
-  infoLabel: {
-    color: "#94a3b8",
-    fontSize: 12
-  },
-  infoValue: {
-    color: "white",
-    fontWeight: "900",
-    marginTop: 4
-  },
+  infoLabel: { color: "#94a3b8", fontSize: 12 },
+  infoValue: { color: "white", fontWeight: "900", marginTop: 4 },
   secondary: {
     marginTop: 16,
     backgroundColor: "#1e293b",
     padding: 16,
     borderRadius: 16
   },
-  secondaryText: {
-    color: "#67e8f9",
-    textAlign: "center",
-    fontWeight: "900"
-  },
+  secondaryText: { color: "#67e8f9", textAlign: "center", fontWeight: "900" },
   logout: {
     marginTop: 24,
     backgroundColor: "rgba(239,68,68,.12)",
@@ -289,9 +261,5 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 18
   },
-  logoutText: {
-    color: "#fca5a5",
-    textAlign: "center",
-    fontWeight: "900"
-  }
+  logoutText: { color: "#fca5a5", textAlign: "center", fontWeight: "900" }
 });

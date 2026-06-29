@@ -10,6 +10,11 @@ import { router } from "expo-router";
 
 const sections = [
   {
+  title: "Live Dashboard",
+  desc: "Real-time portfolio, cash, broker, market, and order updates.",
+  route: "/live-dashboard"
+  },
+  {
     title: "My Holdings",
     desc: "View all portfolio positions, cost, value, and gain/loss.",
     route: "/holding-details"

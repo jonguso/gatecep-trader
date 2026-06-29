@@ -232,6 +232,7 @@ export default function Dashboard() {
       </View>
 
       <View style={styles.quickGrid}>
+        <Quick title="Live Dashboard" route="/live-dashboard" />
         <Quick title="Portfolio" route="/portfolio-hub" />
         <Quick title="Markets" route="/(tabs)/markets" />
         <Quick title="Trading" route="/(tabs)/trading" />

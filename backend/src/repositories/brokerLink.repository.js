@@ -8,14 +8,14 @@ export async function saveBrokerLink(input = {}) {
     `INSERT INTO broker_links
       (broker, client_number, cds_number, email, source, recommended_broker, customer_profile, status)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-     ON CONFLICT (broker, client_number, cds_number)
-     DO UPDATE SET
-      email = EXCLUDED.email,
-      source = EXCLUDED.source,
-      recommended_broker = EXCLUDED.recommended_broker,
-      customer_profile = EXCLUDED.customer_profile,
-      status = EXCLUDED.status
-     RETURNING *`,
+     ON CONFLICT (user_id, broker)
+DO UPDATE SET
+  client_number = EXCLUDED.client_number,
+  cds_number = EXCLUDED.cds_number,
+  email = EXCLUDED.email,
+  status = 'ACTIVE',
+  updated_at = NOW()
+RETURNING *`,
     [
       broker,
       input.clientNumber || "",
