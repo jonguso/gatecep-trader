@@ -9,12 +9,13 @@ import {
 import { router } from "expo-router";
 
 import { savePortfolio } from "../../src/portfolio/portfolioStore";
+import { saveInvestorProfile } from "../../src/features/profile/api/investorProfileApi";
 import {
   userGetItem,
   userSetItem
 } from "../../src/auth/userStorage";
 
-const STARTER_AMOUNT = 10000;
+const STARTER_AMOUNT = 25000;
 
 const SECURITY_IDEAS = {
   Banking: [
@@ -188,6 +189,33 @@ export default function SmartPortfolio() {
       })
     );
 
+const name = `${profile?.firstName || ""} ${profile?.lastName || ""}`.trim();
+
+await saveInvestorProfile({
+  name,
+  goal: profile?.goal || "Build Wealth",
+  risk: profile?.riskTolerance || profile?.risk || "Balanced",
+  experience: profile?.experience || "Beginner",
+  timeHorizon: profile?.timeHorizon || "3-5 Years",
+  contribution: profile?.contribution || "Monthly",
+  investorType:
+    profile?.goal === "Retirement"
+      ? "Long-Term Builder"
+      : profile?.goal === "Passive Income"
+      ? "Income Builder"
+      : "Balanced Builder",
+  marketDrop: profile?.marketDrop || "Wait",
+  amount: profile?.starterAmount || 10000,
+  monthlyContribution: profile?.monthlyContribution || 0,
+  goalTarget: profile?.goalTarget || 1000000,
+  riskScore: profile?.riskScore || 0,
+  confidence: profile?.confidence || 0,
+  brokerRecommendation:
+    profile?.broker?.name ||
+    profile?.recommendedBroker?.broker ||
+    profile?.recommendedBroker?.name ||
+    null
+});
     router.replace("/(tabs)/dashboard");
   }
 
