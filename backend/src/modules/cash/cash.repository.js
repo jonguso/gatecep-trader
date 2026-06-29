@@ -1,3 +1,12 @@
+/**
+ * STATUS: ACTIVE
+ * MODULE: <module name>
+ * PURPOSE: Production API/service logic for GateCEP 3.0
+ * USED BY: Backend, Mobile, Railway
+ * LAST VERIFIED: 2026-06-29
+ * NOTES: GateCEP 3.0 foundation file
+ */
+
 import { v4 as uuid } from "uuid";
 import { pool } from "../../database/db.js";
 

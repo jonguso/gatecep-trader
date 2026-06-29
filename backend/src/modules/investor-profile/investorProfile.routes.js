@@ -1,3 +1,12 @@
+/**
+ * STATUS: ACTIVE
+ * MODULE: <module name>
+ * PURPOSE: Production API/service logic for GateCEP 3.0
+ * USED BY: Backend, Mobile, Railway
+ * LAST VERIFIED: 2026-06-29
+ * NOTES: GateCEP 3.0 foundation file
+ */
+
 import express from "express";
 import { authRequired } from "../../middleware/authRequired.js";
 import { pool } from "../../database/db.js";
