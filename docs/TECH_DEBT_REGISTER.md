@@ -1,0 +1,44 @@
+\# GateCEP Technical Debt Register
+
+
+
+\## Purpose
+
+
+
+Tracks duplicated logic, obsolete files, static data, and migration targets.
+
+
+
+\## Status Labels
+
+
+
+\- OPEN
+
+\- IN PROGRESS
+
+\- RESOLVED
+
+\- DEFERRED
+
+
+
+\## Register
+
+
+
+| ID | Area | Issue | Status | Target |
+
+|---|---|---|---|---|
+
+| TD-001 | Market | Static prices remain in Smart Portfolio | OPEN | ENG-MKT-001 |
+
+| TD-002 | Broker | Broker lists still duplicated in some mobile screens | OPEN | shared/constants/brokers.js |
+
+| TD-003 | Portfolio | Multiple valuation calculations across screens | OPEN | ENG-PORT-001 |
+
+| TD-004 | Investor | Questionnaire/profile/edit shape not fully shared | OPEN | INV-001 |
+
+| TD-005 | Cash | Cash calculations not yet in shared cash engine | OPEN | ENG-CASH-001 |
+
