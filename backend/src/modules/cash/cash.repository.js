@@ -24,14 +24,6 @@ export async function getUserCashBalances(userId) {
 }
 
 export async function upsertUserCashBalance(userId, payload = {}) {
-  const broker = payload.broker || "AIB-AXYS";
-  const currency = payload.currency || "KES";
-  const cashBalance = Number(payload.cashBalance || payload.cash || 0);
-  const source = payload.source || "MANUAL";
-
-  console.log("payload", payload);
-  console.log("cashBalance", cashBalance);
-
   const result = await pool.query(
     `
     INSERT INTO user_cash_balances (
@@ -45,9 +37,8 @@ export async function upsertUserCashBalance(userId, payload = {}) {
       updated_at
     )
     VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
-    ON CONFLICT (user_id, broker)
+    ON CONFLICT (user_id, broker, currency)
     DO UPDATE SET
-      currency = EXCLUDED.currency,
       cash_balance = EXCLUDED.cash_balance,
       source = EXCLUDED.source,
       updated_at = NOW()
@@ -61,7 +52,14 @@ export async function upsertUserCashBalance(userId, payload = {}) {
       created_at AS "createdAt",
       updated_at AS "updatedAt"
     `,
-    [uuid(), userId, broker, currency, cashBalance, source]
+    [
+      uuid(),
+      userId,
+      payload.broker || "GATECEP-DEMO",
+      payload.currency || "KES",
+      Number(payload.cashBalance || payload.amount || payload.availableCash || 0),
+      payload.source || "MANUAL"
+    ]
   );
 
   return result.rows[0];
