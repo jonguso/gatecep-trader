@@ -1,14 +1,48 @@
 /**
+ * ============================================================================
  * STATUS: ACTIVE
- * MODULE: <module name>
- * PURPOSE: Production API/service logic for GateCEP 3.0
- * USED BY: Backend, Mobile, Railway
- * LAST VERIFIED: 2026-06-29
- * NOTES: GateCEP 3.0 foundation file
+ * MODULE: Broker Links Repository
+ * LAYER: Backend Repository
+ * DOMAIN: Broker Integration
+ *
+ * PURPOSE:
+ * Handles persistence of user broker links. Creates, updates and retrieves
+ * broker accounts connected to a GateCEP user.
+ *
+ * DATABASE:
+ * - user_broker_links
+ *
+ * USED BY:
+ * - brokerLinks.routes.js
+ * - Broker Profile
+ * - Broker Account Center
+ * - Onboarding Broker Connection
+ * - Dashboard
+ * - Mobile App
+ * - Web App
+ *
+ * DEPENDS ON:
+ * - PostgreSQL
+ * - UUID
+ *
+ * SHARED WITH:
+ * - shared/constants/brokers.js
+ * - shared/utils/normalizeBroker.js
+ *
+ * LAST VERIFIED:
+ * 2026-06-29
+ *
+ * VERSION:
+ * GateCEP 3.0 Foundation
+ *
+ * OWNER:
+ * Broker Services
+ * ============================================================================
  */
 
 import { v4 as uuid } from "uuid";
 import { pool } from "../../database/db.js";
+import { normalizeBroker } from "../../../../shared/utils/normalizeBroker.js";
 
 export async function getUserBrokerLinks(userId) {
   const result = await pool.query(
@@ -65,7 +99,7 @@ export async function createBrokerLink(userId, payload = {}) {
     [
       uuid(),
       userId,
-      payload.broker || "GATECEP-DEMO",
+      normalizeBroker(payload.broker || "GATECEP-DEMO"),
       payload.clientNumber || "",
       payload.cdsNumber || ""
     ]
