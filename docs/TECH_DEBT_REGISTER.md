@@ -36,7 +36,7 @@ Tracks duplicated logic, obsolete files, static data, and migration targets.
 
 | TD-002 | Broker | Broker lists still duplicated in some mobile screens | OPEN | shared/constants/brokers.js |
 
-| TD-003 | Portfolio | Multiple valuation calculations across screens | OPEN | ENG-PORT-001 |
+| TD-003 | Portfolio | Multiple valuation calculations across screens | IN PROGRESS | ENG-PORT-001 |
 
 | TD-004 | Investor | Questionnaire/profile/edit shape not fully shared | OPEN | INV-001 |
 

@@ -70,3 +70,25 @@ Provides reusable portfolio valuation, gain/loss, allocation, cash, dividend, ri
 
 \- Market prices must be passed in as input.
 
+
+
+\## Public API
+
+
+
+Applications should import from:
+
+
+
+```js
+
+import {
+
+&#x20; calculatePortfolioSummary,
+
+&#x20; calculateHoldings,
+
+&#x20; calculateGoalProgress
+
+} from "../../shared/portfolio/engine.js";
+
