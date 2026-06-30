@@ -1,29 +1,3 @@
-/**
- * ============================================================================
- * STATUS: ACTIVE
- * MODULE: Portfolio Service
- * DOMAIN: Portfolio
- * DOMAIN ID: PORT-001
- * ENGINE ID: ENG-PORT-001
- *
- * PURPOSE:
- * Backend portfolio service using the shared portfolio engine.
- *
- * USED BY:
- * - /user-portfolio
- * - /user-positions
- * - Market Intelligence
- * - Dashboard
- * - Portfolio Hub
- *
- * LAST VERIFIED:
- * 2026-06-29
- *
- * VERSION:
- * GateCEP 3.1 Platform Consolidation
- * ============================================================================
- */
-
 import {
   listUserPortfolio,
   listUserPortfolioAccounts,
@@ -31,31 +5,25 @@ import {
   updateUserPositionSettlement
 } from "./portfolio.repository.js";
 
-import {
-  calculatePortfolioSummary
-} from "../../../../shared/portfolio/engine.js";
-
 export async function getUserPortfolio(userId, options = {}) {
   const holdings = await listUserPortfolio(userId, options);
 
-  const portfolio = calculatePortfolioSummary({
-    holdings,
-    cash: Number(options.cash || 0),
-    priceMap: options.priceMap || {}
-  });
+  const totalValue = holdings.reduce(
+    (sum, item) => sum + Number(item.marketValue || 0),
+    0
+  );
+
+  const totalProfitLoss = holdings.reduce(
+    (sum, item) => sum + Number(item.profitLoss || 0),
+    0
+  );
 
   return {
-    holdings: portfolio.holdings,
+    holdings,
     summary: {
-      totalHoldings: portfolio.summary.holdingsCount,
-      holdingsCount: portfolio.summary.holdingsCount,
-      totalValue: portfolio.summary.totalValue,
-      investedValue: portfolio.summary.investedValue,
-      totalCash: portfolio.summary.totalCash,
-      netWorth: portfolio.summary.netWorth,
-      totalProfitLoss: portfolio.summary.totalGain,
-      totalGain: portfolio.summary.totalGain,
-      totalGainPct: portfolio.summary.totalGainPct
+      totalHoldings: holdings.length,
+      totalValue,
+      totalProfitLoss
     }
   };
 }
@@ -76,7 +44,6 @@ export async function getUserPortfolioAccounts(userId) {
     version: "PortfolioAccounts-014A3"
   };
 }
-
 export async function createHolding(userId, payload) {
   return await addUserHolding(userId, payload);
 }
