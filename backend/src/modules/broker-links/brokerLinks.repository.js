@@ -42,7 +42,10 @@
 
 import { v4 as uuid } from "uuid";
 import { pool } from "../../database/db.js";
-import { normalizeBroker } from "../../../../shared/utils/normalizeBroker.js";
+
+function normalizeBroker(value) {
+  return String(value || "GATECEP-DEMO").trim().toUpperCase();
+}
 
 export async function getUserBrokerLinks(userId) {
   const result = await pool.query(
