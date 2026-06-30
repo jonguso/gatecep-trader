@@ -44,3 +44,5 @@ Tracks duplicated logic, obsolete files, static data, and migration targets.
 
 | TD-006 | Monorepo | Mobile has temporary shared engine bridge because Metro cannot import root shared directly | OPEN | @gatecep/shared |
 
+| TD-007 | Runtime | Backend/mobile cannot safely consume root shared/ until @gatecep/shared package boundary is complete | OPEN | GateCEP 3.2 |
+
