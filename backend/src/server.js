@@ -5,6 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./modules/auth/auth.routes.js";
 import usersRoutes from "./modules/users/users.routes.js";
+import investorDNARoutes from "./modules/investor-dna/investorDNA.routes.js";
 import portfolioRoutes from "./modules/portfolio/portfolio.routes.js";
 import cashRoutes from "./modules/cash/cash.routes.js";
 import brokerLinksRoutes from "./modules/broker-links/brokerLinks.routes.js";
@@ -98,6 +99,7 @@ app.use("/live-portfolio", livePortfolioRoutes);
 app.use("/portfolio-health", portfolioHealthRoutes);
 app.use("/diagnostics", diagnosticsRoutes);
 app.use("/investor-profile", investorProfileRoutes);
+app.use("/investor-dna", investorDNARoutes);
 app.use("/user-profile", userProfileRoutes);
 
 app.use("/coach-g/broker-link", brokerLinkRoutes);
