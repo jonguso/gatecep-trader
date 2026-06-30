@@ -1,0 +1,33 @@
+/**
+ * Project Compass Review
+ * Domain: Investor DNA
+ * Covenant: Approved
+ * Investor First: Yes
+ * Coach G: Supported
+ * Explainable: Yes
+ */
+
+export const DNA_GOALS = {
+  WEALTH_GROWTH: "WEALTH_GROWTH",
+  DIVIDEND_INCOME: "DIVIDEND_INCOME",
+  RETIREMENT: "RETIREMENT",
+  EDUCATION: "EDUCATION",
+  HOME_PURCHASE: "HOME_PURCHASE",
+  FINANCIAL_FREEDOM: "FINANCIAL_FREEDOM"
+};
+
+export const DNA_RISK_PROFILES = {
+  CONSERVATIVE: "CONSERVATIVE",
+  BALANCED: "BALANCED",
+  GROWTH: "GROWTH",
+  AGGRESSIVE: "AGGRESSIVE"
+};
+
+export const DNA_EXPERIENCE = {
+  NONE: "NONE",
+  BEGINNER: "BEGINNER",
+  INTERMEDIATE: "INTERMEDIATE",
+  ADVANCED: "ADVANCED"
+};
+
+export const DNA_VERSION = "1.0.0";
