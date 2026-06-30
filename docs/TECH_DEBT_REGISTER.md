@@ -42,3 +42,5 @@ Tracks duplicated logic, obsolete files, static data, and migration targets.
 
 | TD-005 | Cash | Cash calculations not yet in shared cash engine | OPEN | ENG-CASH-001 |
 
+| TD-006 | Monorepo | Mobile has temporary shared engine bridge because Metro cannot import root shared directly | OPEN | @gatecep/shared |
+

@@ -1,0 +1,12 @@
+{
+  "name": "@gatecep/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    "./portfolio": "./portfolio/engine.js",
+    "./market": "./market/index.js",
+    "./constants/brokers": "./constants/brokers.js",
+    "./utils/normalizeBroker": "./utils/normalizeBroker.js"
+  }
+}
