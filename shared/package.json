@@ -7,6 +7,7 @@
     "./portfolio": "./portfolio/engine.js",
     "./market": "./market/index.js",
     "./constants/brokers": "./constants/brokers.js",
-    "./utils/normalizeBroker": "./utils/normalizeBroker.js"
+    "./utils/normalizeBroker": "./utils/normalizeBroker.js",
+     "./cash": "./cash/engine.js"
   }
 }

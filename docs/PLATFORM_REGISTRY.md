@@ -52,7 +52,7 @@ Tracks domain ownership, shared engines, implementation status, and migration pr
 
 | Broker | BRK-001 | — | DEV | PARTIAL | ACTIVE | PARTIAL | PARTIAL | Broker catalog moving to shared |
 
-| Cash | CASH-001 | ENG-CASH-001 | DEV | PLANNED | ACTIVE | PARTIAL | PARTIAL | Cash API working; engine pending |
+| Cash | CASH-001 | ENG-CASH-001 | DEV | ACTIVE | ACTIVE | PARTIAL | PARTIAL | Cash engine created; migration pending |
 
 | Portfolio | PORT-001 | ENG-PORT-001 | DEV | ACTIVE | PARTIAL | PARTIAL | PARTIAL | Shared portfolio engine created |
 
